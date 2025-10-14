@@ -1,0 +1,14 @@
+{
+    "flutter": {
+        "platforms": {
+            "dart": {
+                "lib/firebase_options.dart": {
+                    "projectId": "apppagpag",
+                    "configurations": {
+                        "web": "1:1065108873797:web:eb590616399dd2dc10792c"
+                    }
+                }
+            }
+        }
+    }
+}
