@@ -88,4 +88,14 @@ class FormatHelpers {
     
     return '${cleanCep.substring(0, 5)}-${cleanCep.substring(5)}';
   }
+  
+  /// Formata valor monetário (alias para currency)
+  static String formatCurrency(double value) {
+    return currency(value);
+  }
+  
+  /// Formata data e hora (alias para dateTime)
+  static String formatDateTime(DateTime date) {
+    return dateTime(date);
+  }
 }
