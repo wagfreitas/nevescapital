@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/components/custom_text_field.dart';
+import 'package:neves_capital/shared/helpers/card_brand_detector.dart';
 import 'payment_step5_screen.dart';
 
 /// Tela 4: Inserir dados do cartão
@@ -31,14 +32,35 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
   final _numeroCartaoController = TextEditingController();
   final _cvvController = TextEditingController();
   final _vencimentoController = TextEditingController();
+  CardBrand _detectedBrand = CardBrand.unknown;
+
+  @override
+  void initState() {
+    super.initState();
+    // Escutar mudanças no número do cartão para detectar a bandeira
+    _numeroCartaoController.addListener(_detectCardBrand);
+  }
 
   @override
   void dispose() {
+    _numeroCartaoController.removeListener(_detectCardBrand);
     _nomeTitularController.dispose();
     _numeroCartaoController.dispose();
     _cvvController.dispose();
     _vencimentoController.dispose();
     super.dispose();
+  }
+
+  void _detectCardBrand() {
+    final cardNumber = _numeroCartaoController.text.replaceAll(' ', '');
+    final detectedBrand = CardBrandDetector.detectBrand(cardNumber);
+    
+    if (detectedBrand != _detectedBrand) {
+      setState(() {
+        _detectedBrand = detectedBrand;
+      });
+      print('💳 Bandeira detectada: ${CardBrandDetector.getBrandName(detectedBrand)}');
+    }
   }
 
   void _continuar() {
@@ -129,26 +151,53 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                 const SizedBox(height: 20),
 
                 // Número do Cartão
-                CustomTextField(
-                  controller: _numeroCartaoController,
-                  hintText: 'Número do Cartão',
-                  labelText: 'Número do Cartão',
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(16),
-                    _CardNumberFormatter(),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CustomTextField(
+                      controller: _numeroCartaoController,
+                      hintText: 'Número do Cartão',
+                      labelText: 'Número do Cartão',
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(16),
+                        _CardNumberFormatter(),
+                      ],
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Insira o número do cartão';
+                        }
+                        final digits = value.replaceAll(' ', '');
+                        if (digits.length < 13 || digits.length > 16) {
+                          return 'Número do cartão inválido';
+                        }
+                        return null;
+                      },
+                    ),
+                    // Indicador de bandeira detectada
+                    if (_detectedBrand != CardBrand.unknown) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.credit_card,
+                            size: 20,
+                            color: Colors.green[700],
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Bandeira: ${CardBrandDetector.getBrandName(_detectedBrand)}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Insira o número do cartão';
-                    }
-                    final digits = value.replaceAll(' ', '');
-                    if (digits.length < 13 || digits.length > 16) {
-                      return 'Número do cartão inválido';
-                    }
-                    return null;
-                  },
                 ),
                 const SizedBox(height: 20),
 

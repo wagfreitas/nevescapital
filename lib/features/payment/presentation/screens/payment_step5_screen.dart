@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/components/custom_loading.dart';
 import 'package:neves_capital/shared/helpers/format_helpers.dart';
+import 'package:neves_capital/shared/helpers/card_brand_detector.dart';
 import 'package:neves_capital/features/payment/data/services/pagarme_service.dart';
 import 'payment_result_screen.dart';
 
@@ -92,7 +93,10 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
     final valorFormatado = FormatHelpers.formatCurrency(widget.valorCentavos / 100);
     final valorLiquido = (widget.valorCentavos * 0.97) / 100;
     final valorLiquidoFormatado = FormatHelpers.formatCurrency(valorLiquido);
-    final bandeiraCartao = _detectarBandeira(widget.numeroCartao);
+    
+    // Detectar bandeira do cartão
+    final detectedBrand = CardBrandDetector.detectBrand(widget.numeroCartao);
+    final bandeiraCartao = CardBrandDetector.getBrandName(detectedBrand);
 
     return Scaffold(
       appBar: AppBar(
@@ -295,15 +299,4 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
     );
   }
 
-  String _detectarBandeira(String numeroCartao) {
-    // Remove espaços e pega os primeiros dígitos
-    final digits = numeroCartao.replaceAll(' ', '').replaceAll('*', '');
-    
-    if (digits.startsWith('4')) return 'Visa';
-    if (digits.startsWith('5')) return 'Mastercard';
-    if (digits.startsWith('3')) return 'American Express';
-    if (digits.startsWith('6')) return 'Discover';
-    
-    return 'Cartão';
-  }
 }
