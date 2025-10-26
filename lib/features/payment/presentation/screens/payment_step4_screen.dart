@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/components/custom_text_field.dart';
 import 'package:neves_capital/shared/helpers/card_brand_detector.dart';
-import 'package:card_scanner/card_scanner.dart';
+// import 'package:credit_card_scanner/credit_card_scanner.dart'; // TEMPORARIAMENTE DESABILITADO
 import 'payment_step5_screen.dart';
 
 /// Tela 4: Inserir dados do cartão
@@ -64,48 +64,24 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
     }
   }
 
+  // TEMPORARIAMENTE DESABILITADO - Conflito de dependências com Firebase
+  // TODO: Procurar pacote OCR compatível ou implementar solução custom
+  /*
   Future<void> _scanCard() async {
     try {
       print('📷 Iniciando scan de cartão...');
       
-      final scanResult = await CardScanner.scanCard();
+      final scanResult = await CreditCardScanner.scanCard();
 
       if (scanResult != null) {
         print('📷 Cartão escaneado com sucesso!');
-        print('📷 Número: ${scanResult.cardNumber}');
-        print('📷 Nome: ${scanResult.cardHolderName}');
-        print('📷 Validade: ${scanResult.expiryDate}');
-
-        // Preencher campos automaticamente
-        _numeroCartaoController.text = _formatCardNumber(scanResult.cardNumber);
-        _nomeTitularController.text = scanResult.cardHolderName;
-        _vencimentoController.text = _formatExpiryDate(scanResult.expiryDate);
-
-        // Mostrar feedback de sucesso
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Cartão escaneado com sucesso! Verifique os dados.'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-      } else {
-        print('📷 Scan cancelado pelo usuário');
+        // ... código de preenchimento ...
       }
     } catch (e) {
       print('❌ Erro ao escanear cartão: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao escanear cartão: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
+  */
 
   String _formatCardNumber(String cardNumber) {
     // Remove espaços e formata: XXXX XXXX XXXX XXXX
@@ -203,41 +179,11 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 40),
                 
-                // Botão Escanear Cartão
-                OutlinedButton.icon(
-                  onPressed: _scanCard,
-                  icon: const Icon(Icons.camera_alt),
-                  label: const Text('Escanear Cartão com Câmera'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: BorderSide(color: Theme.of(context).primaryColor),
-                    foregroundColor: Theme.of(context).primaryColor,
-                  ),
-                ),
-                
-                const SizedBox(height: 20),
-                
-                // Ou digitar manualmente
-                Row(
-                  children: [
-                    Expanded(child: Divider(color: Colors.grey[600])),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'ou digite manualmente',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    Expanded(child: Divider(color: Colors.grey[600])),
-                  ],
-                ),
-                
-                const SizedBox(height: 20),
+                // BOTÃO DE SCAN TEMPORARIAMENTE REMOVIDO
+                // Conflito de dependências com Firebase
+                // Será reimplementado com solução compatível
 
                 // Nome do Titular
                 CustomTextField(
