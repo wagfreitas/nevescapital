@@ -46,7 +46,7 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Este app precisa acessar a câmera para capturar fotos dos seus documentos de identidade.</string>
+	<string>Este app precisa acessar a câmera para capturar fotos dos seus documentos e escanear cartões de crédito.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Este app precisa acessar a galeria para selecionar fotos dos seus documentos de identidade.</string>
 	<key>NSFaceIDUsageDescription</key>

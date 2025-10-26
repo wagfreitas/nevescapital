@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/components/custom_text_field.dart';
 import 'package:neves_capital/shared/helpers/card_brand_detector.dart';
+import 'package:card_scanner/card_scanner.dart';
 import 'payment_step5_screen.dart';
 
 /// Tela 4: Inserir dados do cartão
@@ -61,6 +62,78 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
       });
       print('💳 Bandeira detectada: ${CardBrandDetector.getBrandName(detectedBrand)}');
     }
+  }
+
+  Future<void> _scanCard() async {
+    try {
+      print('📷 Iniciando scan de cartão...');
+      
+      final scanResult = await CardScanner.scanCard();
+
+      if (scanResult != null) {
+        print('📷 Cartão escaneado com sucesso!');
+        print('📷 Número: ${scanResult.cardNumber}');
+        print('📷 Nome: ${scanResult.cardHolderName}');
+        print('📷 Validade: ${scanResult.expiryDate}');
+
+        // Preencher campos automaticamente
+        _numeroCartaoController.text = _formatCardNumber(scanResult.cardNumber);
+        _nomeTitularController.text = scanResult.cardHolderName;
+        _vencimentoController.text = _formatExpiryDate(scanResult.expiryDate);
+
+        // Mostrar feedback de sucesso
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cartão escaneado com sucesso! Verifique os dados.'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        print('📷 Scan cancelado pelo usuário');
+      }
+    } catch (e) {
+      print('❌ Erro ao escanear cartão: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao escanear cartão: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  String _formatCardNumber(String cardNumber) {
+    // Remove espaços e formata: XXXX XXXX XXXX XXXX
+    final digits = cardNumber.replaceAll(RegExp(r'\D'), '');
+    final buffer = StringBuffer();
+    
+    for (int i = 0; i < digits.length && i < 16; i++) {
+      if (i > 0 && i % 4 == 0) {
+        buffer.write(' ');
+      }
+      buffer.write(digits[i]);
+    }
+    
+    return buffer.toString();
+  }
+
+  String _formatExpiryDate(String expiryDate) {
+    // Formatar para MM/AA
+    final cleaned = expiryDate.replaceAll(RegExp(r'\D'), '');
+    
+    if (cleaned.length >= 4) {
+      // Se veio no formato MMYY ou MMYYYY
+      final month = cleaned.substring(0, 2);
+      final year = cleaned.length >= 4 ? cleaned.substring(2, 4) : cleaned.substring(2);
+      return '$month/$year';
+    }
+    
+    return expiryDate;
   }
 
   void _continuar() {
@@ -130,7 +203,41 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 20),
+                
+                // Botão Escanear Cartão
+                OutlinedButton.icon(
+                  onPressed: _scanCard,
+                  icon: const Icon(Icons.camera_alt),
+                  label: const Text('Escanear Cartão com Câmera'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: BorderSide(color: Theme.of(context).primaryColor),
+                    foregroundColor: Theme.of(context).primaryColor,
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Ou digitar manualmente
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.grey[600])),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'ou digite manualmente',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: Colors.grey[600])),
+                  ],
+                ),
+                
+                const SizedBox(height: 20),
 
                 // Nome do Titular
                 CustomTextField(
