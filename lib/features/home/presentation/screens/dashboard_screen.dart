@@ -60,12 +60,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   
   /// Mensagem de boas-vindas
   Widget _buildWelcomeMessage(BuildContext context) {
-    String userName = 'Daniel';
+    String userName = 'Usuário';
     
     // Verificar se o controller ainda está ativo antes de usar
     try {
-      if (!widget.authController.isDisposed) {
-        userName = widget.authController.currentUser?.displayName ?? 'Daniel';
+      if (!widget.authController.isDisposed && widget.authController.currentUser != null) {
+        final user = widget.authController.currentUser!;
+        
+        // Tentar pegar o nome de várias formas
+        if (user.displayName != null && user.displayName!.isNotEmpty) {
+          // Pegar apenas o primeiro nome
+          userName = user.displayName!.split(' ').first;
+        } else if (user.email != null) {
+          // Se não tem displayName, usar a parte antes do @ do email
+          userName = user.email!.split('@').first;
+        }
+        
+        print('👤 Nome do usuário exibido: $userName');
       }
     } catch (e) {
       print('⚠️ Erro ao acessar authController: $e');
