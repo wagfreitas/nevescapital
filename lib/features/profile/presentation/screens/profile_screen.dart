@@ -16,61 +16,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  bool _didNavigate = false;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // Escutar mudanças no controller para detectar logout e forçar
-    // a navegação para Onboarding limpando a pilha.
-    try {
-      if (!widget.authController.isDisposed) {
-        widget.authController.addListener(_authListener);
-      }
-    } catch (e) {
-      print('⚠️ Erro ao adicionar listener: $e');
-    }
-  }
-
-  void _authListener() {
-    if (!mounted) return;
-
-    try {
-      if (widget.authController.isDisposed) {
-        return;
-      }
-
-      final isLoggedIn = widget.authController.currentUser != null;
-
-      if (!isLoggedIn && !_didNavigate) {
-        _didNavigate = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (_) => OnboardingScreen(authController: widget.authController),
-            ),
-            (route) => false,
-          );
-        });
-      }
-    } catch (e) {
-      print('⚠️ Erro no auth listener: $e');
-    }
-  }
-
-  @override
-  void dispose() {
-    try {
-      if (!widget.authController.isDisposed) {
-        widget.authController.removeListener(_authListener);
-      }
-    } catch (e) {
-      print('⚠️ Erro ao remover listener: $e');
-    }
-    super.dispose();
-  }
+  // Listener removido - o logout já navega explicitamente para Onboarding
 
   @override
   Widget build(BuildContext context) {
