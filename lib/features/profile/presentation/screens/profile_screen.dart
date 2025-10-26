@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../auth/presentation/controllers/auth_controller_real.dart';
 import '../../../auth/presentation/screens/onboarding_screen.dart';
+import '../../../../core/theme/theme_controller.dart';
 
 /// Tela de perfil do usuário
 class ProfileScreen extends StatefulWidget {
@@ -20,9 +21,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('');
+    print('🟣 ProfileScreen - BUILD iniciado');
+    print('🟣 authController.isDisposed: ${widget.authController.isDisposed}');
+    print('🟣 authController.currentUser: ${widget.authController.currentUser?.uid}');
+    print('🟣 authController.isLoggedIn: ${widget.authController.isLoggedIn}');
+    
     // Verificar se o controller ainda está ativo antes de usar
     try {
       if (widget.authController.isDisposed) {
+        print('🟣 Controller disposed - mostrando tela de erro');
         return Scaffold(
           appBar: AppBar(
             leading: IconButton(
@@ -273,6 +281,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     MaterialPageRoute(
                       builder: (_) => OnboardingScreen(
                         authController: widget.authController,
+                        themeController: ThemeController(),
                       ),
                     ),
                     (route) => false,
@@ -286,6 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     MaterialPageRoute(
                       builder: (_) => OnboardingScreen(
                         authController: widget.authController,
+                        themeController: ThemeController(),
                       ),
                     ),
                     (route) => false,

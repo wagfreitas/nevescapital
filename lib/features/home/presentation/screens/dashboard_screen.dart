@@ -200,9 +200,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 label: 'Conta',
                 isActive: false,
                 onTap: () {
+                  print('');
+                  print('👤 CLICOU EM CONTA');
+                  print('👤 authController.isDisposed: ${widget.authController.isDisposed}');
+                  print('👤 authController.currentUser: ${widget.authController.currentUser?.uid}');
+                  print('👤 authController.isLoggedIn: ${widget.authController.isLoggedIn}');
+                  
                   try {
                     // Verificar se o controller ainda está ativo antes de navegar
                     if (widget.authController.isDisposed) {
+                      print('👤 Controller disposed - navegando para Onboarding');
                       // Sessão expirada - navegar para onboarding
                       Navigator.of(context).pushAndRemoveUntil(
                         MaterialPageRoute(
@@ -216,6 +223,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       return;
                     }
                     
+                    print('👤 Navegando para ProfileScreen...');
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -224,6 +232,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                     );
+                    print('👤 Navegação para ProfileScreen concluída');
                   } catch (e) {
                     print('⚠️ Erro ao navegar para ProfileScreen: $e');
                     // Em caso de erro, navegar para onboarding

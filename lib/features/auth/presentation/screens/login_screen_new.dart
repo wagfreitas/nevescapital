@@ -278,10 +278,10 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
       if (!mounted) return;
 
       if (success) {
-        // Login bem-sucedido - navegar diretamente para Dashboard
+        // Login bem-sucedido - navegar para Dashboard mantendo AppWrapper na base
         print('✅ Login realizado - navegando para Dashboard');
         if (mounted) {
-          // Navegar para Dashboard limpando toda a pilha
+          // pushAndRemoveUntil mas MANTÉM o AppWrapper (route.isFirst)
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(
               builder: (context) => DashboardScreen(
@@ -289,7 +289,7 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
                 themeController: widget.themeController ?? ThemeController(),
               ),
             ),
-            (route) => false,
+            (route) => route.isFirst, // MANTÉM a primeira rota (AppWrapper)
           );
         }
       } else {
