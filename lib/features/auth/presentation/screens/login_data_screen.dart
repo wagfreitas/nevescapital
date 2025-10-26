@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/cpf_input_field.dart';
+import 'package:neves_capital/shared/components/phone_input_field.dart';
 import 'package:neves_capital/shared/components/smart_text_form_field.dart';
 import 'package:neves_capital/shared/helpers/cpf_helper.dart';
 import 'package:neves_capital/shared/helpers/email_helper.dart';
 import 'package:neves_capital/shared/helpers/password_helper.dart';
+import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/features/auth/presentation/screens/personal_data_screen.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller_real.dart';
 
@@ -19,6 +21,7 @@ class _LoginDataScreenState extends State<LoginDataScreen> {
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _cpfController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
   
@@ -42,6 +45,7 @@ class _LoginDataScreenState extends State<LoginDataScreen> {
     _fullNameController.dispose();
     _cpfController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _authController.dispose();
@@ -129,6 +133,14 @@ class _LoginDataScreenState extends State<LoginDataScreen> {
                   keyboardType: TextInputType.emailAddress,
                   icon: Icons.email,
                   validator: EmailHelper.validateEmail,
+                ),
+                const SizedBox(height: 12.0),
+                
+                // Telefone
+                PhoneInputField(
+                  controller: _phoneController,
+                  hintText: 'Digite seu telefone',
+                  validator: PhoneHelper.validatePhone,
                 ),
                 const SizedBox(height: 12.0),
                 
@@ -274,6 +286,7 @@ class _LoginDataScreenState extends State<LoginDataScreen> {
             'fullName': _fullNameController.text.trim(),
             'cpf': CpfHelper.getCpfNumbers(_cpfController.text),
             'email': EmailHelper.cleanEmail(_emailController.text),
+            'phone': PhoneHelper.getPhoneNumbers(_phoneController.text),
             'password': _passwordController.text,
           },
         ),

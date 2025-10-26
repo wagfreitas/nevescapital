@@ -25,8 +25,8 @@ class HomeScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              authController.logout();
+            onPressed: () async {
+              await authController.logout();
             },
           ),
         ],

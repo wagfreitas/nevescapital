@@ -42,9 +42,10 @@ const common_1 = __webpack_require__(2);
 const config_1 = __webpack_require__(6);
 const throttler_1 = __webpack_require__(7);
 const users_module_1 = __webpack_require__(8);
-const auth_module_1 = __webpack_require__(20);
-const database_module_1 = __webpack_require__(21);
-const health_controller_1 = __webpack_require__(22);
+const auth_module_1 = __webpack_require__(22);
+const database_module_1 = __webpack_require__(23);
+const health_controller_1 = __webpack_require__(24);
+const migration_controller_1 = __webpack_require__(25);
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -63,7 +64,7 @@ exports.AppModule = AppModule = __decorate([
             users_module_1.UsersModule,
             auth_module_1.AuthModule,
         ],
-        controllers: [health_controller_1.HealthController],
+        controllers: [health_controller_1.HealthController, migration_controller_1.MigrationController],
     })
 ], AppModule);
 
@@ -96,15 +97,17 @@ exports.UsersModule = void 0;
 const common_1 = __webpack_require__(2);
 const users_service_1 = __webpack_require__(9);
 const users_controller_1 = __webpack_require__(14);
+const user_transaction_service_1 = __webpack_require__(20);
+const user_transaction_controller_1 = __webpack_require__(21);
 const encryption_service_1 = __webpack_require__(11);
 let UsersModule = class UsersModule {
 };
 exports.UsersModule = UsersModule;
 exports.UsersModule = UsersModule = __decorate([
     (0, common_1.Module)({
-        controllers: [users_controller_1.UsersController],
-        providers: [users_service_1.UsersService, encryption_service_1.EncryptionService],
-        exports: [users_service_1.UsersService],
+        controllers: [users_controller_1.UsersController, user_transaction_controller_1.UserTransactionController],
+        providers: [users_service_1.UsersService, user_transaction_service_1.UserTransactionService, encryption_service_1.EncryptionService],
+        exports: [users_service_1.UsersService, user_transaction_service_1.UserTransactionService],
     })
 ], UsersModule);
 
@@ -145,28 +148,38 @@ let UsersService = class UsersService {
         return encrypted;
     }
     decryptFromBytea(buffer) {
-        const encrypted = buffer.toString('utf8');
-        const decrypted = this.encryptionService.decrypt(encrypted);
-        if (!decrypted) {
-            throw new Error('Falha na descriptografia');
+        try {
+            let encrypted;
+            if (Buffer.isBuffer(buffer)) {
+                encrypted = buffer.toString('utf8');
+            }
+            else if (typeof buffer === 'string') {
+                encrypted = buffer;
+            }
+            else {
+                throw new Error('Formato de buffer inválido');
+            }
+            console.log(`🔐 Tentando descriptografar: ${encrypted.substring(0, 50)}...`);
+            const decrypted = this.encryptionService.decrypt(encrypted);
+            if (!decrypted) {
+                throw new Error('Falha na descriptografia - resultado vazio');
+            }
+            console.log(`✅ Descriptografado com sucesso: ${decrypted}`);
+            return decrypted;
         }
-        return decrypted;
+        catch (error) {
+            console.error('❌ Erro na descriptografia:', error);
+            throw new Error(`Falha na descriptografia: ${error.message}`);
+        }
     }
     async create(createUserDto) {
         const client = await this.pool.connect();
         try {
             await client.query('BEGIN');
-            const cpfEncrypted = this.encryptToBytea(createUserDto.cpf);
-            const existingCpf = await client.query('SELECT id FROM users WHERE cpf_encrypted = $1', [cpfEncrypted]);
-            if (existingCpf.rows.length > 0) {
-                throw new common_1.ConflictException('CPF já cadastrado');
-            }
-            const emailEncrypted = this.encryptToBytea(createUserDto.email);
-            const existingEmail = await client.query('SELECT id FROM users WHERE email_encrypted = $1', [emailEncrypted]);
-            if (existingEmail.rows.length > 0) {
-                throw new common_1.ConflictException('Email já cadastrado');
-            }
+            console.log(`🔍 Criando usuário: ${createUserDto.fullName}...`);
             const fullNameEncrypted = this.encryptToBytea(createUserDto.fullName);
+            const cpfEncrypted = this.encryptToBytea(createUserDto.cpf);
+            const emailEncrypted = this.encryptToBytea(createUserDto.email);
             const userResult = await client.query(`INSERT INTO users (
           full_name,
           cpf_encrypted,
@@ -228,7 +241,7 @@ let UsersService = class UsersService {
     }
     async findByCpf(cpf) {
         try {
-            const cpfEncrypted = this.encryptToBytea(cpf);
+            console.log(`🔍 Buscando usuário por CPF: ${cpf}`);
             const result = await this.pool.query(`SELECT 
           u.id,
           u.full_name,
@@ -237,11 +250,29 @@ let UsersService = class UsersService {
           u.kyc_status,
           u.created_at
         FROM users u
-        WHERE u.cpf_encrypted = $1 AND u.deleted_at IS NULL`, [cpfEncrypted]);
-            if (result.rows.length === 0) {
+        WHERE u.deleted_at IS NULL`);
+            console.log(`📊 Encontrados ${result.rows.length} usuários ativos`);
+            let foundUser = null;
+            for (const user of result.rows) {
+                try {
+                    const decryptedCpf = this.decryptFromBytea(user.cpf_encrypted);
+                    console.log(`🔐 CPF descriptografado: ${decryptedCpf}`);
+                    if (decryptedCpf === cpf) {
+                        console.log(`✅ Usuário encontrado! ID: ${user.id}`);
+                        foundUser = user;
+                        break;
+                    }
+                }
+                catch (error) {
+                    console.error(`❌ Erro ao descriptografar CPF do usuário ${user.id}:`, error);
+                    continue;
+                }
+            }
+            if (!foundUser) {
+                console.log(`⚠️  Nenhum usuário encontrado com CPF: ${cpf}`);
                 throw new common_1.NotFoundException('Usuário não encontrado');
             }
-            const user = result.rows[0];
+            const user = foundUser;
             const phoneResult = await this.pool.query('SELECT phone_encrypted FROM user_phones WHERE user_id = $1 AND is_primary = true', [user.id]);
             const addressResult = await this.pool.query(`SELECT 
           street_encrypted,
@@ -833,6 +864,357 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var _a;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.UserTransactionService = void 0;
+const common_1 = __webpack_require__(2);
+const pg_1 = __webpack_require__(10);
+let UserTransactionService = class UserTransactionService {
+    constructor(pool) {
+        this.pool = pool;
+    }
+    async saveTransaction(transaction) {
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+            const transactionQuery = `
+        INSERT INTO user_transactions (
+          user_id, pagarme_order_id, pagarme_charge_id, amount, 
+          status, establishment_name, customer_name, payment_method
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING *
+      `;
+            const transactionResult = await client.query(transactionQuery, [
+                transaction.user_id,
+                transaction.pagarme_order_id,
+                transaction.pagarme_charge_id,
+                transaction.amount,
+                transaction.status,
+                transaction.establishment_name,
+                transaction.customer_name,
+                transaction.payment_method,
+            ]);
+            const savedTransaction = transactionResult.rows[0];
+            await this.updateUserBalance(client, transaction.user_id);
+            await this.logSync(client, {
+                order_id: transaction.pagarme_order_id,
+                charge_id: transaction.pagarme_charge_id,
+                sync_status: 'synced',
+                sync_attempts: 1,
+            });
+            await client.query('COMMIT');
+            return savedTransaction;
+        }
+        catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        }
+        finally {
+            client.release();
+        }
+    }
+    async updateUserBalance(client, userId) {
+        const balanceQuery = `
+      INSERT INTO user_balances (user_id, available_amount, waiting_funds, total_transactions, last_transaction_at)
+      SELECT 
+        $1,
+        COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0),
+        COALESCE(SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END), 0),
+        COUNT(*),
+        MAX(created_at)
+      FROM user_transactions 
+      WHERE user_id = $1
+      ON CONFLICT (user_id) 
+      DO UPDATE SET
+        available_amount = EXCLUDED.available_amount,
+        waiting_funds = EXCLUDED.waiting_funds,
+        total_transactions = EXCLUDED.total_transactions,
+        last_transaction_at = EXCLUDED.last_transaction_at,
+        last_updated = NOW()
+    `;
+        await client.query(balanceQuery, [userId]);
+    }
+    async logSync(client, syncLog) {
+        const syncQuery = `
+      INSERT INTO pagarme_sync_log (order_id, charge_id, sync_status, sync_attempts, last_sync_attempt)
+      VALUES ($1, $2, $3, $4, NOW())
+      ON CONFLICT (order_id) 
+      DO UPDATE SET
+        sync_status = EXCLUDED.sync_status,
+        sync_attempts = EXCLUDED.sync_attempts,
+        last_sync_attempt = EXCLUDED.last_sync_attempt,
+        updated_at = NOW()
+    `;
+        await client.query(syncQuery, [
+            syncLog.order_id,
+            syncLog.charge_id,
+            syncLog.sync_status,
+            syncLog.sync_attempts,
+        ]);
+    }
+    async getUserBalance(userId) {
+        const query = `
+      SELECT * FROM user_balances WHERE user_id = $1
+    `;
+        const result = await this.pool.query(query, [userId]);
+        return result.rows[0] || null;
+    }
+    async getUserTransactions(userId, limit = 50, offset = 0) {
+        const query = `
+      SELECT * FROM user_transactions 
+      WHERE user_id = $1 
+      ORDER BY created_at DESC 
+      LIMIT $2 OFFSET $3
+    `;
+        const result = await this.pool.query(query, [userId, limit, offset]);
+        return result.rows;
+    }
+    async getUserStats(userId) {
+        const query = `
+      SELECT 
+        COUNT(*) as total_transactions,
+        SUM(amount) as total_amount,
+        COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid_transactions,
+        SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) as paid_amount,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_transactions,
+        SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) as pending_amount,
+        COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_transactions
+      FROM user_transactions 
+      WHERE user_id = $1
+    `;
+        const result = await this.pool.query(query, [userId]);
+        const stats = result.rows[0];
+        return {
+            totalTransactions: parseInt(stats.total_transactions) || 0,
+            totalAmount: parseInt(stats.total_amount) || 0,
+            paidTransactions: parseInt(stats.paid_transactions) || 0,
+            paidAmount: parseInt(stats.paid_amount) || 0,
+            pendingTransactions: parseInt(stats.pending_transactions) || 0,
+            pendingAmount: parseInt(stats.pending_amount) || 0,
+            failedTransactions: parseInt(stats.failed_transactions) || 0,
+        };
+    }
+    async isTransactionSynced(orderId) {
+        const query = `
+      SELECT COUNT(*) FROM pagarme_sync_log 
+      WHERE order_id = $1 AND sync_status = 'synced'
+    `;
+        const result = await this.pool.query(query, [orderId]);
+        return parseInt(result.rows[0].count) > 0;
+    }
+    async markSyncFailed(orderId, errorMessage) {
+        const query = `
+      INSERT INTO pagarme_sync_log (order_id, sync_status, sync_attempts, error_message, last_sync_attempt)
+      VALUES ($1, 'failed', 1, $2, NOW())
+      ON CONFLICT (order_id) 
+      DO UPDATE SET
+        sync_status = 'failed',
+        sync_attempts = pagarme_sync_log.sync_attempts + 1,
+        error_message = EXCLUDED.error_message,
+        last_sync_attempt = EXCLUDED.last_sync_attempt,
+        updated_at = NOW()
+    `;
+        await this.pool.query(query, [orderId, errorMessage]);
+    }
+};
+exports.UserTransactionService = UserTransactionService;
+exports.UserTransactionService = UserTransactionService = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [typeof (_a = typeof pg_1.Pool !== "undefined" && pg_1.Pool) === "function" ? _a : Object])
+], UserTransactionService);
+
+
+/***/ }),
+/* 21 */
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+var _a, _b;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.UserTransactionController = void 0;
+const common_1 = __webpack_require__(2);
+const user_transaction_service_1 = __webpack_require__(20);
+let UserTransactionController = class UserTransactionController {
+    constructor(transactionService) {
+        this.transactionService = transactionService;
+    }
+    async saveTransaction(transaction) {
+        try {
+            const isSynced = await this.transactionService.isTransactionSynced(transaction.pagarme_order_id);
+            if (isSynced) {
+                return {
+                    success: false,
+                    message: 'Transação já foi sincronizada',
+                };
+            }
+            const savedTransaction = await this.transactionService.saveTransaction(transaction);
+            return {
+                success: true,
+                data: savedTransaction,
+                message: 'Transação salva com sucesso',
+            };
+        }
+        catch (error) {
+            return {
+                success: false,
+                message: 'Erro ao salvar transação',
+                error: error.message,
+            };
+        }
+    }
+    async getUserBalance(userId) {
+        try {
+            const balance = await this.transactionService.getUserBalance(userId);
+            if (!balance) {
+                return {
+                    success: true,
+                    data: {
+                        available_amount: 0,
+                        waiting_funds: 0,
+                        total_transactions: 0,
+                    },
+                };
+            }
+            return {
+                success: true,
+                data: balance,
+            };
+        }
+        catch (error) {
+            return {
+                success: false,
+                message: 'Erro ao buscar saldo',
+                error: error.message,
+            };
+        }
+    }
+    async getUserTransactions(userId, limit = '50', offset = '0') {
+        try {
+            const transactions = await this.transactionService.getUserTransactions(userId, parseInt(limit), parseInt(offset));
+            return {
+                success: true,
+                data: transactions,
+                pagination: {
+                    limit: parseInt(limit),
+                    offset: parseInt(offset),
+                    total: transactions.length,
+                },
+            };
+        }
+        catch (error) {
+            return {
+                success: false,
+                message: 'Erro ao buscar histórico',
+                error: error.message,
+            };
+        }
+    }
+    async getUserStats(userId) {
+        try {
+            const stats = await this.transactionService.getUserStats(userId);
+            return {
+                success: true,
+                data: stats,
+            };
+        }
+        catch (error) {
+            return {
+                success: false,
+                message: 'Erro ao buscar estatísticas',
+                error: error.message,
+            };
+        }
+    }
+    async getSyncStatus(orderId) {
+        try {
+            const isSynced = await this.transactionService.isTransactionSynced(orderId);
+            return {
+                success: true,
+                data: {
+                    order_id: orderId,
+                    synced: isSynced,
+                },
+            };
+        }
+        catch (error) {
+            return {
+                success: false,
+                message: 'Erro ao verificar status de sincronização',
+                error: error.message,
+            };
+        }
+    }
+};
+exports.UserTransactionController = UserTransactionController;
+__decorate([
+    (0, common_1.Post)(),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [typeof (_b = typeof user_transaction_service_1.UserTransaction !== "undefined" && user_transaction_service_1.UserTransaction) === "function" ? _b : Object]),
+    __metadata("design:returntype", Promise)
+], UserTransactionController.prototype, "saveTransaction", null);
+__decorate([
+    (0, common_1.Get)('balance/:userId'),
+    __param(0, (0, common_1.Param)('userId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], UserTransactionController.prototype, "getUserBalance", null);
+__decorate([
+    (0, common_1.Get)('history/:userId'),
+    __param(0, (0, common_1.Param)('userId')),
+    __param(1, (0, common_1.Query)('limit')),
+    __param(2, (0, common_1.Query)('offset')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:returntype", Promise)
+], UserTransactionController.prototype, "getUserTransactions", null);
+__decorate([
+    (0, common_1.Get)('stats/:userId'),
+    __param(0, (0, common_1.Param)('userId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], UserTransactionController.prototype, "getUserStats", null);
+__decorate([
+    (0, common_1.Get)('sync-status/:orderId'),
+    __param(0, (0, common_1.Param)('orderId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], UserTransactionController.prototype, "getSyncStatus", null);
+exports.UserTransactionController = UserTransactionController = __decorate([
+    (0, common_1.Controller)('transactions'),
+    __metadata("design:paramtypes", [typeof (_a = typeof user_transaction_service_1.UserTransactionService !== "undefined" && user_transaction_service_1.UserTransactionService) === "function" ? _a : Object])
+], UserTransactionController);
+
+
+/***/ }),
+/* 22 */
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AuthModule = void 0;
 const common_1 = __webpack_require__(2);
@@ -845,7 +1227,7 @@ exports.AuthModule = AuthModule = __decorate([
 
 
 /***/ }),
-/* 21 */
+/* 23 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -869,17 +1251,26 @@ exports.DatabaseModule = DatabaseModule = __decorate([
             {
                 provide: 'DATABASE_POOL',
                 useFactory: () => {
-                    const pool = new pg_1.Pool({
-                        host: process.env.DB_HOST,
-                        port: parseInt(process.env.DB_PORT || '5432'),
+                    const isCloudRun = !!process.env.INSTANCE_UNIX_SOCKET;
+                    const config = {
                         database: process.env.DB_NAME,
                         user: process.env.DB_USER,
                         password: process.env.DB_PASSWORD,
-                        ssl: false,
                         max: 10,
                         idleTimeoutMillis: 30000,
-                        connectionTimeoutMillis: 2000,
-                    });
+                        connectionTimeoutMillis: 10000,
+                    };
+                    if (isCloudRun) {
+                        config.host = process.env.INSTANCE_UNIX_SOCKET;
+                        console.log(`🔌 Conectando via Unix socket: ${config.host}`);
+                    }
+                    else {
+                        config.host = process.env.DB_HOST;
+                        config.port = parseInt(process.env.DB_PORT || '5432');
+                        config.ssl = false;
+                        console.log(`🔌 Conectando via TCP: ${config.host}:${config.port}`);
+                    }
+                    const pool = new pg_1.Pool(config);
                     pool.on('connect', () => {
                         console.log('✅ Conectado ao PostgreSQL Cloud SQL');
                     });
@@ -896,7 +1287,7 @@ exports.DatabaseModule = DatabaseModule = __decorate([
 
 
 /***/ }),
-/* 22 */
+/* 24 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -935,6 +1326,136 @@ exports.HealthController = HealthController = __decorate([
     (0, swagger_1.ApiTags)('Health'),
     (0, common_1.Controller)('health')
 ], HealthController);
+
+
+/***/ }),
+/* 25 */
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var _a;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.MigrationController = void 0;
+const common_1 = __webpack_require__(2);
+const pg_1 = __webpack_require__(10);
+let MigrationController = class MigrationController {
+    constructor(pool) {
+        this.pool = pool;
+    }
+    async setupTables() {
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+            await client.query(`
+        CREATE TABLE IF NOT EXISTS user_transactions (
+          id SERIAL PRIMARY KEY,
+          user_id VARCHAR(255) NOT NULL,
+          pagarme_order_id VARCHAR(255) UNIQUE NOT NULL,
+          pagarme_charge_id VARCHAR(255),
+          amount INTEGER NOT NULL,
+          status VARCHAR(50) NOT NULL,
+          establishment_name VARCHAR(255),
+          customer_name VARCHAR(255),
+          payment_method VARCHAR(50),
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+            await client.query(`
+        CREATE TABLE IF NOT EXISTS user_balances (
+          user_id VARCHAR(255) PRIMARY KEY,
+          available_amount INTEGER DEFAULT 0,
+          waiting_funds INTEGER DEFAULT 0,
+          total_transactions INTEGER DEFAULT 0,
+          last_transaction_at TIMESTAMP,
+          last_updated TIMESTAMP DEFAULT NOW()
+        )
+      `);
+            await client.query(`
+        CREATE TABLE IF NOT EXISTS pagarme_sync_log (
+          id SERIAL PRIMARY KEY,
+          order_id VARCHAR(255) NOT NULL,
+          charge_id VARCHAR(255),
+          sync_status VARCHAR(50) NOT NULL,
+          sync_attempts INTEGER DEFAULT 0,
+          last_sync_attempt TIMESTAMP,
+          error_message TEXT,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+            await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_user_transactions_user_id ON user_transactions(user_id)
+      `);
+            await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_user_transactions_status ON user_transactions(status)
+      `);
+            await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_pagarme_sync_order_id ON pagarme_sync_log(order_id)
+      `);
+            await client.query(`
+        CREATE OR REPLACE FUNCTION update_updated_at_column()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+        END;
+        $$ language 'plpgsql'
+      `);
+            await client.query(`
+        DROP TRIGGER IF EXISTS update_user_transactions_updated_at ON user_transactions;
+        CREATE TRIGGER update_user_transactions_updated_at 
+            BEFORE UPDATE ON user_transactions 
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+      `);
+            await client.query(`
+        DROP TRIGGER IF EXISTS update_user_balances_updated_at ON user_balances;
+        CREATE TRIGGER update_user_balances_updated_at 
+            BEFORE UPDATE ON user_balances 
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+      `);
+            await client.query(`
+        DROP TRIGGER IF EXISTS update_pagarme_sync_log_updated_at ON pagarme_sync_log;
+        CREATE TRIGGER update_pagarme_sync_log_updated_at 
+            BEFORE UPDATE ON pagarme_sync_log 
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+      `);
+            await client.query('COMMIT');
+            return {
+                success: true,
+                message: 'Tabelas criadas com sucesso!',
+                tables: ['user_transactions', 'user_balances', 'pagarme_sync_log'],
+            };
+        }
+        catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        }
+        finally {
+            client.release();
+        }
+    }
+};
+exports.MigrationController = MigrationController;
+__decorate([
+    (0, common_1.Post)('setup-tables'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], MigrationController.prototype, "setupTables", null);
+exports.MigrationController = MigrationController = __decorate([
+    (0, common_1.Controller)('migration'),
+    __metadata("design:paramtypes", [typeof (_a = typeof pg_1.Pool !== "undefined" && pg_1.Pool) === "function" ? _a : Object])
+], MigrationController);
 
 
 /***/ })

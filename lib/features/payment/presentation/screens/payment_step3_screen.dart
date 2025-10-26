@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/components/custom_text_field.dart';
 import 'payment_step4_screen.dart';
 
-/// Tela 3: Inserir dados do cartão
+/// Tela 3: Escolher chave Pix
 class PaymentStep3Screen extends StatefulWidget {
   final String nomeEstabelecimento;
+  final String ramoAtuacao;
   final int valorCentavos;
 
   const PaymentStep3Screen({
     Key? key,
     required this.nomeEstabelecimento,
+    required this.ramoAtuacao,
     required this.valorCentavos,
   }) : super(key: key);
 
@@ -21,32 +22,44 @@ class PaymentStep3Screen extends StatefulWidget {
 
 class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
   final _formKey = GlobalKey<FormState>();
-  final _nomeTitularController = TextEditingController();
-  final _numeroCartaoController = TextEditingController();
-  final _cvvController = TextEditingController();
-  final _vencimentoController = TextEditingController();
+  String? _tipoChavePix;
+  final _telefoneController = TextEditingController();
+  final _cpfController = TextEditingController();
+  final _novaChaveController = TextEditingController();
 
   @override
   void dispose() {
-    _nomeTitularController.dispose();
-    _numeroCartaoController.dispose();
-    _cvvController.dispose();
-    _vencimentoController.dispose();
+    _telefoneController.dispose();
+    _cpfController.dispose();
+    _novaChaveController.dispose();
     super.dispose();
   }
 
   void _continuar() {
     if (_formKey.currentState?.validate() ?? false) {
+      String chavePix = '';
+      
+      switch (_tipoChavePix) {
+        case 'telefone':
+          chavePix = _telefoneController.text;
+          break;
+        case 'cpf':
+          chavePix = _cpfController.text;
+          break;
+        case 'nova':
+          chavePix = _novaChaveController.text;
+          break;
+      }
+
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => PaymentStep4Screen(
             nomeEstabelecimento: widget.nomeEstabelecimento,
+            ramoAtuacao: widget.ramoAtuacao,
             valorCentavos: widget.valorCentavos,
-            nomeTitular: _nomeTitularController.text,
-            numeroCartao: _numeroCartaoController.text.replaceAll(' ', ''),
-            cvv: _cvvController.text,
-            vencimento: _vencimentoController.text,
+            chavePix: chavePix,
+            tipoChavePix: _tipoChavePix ?? '',
           ),
         ),
       );
@@ -57,8 +70,17 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Fazer uma Venda'),
+        title: const Text(
+          'Fazer uma Venda',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
         centerTitle: true,
+        backgroundColor: Colors.grey[900],
+        elevation: 0,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -72,7 +94,7 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
                 
                 // Título
                 const Text(
-                  'INSIRA OS DADOS DO CARTÃO',
+                  'ESCOLHA A CHAVE PIX QUE DESEJA RECEBER A VENDA:',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -82,107 +104,33 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
                 ),
                 const SizedBox(height: 40),
 
-                // Nome do Titular
-                CustomTextField(
-                  controller: _nomeTitularController,
-                  hintText: 'Nome do Titular',
-                  labelText: 'Nome do Titular',
-                  textCapitalization: TextCapitalization.words,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Insira o nome do titular';
-                    }
-                    if (value.length < 3) {
-                      return 'Nome inválido';
-                    }
-                    return null;
-                  },
+                // Opções de chave Pix
+                _buildPixOption(
+                  'telefone',
+                  'Telefone',
+                  '(xx) XXXXXX',
+                  _telefoneController,
+                  TextInputType.phone,
                 ),
                 const SizedBox(height: 20),
 
-                // Número do Cartão
-                CustomTextField(
-                  controller: _numeroCartaoController,
-                  hintText: 'Número do Cartão',
-                  labelText: 'Número do Cartão',
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(16),
-                    _CardNumberFormatter(),
-                  ],
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Insira o número do cartão';
-                    }
-                    final digits = value.replaceAll(' ', '');
-                    if (digits.length < 13 || digits.length > 16) {
-                      return 'Número do cartão inválido';
-                    }
-                    return null;
-                  },
+                _buildPixOption(
+                  'cpf',
+                  'CPF/CNPJ',
+                  'XXX.XXXXXXX-SS',
+                  _cpfController,
+                  TextInputType.number,
                 ),
                 const SizedBox(height: 20),
 
-                // CVV e Data de Vencimento
-                Row(
-                  children: [
-                    // CVV
-                    Expanded(
-                      flex: 2,
-                      child: CustomTextField(
-                        controller: _cvvController,
-                        hintText: 'CVV',
-                        labelText: 'CVV',
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(4),
-                        ],
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Insira o CVV';
-                          }
-                          if (value.length < 3) {
-                            return 'CVV inválido';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    
-                    // Data de Vencimento
-                    Expanded(
-                      flex: 3,
-                      child: CustomTextField(
-                        controller: _vencimentoController,
-                        hintText: 'MM/AA',
-                        labelText: 'Data de Vencimento',
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(4),
-                          _ExpiryDateFormatter(),
-                        ],
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Insira a validade';
-                          }
-                          if (value.length != 5) {
-                            return 'Data inválida';
-                          }
-                          final parts = value.split('/');
-                          final month = int.tryParse(parts[0]) ?? 0;
-                          if (month < 1 || month > 12) {
-                            return 'Mês inválido';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                  ],
+                _buildPixOption(
+                  'nova',
+                  'Nova Chave Pix',
+                  'Nova Chave. Pix',
+                  _novaChaveController,
+                  TextInputType.text,
                 ),
+                
                 const SizedBox(height: 40),
 
                 // Botão Continuar
@@ -206,27 +154,101 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
                     _buildProgressDot(false),
                   ],
                 ),
-                
-                const SizedBox(height: 20),
-                
-                // Aviso de segurança
-                const Row(
-                  children: [
-                    Icon(Icons.lock_outline, size: 16, color: Colors.grey),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Seus dados estão protegidos com criptografia',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPixOption(
+    String value,
+    String title,
+    String hintText,
+    TextEditingController controller,
+    TextInputType keyboardType,
+  ) {
+    final isSelected = _tipoChavePix == value;
+    
+    return Card(
+      elevation: isSelected ? 4 : 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isSelected ? Theme.of(context).primaryColor : Colors.grey[300]!,
+          width: isSelected ? 2 : 1,
+        ),
+      ),
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _tipoChavePix = value;
+          });
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Radio<String>(
+                    value: value,
+                    groupValue: _tipoChavePix,
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _tipoChavePix = newValue;
+                      });
+                    },
+                  ),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Theme.of(context).primaryColor : Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              if (isSelected) ...[
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: controller,
+                  keyboardType: keyboardType,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: hintText,
+                    hintStyle: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[700],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                  ),
+                  validator: (value) {
+                    if (_tipoChavePix == value && (value == null || value.isEmpty)) {
+                      return 'Por favor, insira a chave Pix';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -253,57 +275,5 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
   }
 }
 
-/// Formatador para número do cartão (adiciona espaços)
-class _CardNumberFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final text = newValue.text.replaceAll(' ', '');
-    final buffer = StringBuffer();
-    
-    for (int i = 0; i < text.length; i++) {
-      if (i > 0 && i % 4 == 0) {
-        buffer.write(' ');
-      }
-      buffer.write(text[i]);
-    }
-    
-    final formatted = buffer.toString();
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
-    );
-  }
-}
 
-/// Formatador para data de vencimento (MM/AA)
-class _ExpiryDateFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final text = newValue.text.replaceAll('/', '');
-    
-    if (text.isEmpty) {
-      return newValue.copyWith(text: '');
-    }
-    
-    final buffer = StringBuffer();
-    for (int i = 0; i < text.length && i < 4; i++) {
-      if (i == 2) {
-        buffer.write('/');
-      }
-      buffer.write(text[i]);
-    }
-    
-    final formatted = buffer.toString();
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
-    );
-  }
-}
 

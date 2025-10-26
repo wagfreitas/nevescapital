@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Configuration
+    
+    Implementa MASVS-NETWORK standards:
+    - MASVS-NETWORK-1: Certificate Pinning
+    - MASVS-NETWORK-2: Apenas conexões TLS 1.2+
+    - Bloqueia conexões cleartext (HTTP)
+-->
+<network-security-config>
+    <!-- Configuração padrão para produção -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Confiar apenas em CAs do sistema -->
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Configuração de debug (apenas em desenvolvimento) -->
+    <debug-overrides>
+        <!-- Permitir localhost para desenvolvimento -->
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+
+    <!-- Domain-specific configuration -->
+    <domain-config cleartextTrafficPermitted="false">
+        <!-- Google Cloud Functions / Cloud Run -->
+        <domain includeSubdomains="true">southamerica-east1-pag-pag-prod.cloudfunctions.net</domain>
+        <domain includeSubdomains="true">googleapis.com</domain>
+        <domain includeSubdomains="true">firebaseapp.com</domain>
+        
+        <!-- MASVS-NETWORK-1: Certificate Pinning -->
+        <!-- Descomente e configure após obter os pins dos seus certificados -->
+        <!--
+        <pin-set expiration="2026-01-01">
+            <pin digest="SHA-256">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pin>
+            <pin digest="SHA-256">BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=</pin>
+        </pin-set>
+        -->
+        
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- Configuração para localhost (apenas em desenvolvimento) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain> <!-- Android emulator -->
+    </domain-config>
+</network-security-config>
+

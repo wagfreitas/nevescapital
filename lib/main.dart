@@ -4,8 +4,8 @@ import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/auth/presentation/controllers/auth_controller_real.dart';
-import 'features/auth/presentation/screens/login_screen_new.dart';
-import 'features/home/presentation/screens/home_screen.dart';
+import 'features/auth/presentation/screens/onboarding_screen.dart';
+import 'features/home/presentation/screens/dashboard_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,6 +70,7 @@ class AppWrapper extends StatefulWidget {
 
 class _AppWrapperState extends State<AppWrapper> {
   AuthController? _authController;
+  bool? _lastIsLoggedIn;
 
   @override
   void initState() {
@@ -80,6 +81,10 @@ class _AppWrapperState extends State<AppWrapper> {
   Future<void> _setupAuthController() async {
     _authController = AuthController();
     await _authController!.initialize();
+    print('🔍 AppWrapper - AuthController inicializado');
+    print('🔍 AppWrapper - isLoggedIn: ${_authController!.isLoggedIn}');
+    // Registrar estado inicial para detectar transições
+    _lastIsLoggedIn = _authController!.isLoggedIn;
     if (mounted) {
       setState(() {});
     }
@@ -99,17 +104,63 @@ class _AppWrapperState extends State<AppWrapper> {
       );
     }
 
+    // Verificar se o controller ainda está ativo antes de usar
+    if (_authController!.isDisposed) {
+      return const Scaffold(
+        body: Center(
+          child: Text('Sessão expirada'),
+        ),
+      );
+    }
+
     return ListenableBuilder(
       listenable: _authController!,
       builder: (context, child) {
+        // Debug: verificar estado de autenticação
+        print('🔍 AppWrapper - isLoggedIn: ${_authController!.isLoggedIn}');
+        print('🔍 AppWrapper - currentUser: ${_authController!.currentUser?.uid}');
+        // Se houve mudança no estado de login, executar navegação que
+        // limpa a pilha de rotas para evitar telas autenticadas remanescentes.
+        if (_lastIsLoggedIn != _authController!.isLoggedIn) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            if (_authController!.isLoggedIn) {
+              // Usuário logado: navegar para Dashboard e limpar pilha
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) => DashboardScreen(
+                    authController: _authController!,
+                    themeController: widget.themeController,
+                  ),
+                ),
+                (route) => false,
+              );
+            } else {
+              // Usuário deslogado: navegar para Onboarding e limpar pilha
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) => OnboardingScreen(authController: _authController!),
+                ),
+                (route) => false,
+              );
+            }
+          });
+          _lastIsLoggedIn = _authController!.isLoggedIn;
+        }
+
+        // Enquanto a navegação não ocorrer (ou se não houve transição),
+        // mostrar a tela correspondente ao estado atual para manter
+        // compatibilidade com o fluxo existente.
         if (_authController!.isLoggedIn) {
-          return HomeScreen(
+          print('✅ Navegando para DashboardScreen');
+          return DashboardScreen(
             authController: _authController!,
             themeController: widget.themeController,
           );
         }
 
-        return LoginScreenNew(authController: _authController!);
+        print('❌ Navegando para OnboardingScreen - usuário deslogado');
+        return OnboardingScreen(authController: _authController!);
       },
     );
   }

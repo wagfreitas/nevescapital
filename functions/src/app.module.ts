@@ -5,6 +5,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthController } from './health.controller';
+import { MigrationController } from './migration.controller';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { HealthController } from './health.controller';
     UsersModule,
     AuthModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, MigrationController],
 })
 export class AppModule {}
 

@@ -8,10 +8,12 @@ import 'payment_step3_screen.dart';
 /// Tela 2: Inserir valor da venda
 class PaymentStep2Screen extends StatefulWidget {
   final String nomeEstabelecimento;
+  final String ramoAtuacao;
 
   const PaymentStep2Screen({
     Key? key,
     required this.nomeEstabelecimento,
+    required this.ramoAtuacao,
   }) : super(key: key);
 
   @override
@@ -43,6 +45,7 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
         MaterialPageRoute(
           builder: (context) => PaymentStep3Screen(
             nomeEstabelecimento: widget.nomeEstabelecimento,
+            ramoAtuacao: widget.ramoAtuacao,
             valorCentavos: valorCentavos,
           ),
         ),
@@ -54,8 +57,17 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Fazer uma Venda'),
+        title: const Text(
+          'Fazer uma Venda',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
         centerTitle: true,
+        backgroundColor: Colors.grey[900],
+        elevation: 0,
       ),
       body: SafeArea(
         child: Padding(
@@ -188,4 +200,5 @@ class _CurrencyInputFormatter extends TextInputFormatter {
     );
   }
 }
+
 

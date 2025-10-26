@@ -3,7 +3,7 @@ import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/components/custom_text_field.dart';
 import 'payment_step2_screen.dart';
 
-/// Tela 1: Inserir nome do estabelecimento
+/// Tela 1: Inserir nome do estabelecimento e ramo de atuação
 class PaymentStep1Screen extends StatefulWidget {
   const PaymentStep1Screen({Key? key}) : super(key: key);
 
@@ -14,6 +14,7 @@ class PaymentStep1Screen extends StatefulWidget {
 class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
   final _formKey = GlobalKey<FormState>();
   final _nomeEstabelecimentoController = TextEditingController();
+  String? _ramoAtuacao;
 
   @override
   void dispose() {
@@ -28,6 +29,7 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
         MaterialPageRoute(
           builder: (context) => PaymentStep2Screen(
             nomeEstabelecimento: _nomeEstabelecimentoController.text,
+            ramoAtuacao: _ramoAtuacao ?? '',
           ),
         ),
       );
@@ -38,8 +40,17 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Fazer uma Venda'),
+        title: const Text(
+          'Fazer uma Venda',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
         centerTitle: true,
+        backgroundColor: Colors.grey[900],
+        elevation: 0,
       ),
       body: SafeArea(
         child: Padding(
@@ -52,7 +63,7 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
               children: [
                 // Título
                 const Text(
-                  'INSIRA O NOME DO ESTABELECIMENTO',
+                  'INSIRA O NOME DO ESTABELECIMENTO E O RAMO DE ATUAÇÃO',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -62,7 +73,7 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
                 ),
                 const SizedBox(height: 40),
 
-                // Campo de texto
+                // Campo de nome do estabelecimento
                 CustomTextField(
                   controller: _nomeEstabelecimentoController,
                   hintText: 'Ex: Loja do Daniel',
@@ -77,6 +88,41 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
                     return null;
                   },
                   textCapitalization: TextCapitalization.words,
+                ),
+                const SizedBox(height: 20),
+
+                // Campo de ramo de atuação (dropdown)
+                DropdownButtonFormField<String>(
+                  value: _ramoAtuacao,
+                  decoration: const InputDecoration(
+                    labelText: 'Ramo de Atuação',
+                    hintText: 'Selected option',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'varejo', child: Text('Varejo')),
+                    DropdownMenuItem(value: 'atacado', child: Text('Atacado')),
+                    DropdownMenuItem(value: 'servicos', child: Text('Serviços')),
+                    DropdownMenuItem(value: 'restaurante', child: Text('Restaurante')),
+                    DropdownMenuItem(value: 'farmacia', child: Text('Farmácia')),
+                    DropdownMenuItem(value: 'posto', child: Text('Posto de Combustível')),
+                    DropdownMenuItem(value: 'outros', child: Text('Outros')),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _ramoAtuacao = value;
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Por favor, selecione o ramo de atuação';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 40),
 
@@ -128,4 +174,5 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
     );
   }
 }
+
 

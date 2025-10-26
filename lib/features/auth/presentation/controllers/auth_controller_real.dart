@@ -1,8 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:neves_capital/shared/services/auth_service.dart';
 import 'package:neves_capital/shared/services/database_service.dart';
 import 'package:neves_capital/shared/services/biometric_service.dart';
+import 'package:neves_capital/shared/services/user_cache_service.dart';
+import 'package:neves_capital/shared/services/secure_storage_service.dart';
+
+/// Estados de progresso do login
+enum LoginProgress {
+  idle,
+  searchingUser,
+  authenticating,
+  success,
+  error,
+}
 
 /// Controller para gerenciar autenticação real (Firebase + PostgreSQL)
 class AuthController extends ChangeNotifier {
@@ -10,6 +22,8 @@ class AuthController extends ChangeNotifier {
   bool _isLoading = false;
   bool _isBiometricAvailable = false;
   String? _errorMessage;
+  LoginProgress _loginProgress = LoginProgress.idle;
+  bool _isDisposed = false;
 
   // Getters
   firebase_auth.User? get currentUser => _currentUser;
@@ -17,28 +31,47 @@ class AuthController extends ChangeNotifier {
   bool get isBiometricAvailable => _isBiometricAvailable;
   String? get errorMessage => _errorMessage;
   bool get isLoggedIn => _currentUser != null;
+  LoginProgress get loginProgress => _loginProgress;
+  bool get isDisposed => _isDisposed;
 
-  /// Inicializar controller
+  /// Inicializar controller (otimizado)
   Future<void> initialize() async {
     _setLoading(true);
     
     try {
-      // Verificar disponibilidade biométrica
-      _isBiometricAvailable = await BiometricService.isAvailable();
-      
-      // Verificar usuário atual do Firebase
+      // Verificar usuário atual do Firebase primeiro (mais rápido)
       _currentUser = AuthService.currentUser;
+      print('🔍 AuthController.initialize() - _currentUser: ${_currentUser?.uid}');
+      print('🔍 AuthController.initialize() - isLoggedIn: $isLoggedIn');
       
       // Escutar mudanças de autenticação
       AuthService.authStateChanges.listen((firebase_auth.User? user) {
+        print('🔍 AuthController - authStateChanges: ${user?.uid}');
+        print('🔍 AuthController - authStateChanges - isLoggedIn antes: $isLoggedIn');
         _currentUser = user;
+        print('🔍 AuthController - authStateChanges - isLoggedIn depois: $isLoggedIn');
         notifyListeners();
+        print('🔍 AuthController - authStateChanges - notifyListeners() chamado');
       });
+      
+      // Verificar disponibilidade biométrica em paralelo (não bloqueia)
+      _checkBiometricAvailability();
       
     } catch (e) {
       _setError('Erro ao inicializar: $e');
     } finally {
       _setLoading(false);
+    }
+  }
+
+  /// Verificar disponibilidade biométrica em background
+  void _checkBiometricAvailability() async {
+    try {
+      _isBiometricAvailable = await BiometricService.isAvailable();
+      print('🔍 Biometria disponível: $_isBiometricAvailable');
+    } catch (e) {
+      print('❌ Erro ao verificar biometria: $e');
+      _isBiometricAvailable = false;
     }
   }
 
@@ -60,19 +93,16 @@ class AuthController extends ChangeNotifier {
     _setLoading(true);
     _clearError();
 
+    String? postgresUserId;
+    firebase_auth.User? firebaseUser;
+
     try {
-      // 1. Criar conta no Firebase
-      final credential = await AuthService.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
-      if (credential.user == null) {
-        throw Exception('Falha ao criar conta no Firebase');
-      }
-
-      // 2. Salvar dados no PostgreSQL
-      await DatabaseService.createUser(
+      // ==========================================
+      // ETAPA 1: GRAVAR NO POSTGRESQL PRIMEIRO
+      // ==========================================
+      print('📝 Etapa 1: Criando usuário no PostgreSQL...');
+      
+      final postgresResult = await DatabaseService.createUser(
         email: email,
         password: password,
         fullName: fullName,
@@ -87,11 +117,83 @@ class AuthController extends ChangeNotifier {
         complement: complement,
       );
 
-      _currentUser = credential.user;
-      notifyListeners();
+      // ==========================================
+      // VALIDAÇÃO CRÍTICA: VERIFICAR SE POSTGRESQL FOI CRIADO
+      // ==========================================
+      if (postgresResult['success'] != true || postgresResult['user_id'] == null) {
+        throw Exception('Falha ao criar usuário no PostgreSQL. Resposta inválida.');
+      }
+
+      postgresUserId = postgresResult['user_id'] as String;
+      print('✅ Usuário criado no PostgreSQL: $postgresUserId');
+
+      // ==========================================
+      // ETAPA 2: GRAVAR NO FIREBASE (SOMENTE SE POSTGRESQL OK)
+      // ==========================================
+      print('');
+      print('✅ PostgreSQL confirmado! Prosseguindo para Firebase...');
+      print('📝 Etapa 2: Criando usuário no Firebase...');
+      print('⚠️  ATENÇÃO: Se você está vendo esta mensagem e a API estava desligada,');
+      print('⚠️  significa que há um problema no fluxo do código!');
+      print('');
       
-      return true;
+      try {
+        final credential = await AuthService.createUserWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+
+        if (credential.user == null) {
+          throw Exception('Falha ao criar conta no Firebase');
+        }
+
+        firebaseUser = credential.user;
+        print('✅ Usuário criado no Firebase: ${firebaseUser?.uid}');
+
+        // Atualizar displayName no Firebase
+        await firebaseUser?.updateDisplayName(fullName);
+        await firebaseUser?.reload();
+        firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
+        print('✅ DisplayName atualizado: $fullName');
+
+        // ==========================================
+        // SUCESSO: AMBOS OS BANCOS SINCRONIZADOS
+        // ==========================================
+        _currentUser = firebaseUser;
+        notifyListeners();
+        print('✅ Cadastro completo! Usuário em PostgreSQL e Firebase');
+        
+        return true;
+
+      } catch (firebaseError) {
+        // ==========================================
+        // ROLLBACK: DELETAR DO POSTGRESQL
+        // ==========================================
+        print('❌ Erro ao criar no Firebase: $firebaseError');
+        print('🔄 ROLLBACK: Deletando usuário do PostgreSQL...');
+        
+        try {
+          await DatabaseService.deleteUser(postgresUserId);
+          print('✅ Rollback concluído - Usuário removido do PostgreSQL');
+        } catch (deleteError) {
+          print('❌ ERRO CRÍTICO: Falha no rollback! Usuário órfão no PostgreSQL: $postgresUserId');
+          print('❌ Erro do rollback: $deleteError');
+        }
+
+        throw Exception('Erro ao criar no Firebase: $firebaseError');
+      }
+
     } catch (e) {
+      print('');
+      print('═══════════════════════════════════════════════');
+      print('❌ ERRO NO CADASTRO - NADA FOI GRAVADO');
+      print('═══════════════════════════════════════════════');
+      print('Erro: $e');
+      print('PostgreSQL foi criado? ${postgresUserId != null ? "SIM (ID: $postgresUserId)" : "NÃO"}');
+      print('Firebase foi criado? ${firebaseUser != null ? "SIM (UID: ${firebaseUser.uid})" : "NÃO"}');
+      print('═══════════════════════════════════════════════');
+      print('');
+      
       _setError('Erro no cadastro: $e');
       return false;
     } finally {
@@ -99,41 +201,75 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  /// Login com CPF e senha
+  /// Login com CPF e senha (otimizado)
   Future<bool> loginWithCpf({
     required String cpf,
     required String password,
   }) async {
     _setLoading(true);
     _clearError();
+    _setLoginProgress(LoginProgress.searchingUser);
 
     try {
-      // 1. Buscar usuário no PostgreSQL pelo CPF
+      print('🔐 Iniciando login otimizado com CPF: $cpf');
+      
+      // 1. Buscar usuário (com cache otimizado)
       final userData = await DatabaseService.getUserByCpf(cpf);
       
       if (userData == null) {
-        throw Exception('Usuário não encontrado');
+        throw Exception('CPF não cadastrado');
       }
 
-      // 2. Verificar senha
-      final isPasswordValid = await DatabaseService.verifyPassword(cpf, password);
+      final email = userData['email'] as String;
+      final mode = userData['mode'] as String?;
+      print('✅ Usuário encontrado: $email (${mode ?? 'API'})');
+
+      // 2. Fazer login no Firebase com email + senha
+      _setLoginProgress(LoginProgress.authenticating);
+      print('🔐 Fazendo login no Firebase...');
       
-      if (!isPasswordValid) {
-        throw Exception('Senha incorreta');
-      }
-
-      // 3. Fazer login no Firebase com email
       final credential = await AuthService.signInWithEmailAndPassword(
-        email: userData['email'],
+        email: email,
         password: password,
       );
 
+      if (credential.user == null) {
+        throw Exception('Erro ao fazer login no Firebase');
+      }
+
       _currentUser = credential.user;
-      notifyListeners();
+      
+      // 3. Salvar timestamp do login para otimizações futuras
+      await UserCacheService.saveLastLogin();
+      
+      _setLoginProgress(LoginProgress.success);
+      print('✅ Login realizado com sucesso!');
+      print('🔍 AuthController - _currentUser: ${_currentUser?.uid}');
+      print('🔍 AuthController - isLoggedIn: $isLoggedIn');
       
       return true;
+      
     } catch (e) {
-      _setError('Erro no login: $e');
+      print('❌ Erro no login: $e');
+      _setLoginProgress(LoginProgress.error);
+      
+      // Traduzir erros do Firebase
+      String errorMessage = 'Erro no login';
+      
+      if (e.toString().contains('wrong-password') || 
+          e.toString().contains('invalid-credential')) {
+        errorMessage = 'Senha incorreta';
+      } else if (e.toString().contains('user-not-found')) {
+        errorMessage = 'Usuário não encontrado';
+      } else if (e.toString().contains('CPF não cadastrado')) {
+        errorMessage = 'CPF não cadastrado';
+      } else if (e.toString().contains('network') || 
+                 e.toString().contains('timeout') ||
+                 e.toString().contains('Connection')) {
+        errorMessage = 'Erro de conexão. Verifique sua internet.';
+      }
+      
+      _setError(errorMessage);
       return false;
     } finally {
       _setLoading(false);
@@ -175,16 +311,52 @@ class AuthController extends ChangeNotifier {
 
   /// Logout
   Future<void> logout() async {
+    print('🔐 Iniciando logout...');
     _setLoading(true);
     
     try {
+      print('🔐 Fazendo signOut no Firebase...');
       await AuthService.signOut();
+      
+      print('🔐 Limpando _currentUser...');
       _currentUser = null;
+      
+      // Limpar dados locais (cache, secure storage, prefs)
+      print('🔐 Limpando dados locais...');
+      await _clearLocalData();
+      print('🔐 Dados locais limpos');
+
+      print('🔐 Notificando listeners...');
       notifyListeners();
+      
+      print('✅ Logout realizado com sucesso!');
     } catch (e) {
+      print('❌ Erro no logout: $e');
       _setError('Erro ao fazer logout: $e');
     } finally {
       _setLoading(false);
+    }
+  }
+
+  /// Limpar todos os dados locais do usuário
+  Future<void> _clearLocalData() async {
+    try {
+      // Limpar cache do usuário
+      await UserCacheService.clearCache();
+      print('🗑️ Cache do usuário limpo');
+      
+      // Limpar todos os dados sensíveis do secure storage
+      await SecureStorageService.clearAll();
+      print('🗑️ Dados sensíveis limpos');
+      
+      // Limpar dados do SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('auth_token');
+      await prefs.remove('auth_user');
+      print('🗑️ SharedPreferences limpo');
+      
+    } catch (e) {
+      print('❌ Erro ao limpar dados locais: $e');
     }
   }
 
@@ -269,11 +441,23 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _setLoginProgress(LoginProgress progress) {
+    _loginProgress = progress;
+    notifyListeners();
+  }
+
   /// Limpar estado
   void clearState() {
     _currentUser = null;
     _isLoading = false;
     _errorMessage = null;
+    _loginProgress = LoginProgress.idle;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
   }
 }

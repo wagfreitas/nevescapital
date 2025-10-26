@@ -1,48 +1,13 @@
-# .dockerignore para Cloud Run
-
-# Node modules
-node_modules/
+node_modules
 npm-debug.log
-yarn-error.log
-
-# Arquivos de ambiente
 .env
-.env.local
-.env.*.local
-
-# Arquivos de desenvolvimento
-.git/
+.env.*
+dist
+test
+coverage
+.git
 .gitignore
-.dockerignore
-Dockerfile
-docker-compose.yml
-
-# Arquivos de documentação
 README.md
 *.md
-docs/
-
-# Arquivos de teste
-test/
-*.test.js
-*.spec.js
-
-# Arquivos de IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Arquivos de sistema
-.DS_Store
-Thumbs.db
-
-# Logs
-logs/
-*.log
-
-# Coverage
-coverage/
-.nyc_output/
-
+.vscode
+.idea

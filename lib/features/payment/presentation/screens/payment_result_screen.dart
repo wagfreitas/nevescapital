@@ -22,129 +22,147 @@ class PaymentResultScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final valorFormatado = FormatHelpers.formatCurrency(valorCentavos / 100);
+    
+    // Debug: Log do valor
+    print('🔍 PaymentResultScreen - valorCentavos: $valorCentavos');
+    print('🔍 PaymentResultScreen - valorFormatado: $valorFormatado');
 
     return Scaffold(
+      backgroundColor: Colors.grey[900],
       appBar: AppBar(
-        title: const Text('Resultado da Venda'),
+        title: const Text(
+          'Resultado da Venda',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
         centerTitle: true,
+        backgroundColor: Colors.grey[900],
+        elevation: 0,
         automaticallyImplyLeading: false,
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 40),
-              
-              // Ícone de sucesso/erro
-              Icon(
-                sucesso ? Icons.check_circle : Icons.error,
-                size: 100,
-                color: sucesso ? Colors.green : Colors.red,
-              ),
-              const SizedBox(height: 24),
-              
-              // Título
-              Text(
-                sucesso ? 'Pagamento Aprovado!' : 'Pagamento Recusado',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 40),
+                
+                // Ícone de sucesso/erro
+                Icon(
+                  sucesso ? Icons.check_circle : Icons.error,
+                  size: 100,
                   color: sucesso ? Colors.green : Colors.red,
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              
-              // Mensagem
-              Text(
-                mensagem,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 40),
-              
-              // Card com detalhes
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'RESUMO DA OPERAÇÃO',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const Divider(height: 24),
-                      
-                      _buildInfoRow('Valor', valorFormatado),
-                      const SizedBox(height: 12),
-                      
-                      _buildInfoRow('Estabelecimento', nomeEstabelecimento),
-                      
-                      if (transactionId != null) ...[
-                        const SizedBox(height: 12),
-                        _buildInfoRow('ID da Transação', transactionId!),
-                      ],
-                      
-                      const SizedBox(height: 12),
-                      _buildInfoRow(
-                        'Data/Hora',
-                        FormatHelpers.formatDateTime(DateTime.now()),
-                      ),
-                    ],
+                const SizedBox(height: 24),
+                
+                // Título
+                Text(
+                  sucesso ? 'Pagamento Aprovado!' : 'Pagamento Recusado',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: sucesso ? Colors.green : Colors.red,
                   ),
-                ),
-              ),
-              
-              const Spacer(),
-              
-              // Botões
-              if (sucesso) ...[
-                CustomButton(
-                  text: 'Compartilhar Comprovante',
-                  onPressed: () {
-                    // TODO: Implementar compartilhamento
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Funcionalidade em desenvolvimento'),
-                      ),
-                    );
-                  },
-                  isOutlined: true,
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
+                
+                // Mensagem
+                Text(
+                  mensagem,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 40),
+                
+                // Card com detalhes
+                Card(
+                  elevation: 2,
+                  color: Colors.grey[800],
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'RESUMO DA OPERAÇÃO',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const Divider(height: 24, color: Colors.grey),
+                        
+                        _buildInfoRow('Valor', valorFormatado),
+                        const SizedBox(height: 12),
+                        
+                        _buildInfoRow('Estabelecimento', nomeEstabelecimento),
+                        
+                        if (transactionId != null) ...[
+                          const SizedBox(height: 12),
+                          _buildInfoRow('ID da Transação', transactionId!),
+                        ],
+                        
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          'Data/Hora',
+                          FormatHelpers.formatDateTime(DateTime.now()),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 40),
+                
+                // Botões
+                if (sucesso) ...[
+                  CustomButton(
+                    text: 'Compartilhar Comprovante',
+                    onPressed: () {
+                      // TODO: Implementar compartilhamento
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Funcionalidade em desenvolvimento'),
+                        ),
+                      );
+                    },
+                    isOutlined: true,
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                
+                CustomButton(
+                  text: sucesso ? 'Nova Venda' : 'Tentar Novamente',
+                  onPressed: () {
+                    // Voltar para o início
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
+                ),
+                
+                const SizedBox(height: 16),
+                
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
+                  child: const Text('Voltar ao Início'),
+                ),
               ],
-              
-              CustomButton(
-                text: sucesso ? 'Nova Venda' : 'Tentar Novamente',
-                onPressed: () {
-                  // Voltar para o início
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                },
-              ),
-              
-              const SizedBox(height: 16),
-              
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                },
-                child: const Text('Voltar ao Início'),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -159,15 +177,16 @@ class PaymentResultScreen extends StatelessWidget {
           label,
           style: const TextStyle(
             fontSize: 14,
-            color: Colors.grey,
+            color: Colors.white70,
           ),
         ),
         Flexible(
           child: Text(
             value,
             style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
             textAlign: TextAlign.right,
             overflow: TextOverflow.ellipsis,
@@ -177,4 +196,3 @@ class PaymentResultScreen extends StatelessWidget {
     );
   }
 }
-

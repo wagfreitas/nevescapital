@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller_real.dart';
-import 'package:neves_capital/features/auth/presentation/screens/login_data_screen.dart';
-import 'package:neves_capital/shared/services/biometric_service.dart';
 import 'package:neves_capital/shared/components/cpf_input_field.dart';
 import 'package:neves_capital/shared/helpers/cpf_helper.dart';
+import 'package:neves_capital/features/home/presentation/screens/dashboard_screen.dart';
+import 'package:neves_capital/shared/widgets/login_progress_widget.dart';
+import 'package:neves_capital/core/theme/theme_controller.dart';
 
 class LoginScreenNew extends StatefulWidget {
   final AuthController authController;
@@ -23,13 +24,10 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _obscurePassword = true;
-  bool _isBiometricAvailable = false;
-  String _biometricButtonText = 'Usar Biometria';
 
   @override
   void initState() {
     super.initState();
-    _initializeBiometric();
   }
 
   @override
@@ -39,17 +37,6 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
     super.dispose();
   }
 
-  Future<void> _initializeBiometric() async {
-    final isAvailable = await BiometricService.isAvailable();
-    final buttonText = await BiometricService.getBiometricButtonText();
-    
-    if (mounted) {
-      setState(() {
-        _isBiometricAvailable = isAvailable;
-        _biometricButtonText = buttonText;
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,8 +55,6 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
               _buildWelcomeText(),
               const SizedBox(height: 24.0), // mt-6
               _buildForm(),
-              const SizedBox(height: 40.0), // mt-10
-              _buildSignupLink(),
             ],
           ),
         ),
@@ -110,10 +95,6 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
           _buildForgotPasswordLink(),
           const SizedBox(height: 24.0),
           _buildLoginButton(),
-          if (_isBiometricAvailable) ...[
-            const SizedBox(height: 16),
-            _buildBiometricButton(),
-          ],
         ],
       ),
     );
@@ -230,99 +211,53 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
   }
 
   Widget _buildLoginButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : _handleLogin,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF22C55E), // bg-[var(--primary-500)]
-          foregroundColor: const Color(0xFF122118), // text-[#122118]
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(25), // rounded-full
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 14), // py-3.5
-          elevation: 0,
-        ),
-        child: _isLoading
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF122118)),
-                ),
-              )
-            : const Text(
-                'Entrar',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _isLoading ? null : _handleLogin,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF22C55E), // bg-[var(--primary-500)]
+              foregroundColor: const Color(0xFF122118), // text-[#122118]
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25), // rounded-full
               ),
-      ),
-    );
-  }
-
-  Widget _buildBiometricButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: _isLoading ? null : _handleBiometricLogin,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFF22C55E), // text-[var(--primary-500)]
-          side: const BorderSide(color: Color(0xFF22C55E), width: 1.5),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(25), // rounded-full
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 14), // py-3.5
-        ),
-        icon: const Icon(
-          Icons.fingerprint,
-          size: 20,
-          color: Colors.white,
-        ),
-        label: Text(
-          _biometricButtonText,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSignupLink() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const LoginDataScreen(),
+              padding: const EdgeInsets.symmetric(vertical: 14), // py-3.5
+              elevation: 0,
             ),
-          );
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF22C55E), // bg-[var(--primary-500)]
-          foregroundColor: const Color(0xFF122118), // text-[#122118]
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(25), // rounded-full
+            child: _isLoading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF122118)),
+                    ),
+                  )
+                : const Text(
+                    'Entrar',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
           ),
-          padding: const EdgeInsets.symmetric(vertical: 14), // py-3.5
-          elevation: 0,
         ),
-        child: const Text(
-          'Criar Conta',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
+        
+        // Widget de progresso granular
+        if (_isLoading) ...[
+          const SizedBox(height: 16),
+          LoginProgressWidget(
+            progress: widget.authController.loginProgress,
+            errorMessage: widget.authController.errorMessage,
           ),
-        ),
-      ),
+        ],
+      ],
     );
   }
+
+
 
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
@@ -345,7 +280,18 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
             backgroundColor: Color(0xFF22C55E),
           ),
         );
-        // Navegação será gerenciada pelo AppWrapper baseado no estado de autenticação
+        
+        // Navegação manual para o Dashboard
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DashboardScreen(
+              authController: widget.authController,
+              themeController: ThemeController(), // Criar uma instância temporária
+            ),
+          ),
+          (route) => false, // Remove todas as rotas anteriores
+        );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -372,46 +318,4 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
     }
   }
 
-  Future<void> _handleBiometricLogin() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      await widget.authController.loginWithBiometric();
-
-      if (mounted) {
-        if (widget.authController.isLoggedIn) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Login biométrico realizado com sucesso!'),
-              backgroundColor: Color(0xFF22C55E),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(widget.authController.errorMessage ?? 'Erro na autenticação biométrica'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro na autenticação biométrica: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
 }

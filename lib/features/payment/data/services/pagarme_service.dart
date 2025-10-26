@@ -3,8 +3,8 @@ import 'package:http/http.dart' as http;
 
 /// Service para integração com a API do Pagar.me
 class PagarmeService {
-  // Chave de API do ambiente Sandbox (SUBSTITUIR pela sua chave)
-  static const String _apiKey = 'sk_test_SUACHAVEAQUI';
+  // Chave de API do ambiente Sandbox
+  static const String _apiKey = 'sk_test_6483ab5348254353b94b703a2af0f839';
   
   // Base URL da API V5 do Pagar.me
   static const String _baseUrl = 'https://api.pagar.me/core/v5';
@@ -26,24 +26,52 @@ class PagarmeService {
       
       // Construir payload da requisição
       final payload = {
-        'amount': valorCentavos,
+        'amount': valorCentavos, // API V5 espera valor em centavos
         'description': 'Venda - $nomeEstabelecimento',
-        'payment_method': 'credit_card',
-        'credit_card': {
-          'card': {
-            'number': numeroCartao.replaceAll(' ', ''),
-            'holder_name': nomeTitular,
-            'exp_month': int.parse(expMonth),
-            'exp_year': int.parse(expYear),
-            'cvv': cvv,
-          },
-          'installments': 1,
-          'statement_descriptor': nomeEstabelecimento.substring(0, nomeEstabelecimento.length > 13 ? 13 : nomeEstabelecimento.length),
-          'capture': true,
-        },
+        'items': [
+          {
+            'code': 'VENDA_${DateTime.now().millisecondsSinceEpoch}', // Código único obrigatório
+            'amount': valorCentavos, // Valor em centavos
+            'description': 'Venda - $nomeEstabelecimento',
+            'quantity': 1,
+          }
+        ],
+        'payments': [
+          {
+            'payment_method': 'credit_card',
+            'credit_card': {
+              'recurrence_cycle': 'first',
+              'installments': 1,
+              'statement_descriptor': nomeEstabelecimento.substring(0, nomeEstabelecimento.length > 13 ? 13 : nomeEstabelecimento.length),
+              'card': {
+                'number': numeroCartao.replaceAll(' ', ''),
+                'holder_name': nomeTitular,
+                'exp_month': int.parse(expMonth),
+                'exp_year': int.parse(expYear),
+                'cvv': cvv,
+                'billing_address': {
+                  'line_1': 'Rua das Flores, 123',
+                  'zip_code': '01234567',
+                  'city': 'São Paulo',
+                  'state': 'SP',
+                  'country': 'BR'
+                }
+              },
+            },
+          }
+        ],
         'customer': {
           'name': nomeTitular,
+          'email': 'teste@pagpag.com.br', // Email obrigatório
           'type': 'individual',
+          'document': '00000000000', // CPF obrigatório para validação
+          'phones': {
+            'mobile_phone': {
+              'country_code': '55',
+              'area_code': '11',
+              'number': '999999999',
+            }
+          },
         },
         'metadata': {
           'estabelecimento': nomeEstabelecimento,
@@ -84,9 +112,10 @@ class PagarmeService {
               'transactionId': charge['id'],
             };
           } else {
+            final errorMessage = charge['last_transaction']?['acquirer_message'] ?? 'Erro desconhecido';
             return {
               'success': false,
-              'message': 'Pagamento recusado: ${charge['last_transaction']?['acquirer_message'] ?? 'Erro desconhecido'}',
+              'message': 'Pagamento recusado: $errorMessage',
             };
           }
         }
@@ -200,4 +229,5 @@ class PagarmeService {
     }
   }
 }
+
 

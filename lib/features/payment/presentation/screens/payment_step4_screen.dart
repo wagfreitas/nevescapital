@@ -1,27 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
-import 'package:neves_capital/shared/components/custom_loading.dart';
-import 'package:neves_capital/shared/helpers/format_helpers.dart';
-import 'package:neves_capital/features/payment/data/services/pagarme_service.dart';
-import 'payment_result_screen.dart';
+import 'package:neves_capital/shared/components/custom_text_field.dart';
+import 'payment_step5_screen.dart';
 
-/// Tela 4: Resumo e confirmação da venda
+/// Tela 4: Inserir dados do cartão
 class PaymentStep4Screen extends StatefulWidget {
   final String nomeEstabelecimento;
+  final String ramoAtuacao;
   final int valorCentavos;
-  final String nomeTitular;
-  final String numeroCartao;
-  final String cvv;
-  final String vencimento;
+  final String chavePix;
+  final String tipoChavePix;
 
   const PaymentStep4Screen({
     Key? key,
     required this.nomeEstabelecimento,
+    required this.ramoAtuacao,
     required this.valorCentavos,
-    required this.nomeTitular,
-    required this.numeroCartao,
-    required this.cvv,
-    required this.vencimento,
+    required this.chavePix,
+    required this.tipoChavePix,
   }) : super(key: key);
 
   @override
@@ -29,52 +26,37 @@ class PaymentStep4Screen extends StatefulWidget {
 }
 
 class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
-  bool _isProcessing = false;
+  final _formKey = GlobalKey<FormState>();
+  final _nomeTitularController = TextEditingController();
+  final _numeroCartaoController = TextEditingController();
+  final _cvvController = TextEditingController();
+  final _vencimentoController = TextEditingController();
 
-  Future<void> _concluirVenda() async {
-    setState(() {
-      _isProcessing = true;
-    });
+  @override
+  void dispose() {
+    _nomeTitularController.dispose();
+    _numeroCartaoController.dispose();
+    _cvvController.dispose();
+    _vencimentoController.dispose();
+    super.dispose();
+  }
 
-    try {
-      final pagarmeService = PagarmeService();
-      
-      // Processar pagamento
-      final resultado = await pagarmeService.processarPagamentoCartao(
-        nomeEstabelecimento: widget.nomeEstabelecimento,
-        valorCentavos: widget.valorCentavos,
-        nomeTitular: widget.nomeTitular,
-        numeroCartao: widget.numeroCartao,
-        cvv: widget.cvv,
-        vencimento: widget.vencimento,
-      );
-
-      if (!mounted) return;
-
-      // Navegar para tela de resultado
-      Navigator.pushReplacement(
+  void _continuar() {
+    if (_formKey.currentState?.validate() ?? false) {
+      Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => PaymentResultScreen(
-            sucesso: resultado['success'] ?? false,
-            mensagem: resultado['message'] ?? 'Erro desconhecido',
-            transactionId: resultado['transactionId'],
-            valorCentavos: widget.valorCentavos,
+          builder: (context) => PaymentStep5Screen(
             nomeEstabelecimento: widget.nomeEstabelecimento,
+            ramoAtuacao: widget.ramoAtuacao,
+            valorCentavos: widget.valorCentavos,
+            chavePix: widget.chavePix,
+            tipoChavePix: widget.tipoChavePix,
+            nomeTitular: _nomeTitularController.text,
+            numeroCartao: _numeroCartaoController.text.replaceAll(' ', ''),
+            cvv: _cvvController.text,
+            vencimento: _vencimentoController.text,
           ),
-        ),
-      );
-    } catch (e) {
-      setState(() {
-        _isProcessing = false;
-      });
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao processar pagamento: $e'),
-          backgroundColor: Colors.red,
         ),
       );
     }
@@ -82,167 +64,193 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
 
   @override
   Widget build(BuildContext context) {
-    final valorFormatado = FormatHelpers.formatCurrency(widget.valorCentavos / 100);
-    final numeroCartaoMascarado = _mascararCartao(widget.numeroCartao);
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Fazer uma Venda'),
+        title: const Text(
+          'Fazer uma Venda',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
         centerTitle: true,
+        backgroundColor: Colors.grey[900],
+        elevation: 0,
       ),
-      body: _isProcessing
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CustomLoading(),
-                  SizedBox(height: 24),
-                  Text(
-                    'Processando pagamento...',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 20),
+                
+                // Título
+                const Text(
+                  'INSIRA OS DADOS DO CARTÃO:',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
                   ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Aguarde enquanto validamos os dados',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 40),
+
+                // Nome do Titular
+                CustomTextField(
+                  controller: _nomeTitularController,
+                  hintText: 'Nome do Titular',
+                  labelText: 'Nome do Titular',
+                  textCapitalization: TextCapitalization.words,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Insira o nome do titular';
+                    }
+                    if (value.length < 3) {
+                      return 'Nome inválido';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                // Número do Cartão
+                CustomTextField(
+                  controller: _numeroCartaoController,
+                  hintText: 'Número do Cartão',
+                  labelText: 'Número do Cartão',
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(16),
+                    _CardNumberFormatter(),
+                  ],
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Insira o número do cartão';
+                    }
+                    final digits = value.replaceAll(' ', '');
+                    if (digits.length < 13 || digits.length > 16) {
+                      return 'Número do cartão inválido';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                // CVV e Data de Vencimento
+                Row(
                   children: [
-                    const SizedBox(height: 20),
-                    
-                    // Título
-                    const Text(
-                      'RESUMO DA OPERAÇÃO',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 40),
-
-                    // Card de resumo
-                    Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Valor da Venda
-                            _buildInfoRow(
-                              'Valor da Venda',
-                              valorFormatado,
-                              isHighlight: true,
-                            ),
-                            const Divider(height: 32),
-                            
-                            // Nome do Estabelecimento
-                            _buildInfoRow(
-                              'Estabelecimento',
-                              widget.nomeEstabelecimento,
-                            ),
-                            const SizedBox(height: 16),
-                            
-                            // Dados do Cartão
-                            _buildInfoRow(
-                              'Titular do Cartão',
-                              widget.nomeTitular,
-                            ),
-                            const SizedBox(height: 16),
-                            
-                            _buildInfoRow(
-                              'Cartão',
-                              numeroCartaoMascarado,
-                            ),
-                          ],
-                        ),
+                    // CVV
+                    Expanded(
+                      flex: 2,
+                      child: CustomTextField(
+                        controller: _cvvController,
+                        hintText: 'CVV',
+                        labelText: 'CVV',
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(4),
+                        ],
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Insira o CVV';
+                          }
+                          if (value.length < 3) {
+                            return 'CVV inválido';
+                          }
+                          return null;
+                        },
                       ),
                     ),
+                    const SizedBox(width: 16),
                     
-                    const Spacer(),
-
-                    // Botão Concluir Venda
-                    CustomButton(
-                      text: 'Concluir Venda',
-                      onPressed: _concluirVenda,
-                    ),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Indicador de progresso
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildProgressDot(true),
-                        _buildProgressLine(),
-                        _buildProgressDot(true),
-                        _buildProgressLine(),
-                        _buildProgressDot(true),
-                        _buildProgressLine(),
-                        _buildProgressDot(true),
-                      ],
-                    ),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Aviso
-                    const Text(
-                      'Ao concluir, o pagamento será processado imediatamente',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
+                    // Data de Vencimento
+                    Expanded(
+                      flex: 3,
+                      child: CustomTextField(
+                        controller: _vencimentoController,
+                        hintText: 'Data de Vencimento',
+                        labelText: 'Data de Vencimento',
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(4),
+                          _ExpiryDateFormatter(),
+                        ],
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Insira a validade';
+                          }
+                          if (value.length != 5) {
+                            return 'Data inválida';
+                          }
+                          final parts = value.split('/');
+                          final month = int.tryParse(parts[0]) ?? 0;
+                          if (month < 1 || month > 12) {
+                            return 'Mês inválido';
+                          }
+                          return null;
+                        },
                       ),
-                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 40),
+
+                // Botão Continuar
+                CustomButton(
+                  text: 'Continuar',
+                  onPressed: _continuar,
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Indicador de progresso
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildProgressDot(true),
+                    _buildProgressLine(),
+                    _buildProgressDot(true),
+                    _buildProgressLine(),
+                    _buildProgressDot(true),
+                    _buildProgressLine(),
+                    _buildProgressDot(true),
+                  ],
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Aviso de segurança
+                const Row(
+                  children: [
+                    Icon(Icons.lock_outline, size: 16, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Seus dados estão protegidos com criptografia',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value, {bool isHighlight = false}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.grey,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: isHighlight ? 24 : 16,
-            fontWeight: isHighlight ? FontWeight.bold : FontWeight.w600,
-            color: isHighlight ? Theme.of(context).primaryColor : Colors.black87,
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildProgressDot(bool isActive) {
     return Container(
@@ -263,10 +271,60 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
     );
   }
 
-  String _mascararCartao(String numeroCartao) {
-    if (numeroCartao.length < 4) return numeroCartao;
-    final ultimos4 = numeroCartao.substring(numeroCartao.length - 4);
-    return '**** **** **** $ultimos4';
+}
+
+/// Formatador para número do cartão (adiciona espaços)
+class _CardNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text.replaceAll(' ', '');
+    final buffer = StringBuffer();
+    
+    for (int i = 0; i < text.length; i++) {
+      if (i > 0 && i % 4 == 0) {
+        buffer.write(' ');
+      }
+      buffer.write(text[i]);
+    }
+    
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
   }
 }
+
+/// Formatador para data de vencimento (MM/AA)
+class _ExpiryDateFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text.replaceAll('/', '');
+    
+    if (text.isEmpty) {
+      return newValue.copyWith(text: '');
+    }
+    
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length && i < 4; i++) {
+      if (i == 2) {
+        buffer.write('/');
+      }
+      buffer.write(text[i]);
+    }
+    
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
 

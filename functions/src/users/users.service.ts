@@ -29,13 +29,33 @@ export class UsersService {
    * Descriptografar de bytea (PostgreSQL)
    */
   private decryptFromBytea(buffer: Buffer): string {
-    // Buffer vem do PostgreSQL como bytea, converter para string
-    const encrypted = buffer.toString('utf8');
-    const decrypted = this.encryptionService.decrypt(encrypted);
-    if (!decrypted) {
-      throw new Error('Falha na descriptografia');
+    try {
+      // Buffer vem do PostgreSQL como bytea, converter para string
+      let encrypted: string;
+      
+      if (Buffer.isBuffer(buffer)) {
+        // Se é um buffer, converter para string
+        encrypted = buffer.toString('utf8');
+      } else if (typeof buffer === 'string') {
+        // Se já é string, usar diretamente
+        encrypted = buffer;
+      } else {
+        throw new Error('Formato de buffer inválido');
+      }
+      
+      console.log(`🔐 Tentando descriptografar: ${encrypted.substring(0, 50)}...`);
+      
+      const decrypted = this.encryptionService.decrypt(encrypted);
+      if (!decrypted) {
+        throw new Error('Falha na descriptografia - resultado vazio');
+      }
+      
+      console.log(`✅ Descriptografado com sucesso: ${decrypted}`);
+      return decrypted;
+    } catch (error) {
+      console.error('❌ Erro na descriptografia:', error);
+      throw new Error(`Falha na descriptografia: ${error.message}`);
     }
-    return decrypted;
   }
 
   async create(createUserDto: CreateUserDto) {
@@ -44,30 +64,16 @@ export class UsersService {
     try {
       await client.query('BEGIN');
 
-      // Verificar se CPF já existe
-      const cpfEncrypted = this.encryptToBytea(createUserDto.cpf);
-      const existingCpf = await client.query(
-        'SELECT id FROM users WHERE cpf_encrypted = $1',
-        [cpfEncrypted],
-      );
+      console.log(`🔍 Criando usuário: ${createUserDto.fullName}...`);
 
-      if (existingCpf.rows.length > 0) {
-        throw new ConflictException('CPF já cadastrado');
-      }
+      // TODO: Verificação de duplicatas desabilitada temporariamente
+      // Problema: CryptoJS gera valores diferentes a cada criptografia
+      // Solução futura: Migrar para EncryptionV2Service com HMAC hash
 
-      // Verificar se email já existe
-      const emailEncrypted = this.encryptToBytea(createUserDto.email);
-      const existingEmail = await client.query(
-        'SELECT id FROM users WHERE email_encrypted = $1',
-        [emailEncrypted],
-      );
-
-      if (existingEmail.rows.length > 0) {
-        throw new ConflictException('Email já cadastrado');
-      }
-
-      // Criptografar nome completo
+      // Criptografar dados
       const fullNameEncrypted = this.encryptToBytea(createUserDto.fullName);
+      const cpfEncrypted = this.encryptToBytea(createUserDto.cpf);
+      const emailEncrypted = this.encryptToBytea(createUserDto.email);
 
       // Inserir usuário principal
       const userResult = await client.query(
@@ -148,8 +154,9 @@ export class UsersService {
 
   async findByCpf(cpf: string) {
     try {
-      const cpfEncrypted = this.encryptToBytea(cpf);
+      console.log(`🔍 Buscando usuário por CPF: ${cpf}`);
 
+      // Buscar todos os usuários ativos
       const result = await this.pool.query(
         `SELECT 
           u.id,
@@ -159,15 +166,35 @@ export class UsersService {
           u.kyc_status,
           u.created_at
         FROM users u
-        WHERE u.cpf_encrypted = $1 AND u.deleted_at IS NULL`,
-        [cpfEncrypted],
+        WHERE u.deleted_at IS NULL`,
       );
 
-      if (result.rows.length === 0) {
+      console.log(`📊 Encontrados ${result.rows.length} usuários ativos`);
+
+      // Procurar o usuário com CPF correspondente
+      let foundUser = null;
+      for (const user of result.rows) {
+        try {
+          const decryptedCpf = this.decryptFromBytea(user.cpf_encrypted);
+          console.log(`🔐 CPF descriptografado: ${decryptedCpf}`);
+          
+          if (decryptedCpf === cpf) {
+            console.log(`✅ Usuário encontrado! ID: ${user.id}`);
+            foundUser = user;
+            break;
+          }
+        } catch (error) {
+          console.error(`❌ Erro ao descriptografar CPF do usuário ${user.id}:`, error);
+          continue;
+        }
+      }
+
+      if (!foundUser) {
+        console.log(`⚠️  Nenhum usuário encontrado com CPF: ${cpf}`);
         throw new NotFoundException('Usuário não encontrado');
       }
 
-      const user = result.rows[0];
+      const user = foundUser;
 
       // Buscar telefone
       const phoneResult = await this.pool.query(

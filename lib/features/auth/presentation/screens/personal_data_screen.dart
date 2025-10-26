@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/cep_input_field.dart';
-import 'package:neves_capital/shared/components/phone_input_field.dart';
 import 'package:neves_capital/shared/helpers/cep_helper.dart';
-import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/shared/services/cep_service.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller_real.dart';
 
@@ -20,7 +18,6 @@ class PersonalDataScreen extends StatefulWidget {
 }
 
 class _PersonalDataScreenState extends State<PersonalDataScreen> {
-  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _cepController = TextEditingController();
   final TextEditingController _streetController = TextEditingController();
   final TextEditingController _neighborhoodController = TextEditingController();
@@ -42,7 +39,6 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
 
   @override
   void dispose() {
-    _phoneController.dispose();
     _cepController.dispose();
     _streetController.dispose();
     _neighborhoodController.dispose();
@@ -134,14 +130,6 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                 // Indicador de progresso
                 _buildProgressIndicator(step: 2, totalSteps: 2),
                 const SizedBox(height: 24.0),
-                
-                // Telefone
-                PhoneInputField(
-                  controller: _phoneController,
-                  hintText: 'Digite seu telefone',
-                  validator: PhoneHelper.validatePhone,
-                ),
-                const SizedBox(height: 12.0),
                 
                 // CEP
                 CepInputField(
@@ -361,7 +349,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
       final password = widget.loginData['password']!;
       final fullName = widget.loginData['fullName']!;
       final cpf = widget.loginData['cpf']!;
-      final phone = PhoneHelper.getPhoneNumbers(_phoneController.text);
+      final phone = widget.loginData['phone']!;
       final cep = CepHelper.getCepNumbers(_cepController.text);
       final street = _streetController.text.trim();
       final neighborhood = _neighborhoodController.text.trim();
