@@ -251,7 +251,20 @@ class AuthController extends ChangeNotifier {
 
       _currentUser = credential.user;
       
-      // 3. Salvar timestamp do login para otimizações futuras
+      // 3. Verificar e atualizar displayName se necessário
+      final currentDisplayName = _currentUser?.displayName;
+      final userFullName = userData['name'] as String?;
+      
+      if (userFullName != null && userFullName.isNotEmpty && 
+          (currentDisplayName == null || currentDisplayName.isEmpty)) {
+        print('📝 DisplayName vazio, atualizando com: $userFullName');
+        await _currentUser?.updateDisplayName(userFullName);
+        await _currentUser?.reload();
+        _currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+        print('✅ DisplayName atualizado: ${_currentUser?.displayName}');
+      }
+      
+      // 4. Salvar timestamp do login para otimizações futuras
       await UserCacheService.saveLastLogin();
       
       _setLoginProgress(LoginProgress.success);
