@@ -70,7 +70,6 @@ class AppWrapper extends StatefulWidget {
 
 class _AppWrapperState extends State<AppWrapper> {
   AuthController? _authController;
-  bool? _lastIsLoggedIn;
 
   @override
   void initState() {
@@ -83,8 +82,6 @@ class _AppWrapperState extends State<AppWrapper> {
     await _authController!.initialize();
     print('🔍 AppWrapper - AuthController inicializado');
     print('🔍 AppWrapper - isLoggedIn: ${_authController!.isLoggedIn}');
-    // Registrar estado inicial para detectar transições
-    _lastIsLoggedIn = _authController!.isLoggedIn;
     if (mounted) {
       setState(() {});
     }
@@ -117,50 +114,27 @@ class _AppWrapperState extends State<AppWrapper> {
       listenable: _authController!,
       builder: (context, child) {
         // Debug: verificar estado de autenticação
-        print('🔍 AppWrapper - isLoggedIn: ${_authController!.isLoggedIn}');
-        print('🔍 AppWrapper - currentUser: ${_authController!.currentUser?.uid}');
-        // Se houve mudança no estado de login, executar navegação que
-        // limpa a pilha de rotas para evitar telas autenticadas remanescentes.
-        if (_lastIsLoggedIn != _authController!.isLoggedIn) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            if (_authController!.isLoggedIn) {
-              // Usuário logado: navegar para Dashboard e limpar pilha
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (_) => DashboardScreen(
-                    authController: _authController!,
-                    themeController: widget.themeController,
-                  ),
-                ),
-                (route) => false,
-              );
-            } else {
-              // Usuário deslogado: navegar para Onboarding e limpar pilha
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (_) => OnboardingScreen(authController: _authController!),
-                ),
-                (route) => false,
-              );
-            }
-          });
-          _lastIsLoggedIn = _authController!.isLoggedIn;
-        }
+        print('');
+        print('🏗️ AppWrapper - RECONSTRUINDO');
+        print('🏗️ isLoggedIn: ${_authController!.isLoggedIn}');
+        print('🏗️ currentUser: ${_authController!.currentUser?.uid}');
 
-        // Enquanto a navegação não ocorrer (ou se não houve transição),
-        // mostrar a tela correspondente ao estado atual para manter
-        // compatibilidade com o fluxo existente.
+        // Mostrar a tela correspondente ao estado atual
         if (_authController!.isLoggedIn) {
-          print('✅ Navegando para DashboardScreen');
+          print('🏗️ RETORNANDO: DashboardScreen');
+          print('');
           return DashboardScreen(
             authController: _authController!,
             themeController: widget.themeController,
           );
         }
 
-        print('❌ Navegando para OnboardingScreen - usuário deslogado');
-        return OnboardingScreen(authController: _authController!);
+        print('🏗️ RETORNANDO: OnboardingScreen (usuário deslogado)');
+        print('');
+        return OnboardingScreen(
+          authController: _authController!,
+          themeController: widget.themeController,
+        );
       },
     );
   }

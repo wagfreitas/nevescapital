@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../auth/presentation/controllers/auth_controller_real.dart';
+import '../../../auth/presentation/screens/onboarding_screen.dart';
 import '../../../payment/presentation/screens/payment_step1_screen.dart';
 import 'sales_history_screen.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
@@ -59,28 +60,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
   
   /// Mensagem de boas-vindas
   Widget _buildWelcomeMessage(BuildContext context) {
+    String userName = 'Daniel';
+    
     // Verificar se o controller ainda está ativo antes de usar
-    if (widget.authController.isDisposed) {
-      return const Text(
-        'Bem-Vindo',
-        style: TextStyle(
-          fontSize: 28,
-          fontWeight: FontWeight.w600,
-          color: AppTheme.textPrimary,
-        ),
-        textAlign: TextAlign.center,
-      );
+    try {
+      if (!widget.authController.isDisposed) {
+        userName = widget.authController.currentUser?.displayName ?? 'Daniel';
+      }
+    } catch (e) {
+      print('⚠️ Erro ao acessar authController: $e');
     }
     
-    final userName = widget.authController.currentUser?.displayName ?? 'Daniel';
-    return Text(
-      'Bem-Vindo, $userName',
-      style: const TextStyle(
-        fontSize: 28,
-        fontWeight: FontWeight.w600,
-        color: AppTheme.textPrimary,
-      ),
-      textAlign: TextAlign.center,
+    return Column(
+      children: [
+        Text(
+          'Olá, $userName 👋',
+          style: const TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Receba sua venda em segundos no PIX!',
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.grey[600],
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
   
@@ -88,10 +99,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildMainButtons(BuildContext context) {
     return Column(
       children: [
-        // Botão "Faça uma Venda"
+        // Botão "Nova Venda"
         _buildMainButton(
           context,
-          title: 'Faça uma Venda',
+          title: 'Nova Venda',
+          icon: Icons.credit_card,
           onTap: () {
             Navigator.push(
               context,
@@ -104,10 +116,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         
         const SizedBox(height: 20),
         
-        // Botão "Histórico de Vendas"
+        // Botão "Histórico"
         _buildMainButton(
           context,
-          title: 'Histórico de Vendas',
+          title: 'Histórico',
+          icon: Icons.description,
           onTap: () {
             Navigator.push(
               context,
@@ -125,13 +138,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildMainButton(
     BuildContext context, {
     required String title,
+    required IconData icon,
     required VoidCallback onTap,
   }) {
     return SizedBox(
       width: double.infinity,
       height: 60,
-      child: ElevatedButton(
+      child: ElevatedButton.icon(
         onPressed: onTap,
+        icon: Icon(icon, size: 24),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppTheme.primaryColor,
           foregroundColor: Colors.white,
@@ -141,7 +156,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             borderRadius: BorderRadius.circular(16),
           ),
         ),
-        child: Text(
+        label: Text(
           title,
           style: const TextStyle(
             fontSize: 18,
@@ -185,14 +200,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 label: 'Conta',
                 isActive: false,
                 onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ProfileScreen(
-                        authController: widget.authController,
+                  try {
+                    // Verificar se o controller ainda está ativo antes de navegar
+                    if (widget.authController.isDisposed) {
+                      // Sessão expirada - navegar para onboarding
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (_) => OnboardingScreen(
+                            authController: widget.authController,
+                            themeController: widget.themeController,
+                          ),
+                        ),
+                        (route) => false,
+                      );
+                      return;
+                    }
+                    
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ProfileScreen(
+                          authController: widget.authController,
+                        ),
                       ),
-                    ),
-                  );
+                    );
+                  } catch (e) {
+                    print('⚠️ Erro ao navegar para ProfileScreen: $e');
+                    // Em caso de erro, navegar para onboarding
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (_) => OnboardingScreen(
+                          authController: widget.authController,
+                          themeController: widget.themeController,
+                        ),
+                      ),
+                      (route) => false,
+                    );
+                  }
                 },
               ),
             ],

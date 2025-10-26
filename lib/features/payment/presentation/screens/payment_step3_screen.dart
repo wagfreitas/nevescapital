@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
-import 'package:neves_capital/shared/components/custom_text_field.dart';
 import 'payment_step4_screen.dart';
 
-/// Tela 3: Escolher chave Pix
+/// Tela 3: Escolher chave Pix - Conforme wireframe
 class PaymentStep3Screen extends StatefulWidget {
   final String nomeEstabelecimento;
   final String ramoAtuacao;
@@ -21,235 +20,182 @@ class PaymentStep3Screen extends StatefulWidget {
 }
 
 class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
-  final _formKey = GlobalKey<FormState>();
-  String? _tipoChavePix;
-  final _telefoneController = TextEditingController();
-  final _cpfController = TextEditingController();
-  final _novaChaveController = TextEditingController();
-
-  @override
-  void dispose() {
-    _telefoneController.dispose();
-    _cpfController.dispose();
-    _novaChaveController.dispose();
-    super.dispose();
-  }
+  String? _chavePixSelecionada;
+  
+  // Mock de chaves cadastradas - Em produção, virá do backend
+  final List<String> _chavesCadastradas = [
+    'Chave Pix Cadastrada 1',
+    'Chave Pix Cadastrada 2',
+  ];
 
   void _continuar() {
-    if (_formKey.currentState?.validate() ?? false) {
-      String chavePix = '';
-      
-      switch (_tipoChavePix) {
-        case 'telefone':
-          chavePix = _telefoneController.text;
-          break;
-        case 'cpf':
-          chavePix = _cpfController.text;
-          break;
-        case 'nova':
-          chavePix = _novaChaveController.text;
-          break;
-      }
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PaymentStep4Screen(
-            nomeEstabelecimento: widget.nomeEstabelecimento,
-            ramoAtuacao: widget.ramoAtuacao,
-            valorCentavos: widget.valorCentavos,
-            chavePix: chavePix,
-            tipoChavePix: _tipoChavePix ?? '',
-          ),
+    if (_chavePixSelecionada == null || _chavePixSelecionada!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor, selecione uma chave PIX'),
+          backgroundColor: Colors.red,
         ),
       );
+      return;
     }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PaymentStep4Screen(
+          nomeEstabelecimento: widget.nomeEstabelecimento,
+          ramoAtuacao: widget.ramoAtuacao,
+          valorCentavos: widget.valorCentavos,
+          chavePix: _chavePixSelecionada!,
+          tipoChavePix: 'cadastrada',
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Fazer uma Venda',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Center(
+              child: Text(
+                '3/5',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+        ],
         backgroundColor: Colors.grey[900],
         elevation: 0,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 20),
-                
-                // Título
-                const Text(
-                  'ESCOLHA A CHAVE PIX QUE DESEJA RECEBER A VENDA:',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
-                  textAlign: TextAlign.center,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 20),
+              
+              // Título
+              const Text(
+                'Em qual chave PIX deseja receber a sua venda de hoje?',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
                 ),
-                const SizedBox(height: 40),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 40),
 
-                // Opções de chave Pix
-                _buildPixOption(
-                  'telefone',
-                  'Telefone',
-                  '(xx) XXXXXX',
-                  _telefoneController,
-                  TextInputType.phone,
+              // Botões de chaves cadastradas
+              ...List.generate(_chavesCadastradas.length, (index) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: _buildChavePixButton(_chavesCadastradas[index]),
+                );
+              }),
+              
+              const SizedBox(height: 16),
+              
+              // Botão para cadastrar nova chave
+              OutlinedButton.icon(
+                onPressed: () {
+                  // TODO: Navegar para tela de cadastro de chave PIX
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Funcionalidade em desenvolvimento'),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.add_circle_outline),
+                label: const Text('Cadastre uma Nova Chave Pix'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  side: BorderSide(color: Theme.of(context).primaryColor),
                 ),
-                const SizedBox(height: 20),
+              ),
+              
+              const SizedBox(height: 40),
 
-                _buildPixOption(
-                  'cpf',
-                  'CPF/CNPJ',
-                  'XXX.XXXXXXX-SS',
-                  _cpfController,
-                  TextInputType.number,
-                ),
-                const SizedBox(height: 20),
-
-                _buildPixOption(
-                  'nova',
-                  'Nova Chave Pix',
-                  'Nova Chave. Pix',
-                  _novaChaveController,
-                  TextInputType.text,
-                ),
-                
-                const SizedBox(height: 40),
-
-                // Botão Continuar
-                CustomButton(
-                  text: 'Continuar',
-                  onPressed: _continuar,
-                ),
-                
-                const SizedBox(height: 20),
-                
-                // Indicador de progresso
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildProgressDot(true),
-                    _buildProgressLine(),
-                    _buildProgressDot(true),
-                    _buildProgressLine(),
-                    _buildProgressDot(true),
-                    _buildProgressLine(),
-                    _buildProgressDot(false),
-                  ],
-                ),
-              ],
-            ),
+              // Botão Avançar
+              CustomButton(
+                text: 'Avançar',
+                onPressed: _continuar,
+              ),
+              
+              const SizedBox(height: 20),
+              
+              // Indicador de progresso
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildProgressDot(true),
+                  _buildProgressLine(),
+                  _buildProgressDot(true),
+                  _buildProgressLine(),
+                  _buildProgressDot(true),
+                  _buildProgressLine(),
+                  _buildProgressDot(false),
+                  _buildProgressLine(),
+                  _buildProgressDot(false),
+                ],
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildPixOption(
-    String value,
-    String title,
-    String hintText,
-    TextEditingController controller,
-    TextInputType keyboardType,
-  ) {
-    final isSelected = _tipoChavePix == value;
+  Widget _buildChavePixButton(String chavePix) {
+    final isSelected = _chavePixSelecionada == chavePix;
     
-    return Card(
-      elevation: isSelected ? 4 : 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isSelected ? Theme.of(context).primaryColor : Colors.grey[300]!,
-          width: isSelected ? 2 : 1,
-        ),
-      ),
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            _tipoChavePix = value;
-          });
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Radio<String>(
-                    value: value,
-                    groupValue: _tipoChavePix,
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        _tipoChavePix = newValue;
-                      });
-                    },
-                  ),
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? Theme.of(context).primaryColor : Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-              if (isSelected) ...[
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: controller,
-                  keyboardType: keyboardType,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: hintText,
-                    hintStyle: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[700],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                  ),
-                  validator: (value) {
-                    if (_tipoChavePix == value && (value == null || value.isEmpty)) {
-                      return 'Por favor, insira a chave Pix';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ],
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _chavePixSelecionada = chavePix;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: isSelected ? Theme.of(context).primaryColor : Colors.grey[300]!,
+            width: isSelected ? 2 : 1,
           ),
+          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.1) : Colors.transparent,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+              color: isSelected ? Theme.of(context).primaryColor : Colors.grey[600],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                chavePix,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  color: isSelected ? Theme.of(context).primaryColor : Colors.black87,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -274,6 +220,3 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
     );
   }
 }
-
-
-

@@ -23,11 +23,34 @@ class PaymentStep2Screen extends StatefulWidget {
 class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
   final _formKey = GlobalKey<FormState>();
   final _valorController = TextEditingController();
+  double _valorLiquido = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _valorController.addListener(_calcularValorLiquido);
+  }
 
   @override
   void dispose() {
+    _valorController.removeListener(_calcularValorLiquido);
     _valorController.dispose();
     super.dispose();
+  }
+
+  void _calcularValorLiquido() {
+    final valorTexto = _valorController.text
+        .replaceAll('R\$', '')
+        .replaceAll('.', '')
+        .replaceAll(',', '')
+        .trim();
+    final valorCentavos = int.tryParse(valorTexto) ?? 0;
+    final valor = valorCentavos / 100;
+    
+    // Aplicar taxa de desconto (exemplo: 3%)
+    setState(() {
+      _valorLiquido = valor * 0.97; // 97% do valor total
+    });
   }
 
   void _continuar() {
@@ -55,17 +78,29 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
 
   @override
   Widget build(BuildContext context) {
+    final valorLiquidoFormatado = FormatHelpers.formatCurrency(_valorLiquido);
+    
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Fazer uma Venda',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Center(
+              child: Text(
+                '2/5',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+        ],
         backgroundColor: Colors.grey[900],
         elevation: 0,
       ),
@@ -80,7 +115,7 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
               children: [
                 // Título
                 const Text(
-                  'INSIRA O VALOR DA VENDA',
+                  'VALOR DA VENDA',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -122,11 +157,38 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                const SizedBox(height: 20),
+                
+                // Valor líquido calculado
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green[700], size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Você receberá líquido $valorLiquidoFormatado',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
                 const SizedBox(height: 40),
 
-                // Botão Continuar
+                // Botão Avançar
                 CustomButton(
-                  text: 'Continuar',
+                  text: 'Avançar',
                   onPressed: _continuar,
                 ),
                 
@@ -143,7 +205,19 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
                     _buildProgressDot(false),
                     _buildProgressLine(),
                     _buildProgressDot(false),
+                    _buildProgressLine(),
+                    _buildProgressDot(false),
                   ],
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'O valor líquido deverá ser calculado automaticamente com uma taxa de desconto definida em sistema',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),

@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller_real.dart';
 import 'package:neves_capital/features/auth/presentation/screens/login_screen_new.dart';
 import 'package:neves_capital/features/auth/presentation/screens/login_data_screen.dart';
+import 'package:neves_capital/core/theme/theme_controller.dart';
 
 class OnboardingScreen extends StatelessWidget {
   final AuthController authController;
+  final ThemeController? themeController;
 
   const OnboardingScreen({
     super.key,
     required this.authController,
+    this.themeController,
   });
 
   @override
@@ -72,6 +75,7 @@ class OnboardingScreen extends StatelessWidget {
                             MaterialPageRoute(
                               builder: (context) => LoginScreenNew(
                                 authController: authController,
+                                themeController: themeController,
                               ),
                             ),
                           );

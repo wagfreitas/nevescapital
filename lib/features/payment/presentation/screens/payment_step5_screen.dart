@@ -90,19 +90,31 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
   @override
   Widget build(BuildContext context) {
     final valorFormatado = FormatHelpers.formatCurrency(widget.valorCentavos / 100);
-    final numeroCartaoMascarado = _mascararCartao(widget.numeroCartao);
+    final valorLiquido = (widget.valorCentavos * 0.97) / 100;
+    final valorLiquidoFormatado = FormatHelpers.formatCurrency(valorLiquido);
+    final bandeiraCartao = _detectarBandeira(widget.numeroCartao);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Fazer uma Venda',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Center(
+              child: Text(
+                '5/5',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+        ],
         backgroundColor: Colors.grey[900],
         elevation: 0,
       ),
@@ -141,7 +153,7 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
                     
                     // Título
                     const Text(
-                      'RESUMO DA OPERAÇÃO',
+                      'RESUMO DA VENDA',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -164,43 +176,33 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
                           children: [
                             // Valor da Venda
                             _buildInfoRow(
-                              'Valor da Venda',
+                              'VALOR DA VENDA',
                               valorFormatado,
                               isHighlight: true,
                             ),
                             const Divider(height: 32),
                             
-                            // Nome do Estabelecimento
+                            // Valor Líquido (calculado como 97% do valor)
                             _buildInfoRow(
-                              'Estabelecimento',
-                              widget.nomeEstabelecimento,
+                              'VALOR LÍQUIDO',
+                              valorLiquidoFormatado,
+                              isHighlight: false,
                             ),
                             const SizedBox(height: 16),
                             
-                            // Ramo de Atuação
+                            // Meio de Pagamento
                             _buildInfoRow(
-                              'Ramo de Atuação',
-                              _getRamoAtuacaoText(widget.ramoAtuacao),
+                              'MEIO DE PAGAMENTO',
+                              'XXXX $bandeiraCartao',
+                              isHighlight: false,
                             ),
                             const SizedBox(height: 16),
                             
                             // Chave Pix
                             _buildInfoRow(
-                              'Chave Pix',
+                              'CHAVE PIX',
                               widget.chavePix,
-                            ),
-                            const SizedBox(height: 16),
-                            
-                            // Dados do Cartão
-                            _buildInfoRow(
-                              'Titular do Cartão',
-                              widget.nomeTitular,
-                            ),
-                            const SizedBox(height: 16),
-                            
-                            _buildInfoRow(
-                              'Cartão',
-                              numeroCartaoMascarado,
+                              isHighlight: false,
                             ),
                           ],
                         ),
@@ -293,30 +295,15 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
     );
   }
 
-  String _mascararCartao(String numeroCartao) {
-    if (numeroCartao.length < 4) return numeroCartao;
-    final ultimos4 = numeroCartao.substring(numeroCartao.length - 4);
-    return '**** **** **** $ultimos4';
-  }
-
-  String _getRamoAtuacaoText(String ramo) {
-    switch (ramo) {
-      case 'varejo':
-        return 'Varejo';
-      case 'atacado':
-        return 'Atacado';
-      case 'servicos':
-        return 'Serviços';
-      case 'restaurante':
-        return 'Restaurante';
-      case 'farmacia':
-        return 'Farmácia';
-      case 'posto':
-        return 'Posto de Combustível';
-      case 'outros':
-        return 'Outros';
-      default:
-        return ramo;
-    }
+  String _detectarBandeira(String numeroCartao) {
+    // Remove espaços e pega os primeiros dígitos
+    final digits = numeroCartao.replaceAll(' ', '').replaceAll('*', '');
+    
+    if (digits.startsWith('4')) return 'Visa';
+    if (digits.startsWith('5')) return 'Mastercard';
+    if (digits.startsWith('3')) return 'American Express';
+    if (digits.startsWith('6')) return 'Discover';
+    
+    return 'Cartão';
   }
 }

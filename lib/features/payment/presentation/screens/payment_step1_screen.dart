@@ -40,15 +40,25 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Fazer uma Venda',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Center(
+              child: Text(
+                '1/5',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+        ],
         backgroundColor: Colors.grey[900],
         elevation: 0,
       ),
@@ -63,7 +73,7 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
               children: [
                 // Título
                 const Text(
-                  'INSIRA O NOME DO ESTABELECIMENTO E O RAMO DE ATUAÇÃO',
+                  'Seu Logo da Daniel',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -76,7 +86,7 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
                 // Campo de nome do estabelecimento
                 CustomTextField(
                   controller: _nomeEstabelecimentoController,
-                  hintText: 'Ex: Loja do Daniel',
+                  hintText: 'Nome do Estabelecimento',
                   labelText: 'Nome do Estabelecimento',
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -95,7 +105,7 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
                 DropdownButtonFormField<String>(
                   value: _ramoAtuacao,
                   decoration: const InputDecoration(
-                    labelText: 'Ramo de Atuação',
+                    labelText: 'Selected option',
                     hintText: 'Selected option',
                     border: OutlineInputBorder(),
                     contentPadding: EdgeInsets.symmetric(
@@ -126,9 +136,9 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
                 ),
                 const SizedBox(height: 40),
 
-                // Botão Continuar
+                // Botão Avançar
                 CustomButton(
-                  text: 'Continuar',
+                  text: 'Avançar',
                   onPressed: _continuar,
                 ),
                 
@@ -145,7 +155,19 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
                     _buildProgressDot(false),
                     _buildProgressLine(),
                     _buildProgressDot(false),
+                    _buildProgressLine(),
+                    _buildProgressDot(false),
                   ],
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Essa tela deverá aparecer apenas na primeira venda do usuário',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),

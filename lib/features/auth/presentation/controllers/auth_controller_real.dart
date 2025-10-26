@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,6 +25,7 @@ class AuthController extends ChangeNotifier {
   String? _errorMessage;
   LoginProgress _loginProgress = LoginProgress.idle;
   bool _isDisposed = false;
+  StreamSubscription<firebase_auth.User?>? _authStateSubscription;
 
   // Getters
   firebase_auth.User? get currentUser => _currentUser;
@@ -45,13 +47,23 @@ class AuthController extends ChangeNotifier {
       print('🔍 AuthController.initialize() - isLoggedIn: $isLoggedIn');
       
       // Escutar mudanças de autenticação
-      AuthService.authStateChanges.listen((firebase_auth.User? user) {
-        print('🔍 AuthController - authStateChanges: ${user?.uid}');
-        print('🔍 AuthController - authStateChanges - isLoggedIn antes: $isLoggedIn');
+      _authStateSubscription = AuthService.authStateChanges.listen((firebase_auth.User? user) {
+        if (_isDisposed) {
+          print('⚠️ AuthController - authStateChanges ignorado - controller disposed');
+          return;
+        }
+        print('');
+        print('🔥 AuthController - authStateChanges RECEBIDO');
+        print('🔥 User do evento: ${user?.uid}');
+        print('🔥 _currentUser antes: ${_currentUser?.uid}');
+        print('🔥 isLoggedIn antes: $isLoggedIn');
         _currentUser = user;
-        print('🔍 AuthController - authStateChanges - isLoggedIn depois: $isLoggedIn');
+        print('🔥 _currentUser depois: ${_currentUser?.uid}');
+        print('🔥 isLoggedIn depois: $isLoggedIn');
+        print('🔥 Chamando notifyListeners()');
         notifyListeners();
-        print('🔍 AuthController - authStateChanges - notifyListeners() chamado');
+        print('🔥 notifyListeners() concluído');
+        print('');
       });
       
       // Verificar disponibilidade biométrica em paralelo (não bloqueia)
@@ -243,9 +255,18 @@ class AuthController extends ChangeNotifier {
       await UserCacheService.saveLastLogin();
       
       _setLoginProgress(LoginProgress.success);
-      print('✅ Login realizado com sucesso!');
-      print('🔍 AuthController - _currentUser: ${_currentUser?.uid}');
-      print('🔍 AuthController - isLoggedIn: $isLoggedIn');
+      
+      print('');
+      print('✅✅✅ Login realizado com sucesso! ✅✅✅');
+      print('✅ _currentUser setado: ${_currentUser?.uid}');
+      print('✅ isLoggedIn: $isLoggedIn');
+      print('✅ Chamando notifyListeners()...');
+      
+      // Notificar para atualizar UI
+      notifyListeners();
+      
+      print('✅ notifyListeners() concluído');
+      print('');
       
       return true;
       
@@ -458,6 +479,15 @@ class AuthController extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    _authStateSubscription?.cancel();
+    _authStateSubscription = null;
     super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
   }
 }

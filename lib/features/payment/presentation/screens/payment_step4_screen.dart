@@ -66,15 +66,25 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Fazer uma Venda',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Center(
+              child: Text(
+                '4/5',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+        ],
         backgroundColor: Colors.grey[900],
         elevation: 0,
       ),
@@ -90,7 +100,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                 
                 // Título
                 const Text(
-                  'INSIRA OS DADOS DO CARTÃO:',
+                  'DADOS DO CARTÃO DO COMPRADOR',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -103,8 +113,8 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                 // Nome do Titular
                 CustomTextField(
                   controller: _nomeTitularController,
-                  hintText: 'Nome do Titular',
-                  labelText: 'Nome do Titular',
+                  hintText: 'Nome Completo do Titular',
+                  labelText: 'Nome Completo do Titular',
                   textCapitalization: TextCapitalization.words,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -203,9 +213,9 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                 ),
                 const SizedBox(height: 40),
 
-                // Botão Continuar
+                // Botão Avançar
                 CustomButton(
-                  text: 'Continuar',
+                  text: 'Avançar',
                   onPressed: _continuar,
                 ),
                 
@@ -222,6 +232,8 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                     _buildProgressDot(true),
                     _buildProgressLine(),
                     _buildProgressDot(true),
+                    _buildProgressLine(),
+                    _buildProgressDot(false),
                   ],
                 ),
                 

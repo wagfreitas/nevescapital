@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../auth/presentation/controllers/auth_controller_real.dart';
 import '../../../auth/presentation/screens/onboarding_screen.dart';
 
@@ -25,181 +24,273 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     // Escutar mudanças no controller para detectar logout e forçar
     // a navegação para Onboarding limpando a pilha.
-    widget.authController.addListener(_authListener);
+    try {
+      if (!widget.authController.isDisposed) {
+        widget.authController.addListener(_authListener);
+      }
+    } catch (e) {
+      print('⚠️ Erro ao adicionar listener: $e');
+    }
   }
 
   void _authListener() {
     if (!mounted) return;
 
-    final isLoggedIn = widget.authController.currentUser != null;
+    try {
+      if (widget.authController.isDisposed) {
+        return;
+      }
 
-    if (!isLoggedIn && !_didNavigate) {
-      _didNavigate = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (_) => OnboardingScreen(authController: widget.authController),
-          ),
-          (route) => false,
-        );
-      });
+      final isLoggedIn = widget.authController.currentUser != null;
+
+      if (!isLoggedIn && !_didNavigate) {
+        _didNavigate = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (_) => OnboardingScreen(authController: widget.authController),
+            ),
+            (route) => false,
+          );
+        });
+      }
+    } catch (e) {
+      print('⚠️ Erro no auth listener: $e');
     }
   }
 
   @override
   void dispose() {
-    widget.authController.removeListener(_authListener);
+    try {
+      if (!widget.authController.isDisposed) {
+        widget.authController.removeListener(_authListener);
+      }
+    } catch (e) {
+      print('⚠️ Erro ao remover listener: $e');
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final authController = widget.authController;
-
     // Verificar se o controller ainda está ativo antes de usar
-    if (authController.isDisposed) {
+    try {
+      if (widget.authController.isDisposed) {
+        return Scaffold(
+          appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: const Text('Conta'),
+            centerTitle: true,
+          ),
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                const Text(
+                  'Sessão expirada',
+                  style: TextStyle(fontSize: 18),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Voltar'),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      final user = widget.authController.currentUser;
+      
+      if (user == null) {
+        return Scaffold(
+          appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: const Text('Conta'),
+            centerTitle: true,
+          ),
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.person_off, size: 64, color: Colors.grey),
+                const SizedBox(height: 16),
+                const Text(
+                  'Usuário não encontrado',
+                  style: TextStyle(fontSize: 18),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Voltar'),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      print('⚠️ Erro ao acessar authController no build: $e');
       return Scaffold(
         appBar: AppBar(
-          title: Text('Perfil'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: const Text('Conta'),
           centerTitle: true,
         ),
         body: Center(
-          child: Text('Sessão expirada'),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text(
+                'Erro ao carregar perfil',
+                style: TextStyle(fontSize: 18),
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Voltar'),
+              ),
+            ],
+          ),
         ),
       );
     }
 
-    final user = authController.currentUser;
-    
-    if (user == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('Perfil'),
-          centerTitle: true,
-        ),
-        body: Center(
-          child: Text('Usuário não encontrado'),
-        ),
-      );
-    }
-
+    // Se chegou aqui, tudo está ok
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Perfil'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text('Conta'),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Avatar e informações básicas
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundColor: Colors.green.shade100,
-                      child: user.photoURL != null
-                          ? ClipOval(
-                              child: Image.network(
-                                user.photoURL!,
-                                width: 100,
-                                height: 100,
-                                fit: BoxFit.cover,
-                              ),
-                            )
-                          : Icon(
-                              Icons.person,
-                              size: 50,
-                              color: Colors.green.shade700,
-                            ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      user.displayName ?? 'Usuário',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      user.email ?? '',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          border: Border(
+            top: BorderSide(color: Colors.grey.shade300),
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavButton(
+                  context,
+                  icon: Icons.check_circle,
+                  label: 'Vendas',
+                  isActive: false,
+                  onTap: () => Navigator.of(context).popUntil((route) => route.isFirst),
                 ),
-              ),
+                _buildNavButton(
+                  context,
+                  icon: Icons.person,
+                  label: 'Conta',
+                  isActive: true,
+                  onTap: () {},
+                ),
+              ],
             ),
-            const SizedBox(height: 24),
+          ),
+        ),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 40),
+            
+            // Pergunta
+            const Text(
+              'O que deseja alterar?',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            
+            const SizedBox(height: 40),
             
             // Opções do perfil
-            Card(
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.edit),
-                    title: const Text('Editar Perfil'),
-                    trailing: const Icon(Icons.arrow_forward_ios),
-                    onTap: () {
-                      // TODO: Navegar para edição de perfil
-                    },
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.lock),
-                    title: const Text('Alterar Senha'),
-                    trailing: const Icon(Icons.arrow_forward_ios),
-                    onTap: () {
-                      // TODO: Navegar para alteração de senha
-                    },
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.notifications),
-                    title: const Text('Notificações'),
-                    trailing: const Icon(Icons.arrow_forward_ios),
-                    onTap: () {
-                      // TODO: Navegar para configurações de notificação
-                    },
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.help),
-                    title: const Text('Ajuda'),
-                    trailing: const Icon(Icons.arrow_forward_ios),
-                    onTap: () {
-                      // TODO: Navegar para ajuda
-                    },
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.privacy_tip_outlined),
-                    title: const Text('Política de Privacidade'),
-                    trailing: const Icon(Icons.open_in_new),
-                    onTap: () {
-                      _openPrivacyPolicy();
-                    },
-                  ),
-                ],
-              ),
+            _buildOptionCard(
+              context,
+              icon: Icons.person,
+              title: 'Dados Pessoais',
+              subtitle: 'Email, telefone, endereço',
+              onTap: () {
+                // TODO: Navegar para edição de dados pessoais
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Funcionalidade em desenvolvimento')),
+                );
+              },
             ),
-            const SizedBox(height: 24),
+            
+            const SizedBox(height: 16),
+            
+            _buildOptionCard(
+              context,
+              icon: Icons.store,
+              title: 'Dados da Loja',
+              subtitle: 'Nome, ramo de atividade',
+              onTap: () {
+                // TODO: Navegar para edição de dados da loja
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Funcionalidade em desenvolvimento')),
+                );
+              },
+            ),
+            
+            const SizedBox(height: 16),
+            
+            _buildOptionCard(
+              context,
+              icon: Icons.pix,
+              title: 'Chave Pix',
+              subtitle: 'Gerenciar chaves cadastradas',
+              onTap: () {
+                // TODO: Navegar para gestão de chaves PIX
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Funcionalidade em desenvolvimento')),
+                );
+              },
+            ),
+            
+            const Spacer(),
             
             // Botão de logout
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
+              child: OutlinedButton.icon(
                 onPressed: () {
                   _showLogoutDialog(context);
                 },
                 icon: const Icon(Icons.logout),
                 label: const Text('Sair'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: const BorderSide(color: Colors.red),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),
@@ -224,8 +315,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: () async {
               Navigator.of(context).pop(); // Fechar dialog
               
-              // Fazer logout - o AppWrapper já gerencia o redirecionamento
-              await widget.authController.logout();
+              try {
+                // Fazer logout
+                if (!widget.authController.isDisposed) {
+                  await widget.authController.logout();
+                }
+                
+                // Navegar para OnboardingScreen limpando a pilha
+                if (context.mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => OnboardingScreen(
+                        authController: widget.authController,
+                      ),
+                    ),
+                    (route) => false,
+                  );
+                }
+              } catch (e) {
+                print('⚠️ Erro no logout: $e');
+                // Mesmo em caso de erro, navegar para onboarding
+                if (context.mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => OnboardingScreen(
+                        authController: widget.authController,
+                      ),
+                    ),
+                    (route) => false,
+                  );
+                }
+              }
             },
             child: const Text('Sair'),
           ),
@@ -234,19 +354,108 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _openPrivacyPolicy() async {
-    const url = 'https://www.pagpagbrasil.com.br/politica';
-    final uri = Uri.parse(url);
-    
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        // Fallback caso não consiga abrir
-        print('Não foi possível abrir a URL: $url');
-      }
-    } catch (e) {
-      print('Erro ao abrir URL: $e');
-    }
+  Widget _buildOptionCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  color: Theme.of(context).primaryColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: Colors.grey,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavButton(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? Theme.of(context).primaryColor.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isActive ? Theme.of(context).primaryColor : Colors.grey[600],
+              size: 24,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isActive ? Theme.of(context).primaryColor : Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

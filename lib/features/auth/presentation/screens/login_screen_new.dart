@@ -2,16 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller_real.dart';
 import 'package:neves_capital/shared/components/cpf_input_field.dart';
 import 'package:neves_capital/shared/helpers/cpf_helper.dart';
-import 'package:neves_capital/features/home/presentation/screens/dashboard_screen.dart';
 import 'package:neves_capital/shared/widgets/login_progress_widget.dart';
+import 'package:neves_capital/features/home/presentation/screens/dashboard_screen.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 
 class LoginScreenNew extends StatefulWidget {
   final AuthController authController;
+  final ThemeController? themeController;
   
   const LoginScreenNew({
     super.key,
     required this.authController,
+    this.themeController,
   });
 
   @override
@@ -273,32 +275,34 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
         password: _passwordController.text.trim(),
       );
 
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Login realizado com sucesso!'),
-            backgroundColor: Color(0xFF22C55E),
-          ),
-        );
-        
-        // Navegação manual para o Dashboard
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (context) => DashboardScreen(
-              authController: widget.authController,
-              themeController: ThemeController(), // Criar uma instância temporária
+      if (!mounted) return;
+
+      if (success) {
+        // Login bem-sucedido - navegar diretamente para Dashboard
+        print('✅ Login realizado - navegando para Dashboard');
+        if (mounted) {
+          // Navegar para Dashboard limpando toda a pilha
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => DashboardScreen(
+                authController: widget.authController,
+                themeController: widget.themeController ?? ThemeController(),
+              ),
             ),
-          ),
-          (route) => false, // Remove todas as rotas anteriores
-        );
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.authController.errorMessage ?? 'Erro no login'),
-            backgroundColor: Colors.red,
-          ),
-        );
+            (route) => false,
+          );
+        }
+      } else {
+        // Login falhou - mostrar mensagem de erro
+        final errorMessage = widget.authController.errorMessage ?? 'Erro no login';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -317,5 +321,4 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
       }
     }
   }
-
 }
