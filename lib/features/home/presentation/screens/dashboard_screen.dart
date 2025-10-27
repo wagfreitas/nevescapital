@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../auth/presentation/controllers/auth_controller_real.dart';
-import '../../../auth/presentation/screens/onboarding_screen.dart';
 import '../../../payment/presentation/screens/payment_step1_screen.dart';
 import 'sales_history_screen.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
@@ -71,12 +70,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (user.displayName != null && user.displayName!.isNotEmpty) {
           // Pegar apenas o primeiro nome
           userName = user.displayName!.split(' ').first;
+          print('👤 Nome do usuário obtido do displayName: $userName');
         } else if (user.email != null) {
           // Se não tem displayName, usar a parte antes do @ do email
           userName = user.email!.split('@').first;
+          print('⚠️ Nome obtido do email (displayName vazio): $userName');
+          print('⚠️ displayName: "${user.displayName}", email: "${user.email}"');
         }
         
-        print('👤 Nome do usuário exibido: $userName');
+        print('👤 Nome final exibido: $userName');
+      } else {
+        print('⚠️ Usuário não encontrado no authController');
+        print('⚠️ isDisposed: ${widget.authController.isDisposed}');
+        print('⚠️ currentUser: ${widget.authController.currentUser?.uid}');
       }
     } catch (e) {
       print('⚠️ Erro ao acessar authController: $e');
@@ -217,23 +223,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   print('👤 authController.currentUser: ${widget.authController.currentUser?.uid}');
                   print('👤 authController.isLoggedIn: ${widget.authController.isLoggedIn}');
                   
-                  try {
-                    // Verificar se o controller ainda está ativo antes de navegar
-                    if (widget.authController.isDisposed) {
-                      print('👤 Controller disposed - navegando para Onboarding');
-                      // Sessão expirada - navegar para onboarding
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(
-                          builder: (_) => OnboardingScreen(
-                            authController: widget.authController,
-                            themeController: widget.themeController,
-                          ),
-                        ),
-                        (route) => false,
-                      );
-                      return;
-                    }
-                    
+                  // Verificar se o usuário está logado e o controller está válido
+                  if (widget.authController.isLoggedIn && !widget.authController.isDisposed) {
                     print('👤 Navegando para ProfileScreen...');
                     Navigator.push(
                       context,
@@ -244,18 +235,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     );
                     print('👤 Navegação para ProfileScreen concluída');
-                  } catch (e) {
-                    print('⚠️ Erro ao navegar para ProfileScreen: $e');
-                    // Em caso de erro, navegar para onboarding
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder: (_) => OnboardingScreen(
-                          authController: widget.authController,
-                          themeController: widget.themeController,
-                        ),
-                      ),
-                      (route) => false,
-                    );
+                  } else {
+                    print('⚠️ Não é possível navegar - usuário não logado ou controller inválido');
+                    print('⚠️ isLoggedIn: ${widget.authController.isLoggedIn}');
+                    print('⚠️ isDisposed: ${widget.authController.isDisposed}');
+                    // Não fazer nada - o AppWrapper vai lidar com o estado
                   }
                 },
               ),

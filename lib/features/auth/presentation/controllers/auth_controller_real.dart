@@ -251,17 +251,28 @@ class AuthController extends ChangeNotifier {
 
       _currentUser = credential.user;
       
-      // 3. Verificar e atualizar displayName se necessário
-      final currentDisplayName = _currentUser?.displayName;
+      // 3. SEMPRE atualizar e recarregar displayName para garantir que está correto
       final userFullName = userData['name'] as String?;
       
-      if (userFullName != null && userFullName.isNotEmpty && 
-          (currentDisplayName == null || currentDisplayName.isEmpty)) {
-        print('📝 DisplayName vazio, atualizando com: $userFullName');
-        await _currentUser?.updateDisplayName(userFullName);
+      if (userFullName != null && userFullName.isNotEmpty) {
+        final currentDisplayName = _currentUser?.displayName;
+        print('📝 displayName atual: "$currentDisplayName"');
+        print('📝 displayName esperado: "$userFullName"');
+        
+        // Verificar se precisa atualizar
+        if (currentDisplayName != userFullName) {
+          print('📝 Atualizando displayName...');
+          await _currentUser?.updateDisplayName(userFullName);
+          await _currentUser?.reload();
+          _currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+          print('✅ DisplayName atualizado para: ${_currentUser?.displayName}');
+        } else {
+          print('✅ DisplayName já está correto');
+        }
+        
+        // Sempre recarregar o usuário para garantir dados frescos
         await _currentUser?.reload();
         _currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
-        print('✅ DisplayName atualizado: ${_currentUser?.displayName}');
       }
       
       // 4. Salvar timestamp do login para otimizações futuras
@@ -360,13 +371,23 @@ class AuthController extends ChangeNotifier {
       await _clearLocalData();
       print('🔐 Dados locais limpos');
 
+      // Limpar progresso de login
+      _loginProgress = LoginProgress.idle;
+      _errorMessage = null;
+
       print('🔐 Notificando listeners...');
       notifyListeners();
       
       print('✅ Logout realizado com sucesso!');
+      print('✅ _currentUser após logout: $_currentUser');
+      print('✅ isLoggedIn após logout: $isLoggedIn');
     } catch (e) {
       print('❌ Erro no logout: $e');
       _setError('Erro ao fazer logout: $e');
+      // Garantir que mesmo em caso de erro, limpamos o estado
+      _currentUser = null;
+      _loginProgress = LoginProgress.idle;
+      notifyListeners();
     } finally {
       _setLoading(false);
     }

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../auth/presentation/controllers/auth_controller_real.dart';
-import '../../../auth/presentation/screens/onboarding_screen.dart';
-import '../../../../core/theme/theme_controller.dart';
 
 /// Tela de perfil do usuário
 class ProfileScreen extends StatefulWidget {
@@ -270,36 +268,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Navigator.of(context).pop(); // Fechar dialog
               
               try {
-                // Fazer logout
+                // Fazer logout - isso vai disparar notifyListeners()
+                // que vai fazer o AppWrapper refletir o novo estado (deslogado)
                 if (!widget.authController.isDisposed) {
                   await widget.authController.logout();
                 }
                 
-                // Navegar para OnboardingScreen limpando a pilha
+                // Após logout, apenas voltar - o AppWrapper vai gerenciar a navegação
+                // Não precisamos navegar manualmente aqui
                 if (context.mounted) {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(
-                      builder: (_) => OnboardingScreen(
-                        authController: widget.authController,
-                        themeController: ThemeController(),
-                      ),
-                    ),
-                    (route) => false,
-                  );
+                  // Popar todas as rotas até voltar ao AppWrapper
+                  Navigator.of(context).popUntil((route) => route.isFirst);
                 }
               } catch (e) {
                 print('⚠️ Erro no logout: $e');
-                // Mesmo em caso de erro, navegar para onboarding
+                // Em caso de erro, voltar para a primeira rota
                 if (context.mounted) {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(
-                      builder: (_) => OnboardingScreen(
-                        authController: widget.authController,
-                        themeController: ThemeController(),
-                      ),
-                    ),
-                    (route) => false,
-                  );
+                  Navigator.of(context).popUntil((route) => route.isFirst);
                 }
               }
             },
