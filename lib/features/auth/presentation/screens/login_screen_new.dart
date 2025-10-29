@@ -5,6 +5,7 @@ import 'package:neves_capital/shared/helpers/cpf_helper.dart';
 import 'package:neves_capital/shared/widgets/login_progress_widget.dart';
 import 'package:neves_capital/features/home/presentation/screens/dashboard_screen.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
+import 'package:neves_capital/features/auth/presentation/screens/forgot_password_screen.dart';
 
 class LoginScreenNew extends StatefulWidget {
   final AuthController authController;
@@ -198,7 +199,13 @@ class _LoginScreenNewState extends State<LoginScreenNew> {
       alignment: Alignment.centerRight,
       child: TextButton(
         onPressed: () {
-          // TODO: Implementar recuperação de senha
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => ForgotPasswordScreen(
+                authController: widget.authController,
+              ),
+            ),
+          );
         },
         child: const Text(
           'Esqueceu sua senha ?',

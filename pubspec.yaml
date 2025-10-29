@@ -129,6 +129,7 @@ flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
   image_path: "assets/icons/PagPag.png"
+  image_path_ios: "assets/icons/PagPag_botao.png"
   min_sdk_android: 19
   remove_alpha_ios: true
   web:

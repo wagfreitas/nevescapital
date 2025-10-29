@@ -415,7 +415,7 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  /// Redefinir senha
+  /// Redefinir senha por email
   Future<bool> resetPassword(String email) async {
     _setLoading(true);
     _clearError();
@@ -425,6 +425,55 @@ class AuthController extends ChangeNotifier {
       return true;
     } catch (e) {
       _setError('Erro ao redefinir senha: $e');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Redefinir senha usando CPF (busca email no PostgreSQL)
+  Future<bool> resetPasswordByCpf(String cpf) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      print('🔐 Iniciando recuperação de senha com CPF: $cpf');
+
+      // 1. Buscar usuário por CPF no PostgreSQL
+      final userData = await DatabaseService.getUserByCpf(cpf);
+
+      if (userData == null) {
+        throw Exception('CPF não cadastrado');
+      }
+
+      final email = userData['email'] as String;
+      print('✅ Email encontrado: $email');
+
+      // 2. Enviar email de redefinição de senha via Firebase
+      print('📧 Enviando email de redefinição de senha...');
+      await AuthService.resetPassword(email);
+
+      print('✅ Email de redefinição enviado com sucesso!');
+      return true;
+    } catch (e) {
+      print('❌ Erro ao recuperar senha: $e');
+      
+      // Traduzir erros
+      String errorMessage = 'Erro ao recuperar senha';
+      
+      if (e.toString().contains('CPF não cadastrado')) {
+        errorMessage = 'CPF não cadastrado no sistema';
+      } else if (e.toString().contains('user-not-found')) {
+        errorMessage = 'Email não encontrado no Firebase';
+      } else if (e.toString().contains('network') || 
+                 e.toString().contains('timeout') ||
+                 e.toString().contains('Connection')) {
+        errorMessage = 'Erro de conexão. Verifique sua internet.';
+      } else {
+        errorMessage = 'Erro ao enviar email de recuperação: $e';
+      }
+      
+      _setError(errorMessage);
       return false;
     } finally {
       _setLoading(false);
