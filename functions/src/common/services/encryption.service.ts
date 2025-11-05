@@ -30,7 +30,15 @@ export class EncryptionService {
     
     try {
       const decrypted = CryptoJS.AES.decrypt(encryptedText, this.encryptionKey);
-      return decrypted.toString(CryptoJS.enc.Utf8);
+      const decryptedStr = decrypted.toString(CryptoJS.enc.Utf8);
+      
+      if (!decryptedStr || decryptedStr.length === 0) {
+        console.error(`❌ Descriptografia retornou vazio. Chave usada: ${this.encryptionKey.substring(0, 10)}...`);
+        console.error(`❌ Texto criptografado (primeiros 50 chars): ${encryptedText.substring(0, 50)}`);
+        return null;
+      }
+      
+      return decryptedStr;
     } catch (error) {
       console.error('Erro ao descriptografar:', error);
       throw new Error('Falha na descriptografia');

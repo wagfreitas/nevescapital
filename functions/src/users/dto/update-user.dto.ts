@@ -1,4 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsEmail } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateUserDto {
@@ -6,6 +6,11 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   fullName?: string;
+
+  @ApiPropertyOptional({ example: 'novoemail@exemplo.com' })
+  @IsOptional()
+  @IsEmail({}, { message: 'Email inválido' })
+  email?: string;
 
   @ApiPropertyOptional({ example: '11999999999' })
   @IsOptional()

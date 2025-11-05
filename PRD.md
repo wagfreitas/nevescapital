@@ -74,6 +74,22 @@ Este documento define as diretrizes e padrões para o Design System da aplicaç�
 
 ---
 
+## 🚀 **Deploy Backend - Cloud Run**
+
+Para fazer deploy do backend no Cloud Run:
+
+```bash
+cd functions
+gcloud run deploy neves-capital-api \
+  --source . \
+  --region us-central1 \
+  --project pag-pag-dev
+```
+
+**URL do serviço:** https://neves-capital-api-452426572797.us-central1.run.app
+
+---
+
 ## 🎯 **Diretrizes de Uso**
 
 ### **2.1 Quando Criar um Componente**

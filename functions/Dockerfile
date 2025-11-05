@@ -11,7 +11,8 @@ COPY tsconfig*.json ./
 COPY nest-cli.json ./
 
 # Instalar dependências
-RUN npm ci
+# Usando npm install em vez de npm ci para evitar problemas com lock file desatualizado
+RUN npm install
 
 # Copiar código fonte
 COPY src ./src
@@ -28,7 +29,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Instalar apenas dependências de produção
-RUN npm ci --only=production
+RUN npm install --only=production
 
 # Copiar build da aplicação
 COPY --from=builder /app/dist ./dist

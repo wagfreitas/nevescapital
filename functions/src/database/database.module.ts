@@ -16,7 +16,7 @@ import { Pool } from 'pg';
           password: process.env.DB_PASSWORD,
           max: 10,
           idleTimeoutMillis: 30000,
-          connectionTimeoutMillis: 10000, // Aumentar timeout
+          connectionTimeoutMillis: 30000, // Timeout aumentado para conexões remotas
         };
 
         if (isCloudRun) {
@@ -24,11 +24,12 @@ import { Pool } from 'pg';
           config.host = process.env.INSTANCE_UNIX_SOCKET;
           console.log(`🔌 Conectando via Unix socket: ${config.host}`);
         } else {
-          // Desenvolvimento: usar host e porta
+          // Desenvolvimento: usar host e porta (Cloud SQL via Proxy ou IP público)
           config.host = process.env.DB_HOST;
           config.port = parseInt(process.env.DB_PORT || '5432');
-          config.ssl = false;
-          console.log(`🔌 Conectando via TCP: ${config.host}:${config.port}`);
+          // Para Cloud SQL remoto, geralmente precisa SSL
+          config.ssl = process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false;
+          console.log(`🔌 Conectando via TCP: ${config.host}:${config.port} (SSL: ${config.ssl ? 'sim' : 'não'})`);
         }
 
         const pool = new Pool(config);

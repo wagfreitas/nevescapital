@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
-import 'package:neves_capital/features/auth/presentation/controllers/auth_controller_real.dart';
+import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 
 class SelfieVerificationScreen extends StatefulWidget {
   final Map<String, dynamic> userData;

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:neves_capital/features/auth/presentation/controllers/auth_controller_real.dart';
+import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/shared/components/cpf_input_field.dart';
 import 'package:neves_capital/shared/helpers/cpf_helper.dart';
 

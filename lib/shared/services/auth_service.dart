@@ -1,17 +1,17 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
 /// Serviço para gerenciar autenticação Firebase
 class AuthService {
-  static final FirebaseAuth _auth = FirebaseAuth.instance;
+  static final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
 
   /// Usuário atual logado
-  static User? get currentUser => _auth.currentUser;
+  static firebase_auth.User? get currentUser => _auth.currentUser;
 
   /// Stream do estado de autenticação
-  static Stream<User?> get authStateChanges => _auth.authStateChanges();
+  static Stream<firebase_auth.User?> get authStateChanges => _auth.authStateChanges();
 
   /// Criar conta no Firebase
-  static Future<UserCredential> createUserWithEmailAndPassword({
+  static Future<firebase_auth.UserCredential> createUserWithEmailAndPassword({
     required String email,
     required String password,
   }) async {
@@ -25,13 +25,13 @@ class AuthService {
       await credential.user?.sendEmailVerification();
 
       return credential;
-    } on FirebaseAuthException catch (e) {
+    } on firebase_auth.FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     }
   }
 
   /// Fazer login com email e senha
-  static Future<UserCredential> signInWithEmailAndPassword({
+  static Future<firebase_auth.UserCredential> signInWithEmailAndPassword({
     required String email,
     required String password,
   }) async {
@@ -42,7 +42,7 @@ class AuthService {
       );
 
       return credential;
-    } on FirebaseAuthException catch (e) {
+    } on firebase_auth.FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     }
   }
@@ -56,7 +56,7 @@ class AuthService {
   static Future<void> resetPassword(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
-    } on FirebaseAuthException catch (e) {
+    } on firebase_auth.FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     }
   }
@@ -78,8 +78,30 @@ class AuthService {
     await currentUser?.updatePhotoURL(photoURL);
   }
 
+  /// Atualizar email do usuário
+  /// Nota: Pode requerer reautenticação dependendo das configurações do Firebase
+  static Future<void> updateEmail(String newEmail) async {
+    final firebaseUser = _auth.currentUser;
+    if (firebaseUser == null) {
+      throw Exception('Usuário não autenticado');
+    }
+    
+    try {
+      // Usar dynamic para evitar conflito de tipos com User do domínio
+      // O método updateEmail existe no User do Firebase Auth versão 6.1.0
+      final userDynamic = firebaseUser as dynamic;
+      await userDynamic.updateEmail(newEmail);
+      await firebaseUser.sendEmailVerification();
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    } catch (e) {
+      // Se não for FirebaseAuthException, pode ser problema de tipo ou reautenticação necessária
+      throw Exception('Erro ao atualizar email. Pode ser necessário reautenticar: $e');
+    }
+  }
+
   /// Tratar exceções do Firebase Auth
-  static String _handleAuthException(FirebaseAuthException e) {
+  static String _handleAuthException(firebase_auth.FirebaseAuthException e) {
     switch (e.code) {
       case 'user-not-found':
         return 'Usuário não encontrado';

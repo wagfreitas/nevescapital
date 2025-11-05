@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../auth/presentation/controllers/auth_controller_real.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
+import 'edit_personal_data_screen.dart';
 
 /// Tela de perfil do usuário
 class ProfileScreen extends StatefulWidget {
@@ -191,9 +192,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               title: 'Dados Pessoais',
               subtitle: 'Email, telefone, endereço',
               onTap: () {
-                // TODO: Navegar para edição de dados pessoais
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Funcionalidade em desenvolvimento')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EditPersonalDataScreen(
+                      authController: widget.authController,
+                    ),
+                  ),
                 );
               },
             ),

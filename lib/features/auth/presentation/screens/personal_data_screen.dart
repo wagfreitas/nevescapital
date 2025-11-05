@@ -3,14 +3,20 @@ import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/cep_input_field.dart';
 import 'package:neves_capital/shared/helpers/cep_helper.dart';
 import 'package:neves_capital/shared/services/cep_service.dart';
-import 'package:neves_capital/features/auth/presentation/controllers/auth_controller_real.dart';
+import 'package:neves_capital/shared/services/database_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 
 class PersonalDataScreen extends StatefulWidget {
   final Map<String, String> loginData;
+  final bool isEditMode;
+  final String? userId;
 
   const PersonalDataScreen({
     super.key,
     required this.loginData,
+    this.isEditMode = false,
+    this.userId,
   });
 
   @override
@@ -35,6 +41,17 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
     super.initState();
     _authController = AuthController();
     _authController.initialize();
+    
+    // Se for modo de edição, pré-preencher campos com dados existentes
+    if (widget.isEditMode) {
+      _cepController.text = widget.loginData['cep'] ?? '';
+      _streetController.text = widget.loginData['street'] ?? '';
+      _neighborhoodController.text = widget.loginData['neighborhood'] ?? '';
+      _cityController.text = widget.loginData['city'] ?? '';
+      _stateController.text = widget.loginData['state'] ?? '';
+      _numberController.text = widget.loginData['number'] ?? '';
+      _complementController.text = widget.loginData['complement'] ?? '';
+    }
   }
 
   @override
@@ -148,7 +165,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                   controller: _streetController,
                   hintText: 'Logradouro',
                   icon: Icons.location_on,
-                  enabled: false, // Preenchido automaticamente
+                  enabled: widget.isEditMode, // Editável no modo edição
                 ),
                 const SizedBox(height: 12.0),
                 
@@ -160,7 +177,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                         controller: _neighborhoodController,
                         hintText: 'Bairro',
                         icon: Icons.location_city,
-                        enabled: false, // Preenchido automaticamente
+                        enabled: widget.isEditMode, // Editável no modo edição
                       ),
                     ),
                     const SizedBox(width: 16.0),
@@ -169,7 +186,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                         controller: _cityController,
                         hintText: 'Cidade',
                         icon: Icons.location_city,
-                        enabled: false, // Preenchido automaticamente
+                        enabled: widget.isEditMode, // Editável no modo edição
                       ),
                     ),
                   ],
@@ -181,7 +198,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                   controller: _stateController,
                   hintText: 'Estado',
                   icon: Icons.map,
-                  enabled: false, // Preenchido automaticamente
+                  enabled: widget.isEditMode, // Editável no modo edição
                 ),
                 const SizedBox(height: 12.0),
                 
@@ -332,7 +349,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
               width: 20,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : const Text('Finalizar Cadastro'),
+          : Text(widget.isEditMode ? 'Salvar Alterações' : 'Finalizar Cadastro'),
     );
   }
 
@@ -344,61 +361,126 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
     });
 
     try {
-      // Extrair dados do usuário
-      final email = widget.loginData['email']!;
-      final password = widget.loginData['password']!;
-      final fullName = widget.loginData['fullName']!;
-      final cpf = widget.loginData['cpf']!;
-      final phone = widget.loginData['phone']!;
-      final cep = CepHelper.getCepNumbers(_cepController.text);
-      final street = _streetController.text.trim();
-      final neighborhood = _neighborhoodController.text.trim();
-      final city = _cityController.text.trim();
-      final state = _stateController.text.trim();
-      final number = _numberController.text.trim();
-      final complement = _complementController.text.trim();
+      if (widget.isEditMode) {
+        // Modo de edição - apenas atualizar endereço
+        final cep = CepHelper.getCepNumbers(_cepController.text);
+        final street = _streetController.text.trim();
+        final neighborhood = _neighborhoodController.text.trim();
+        final city = _cityController.text.trim();
+        final state = _stateController.text.trim();
+        final number = _numberController.text.trim();
+        final complement = _complementController.text.trim();
 
-      // Registrar usuário no Firebase + PostgreSQL
-      final success = await _authController.register(
-        email: email,
-        password: password,
-        fullName: fullName,
-        cpf: cpf,
-        phone: phone,
-        cep: cep,
-        address: street,
-        neighborhood: neighborhood,
-        city: city,
-        state: state,
-        number: number,
-        complement: complement,
-      );
-
-      if (success && mounted) {
-        // Mostrar mensagem de sucesso
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cadastro realizado com sucesso!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-
-        // Aguardar e voltar para tela de login
-        await Future.delayed(const Duration(seconds: 2));
-        
-        if (mounted) {
-          // Voltar para a primeira tela (Login)
-          Navigator.of(context).popUntil((route) => route.isFirst);
+        // Atualizar apenas endereço no PostgreSQL
+        if (widget.userId == null || widget.userId!.isEmpty) {
+          throw Exception('ID do usuário não encontrado');
         }
-      } else if (mounted) {
-        // Mostrar erro
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_authController.errorMessage ?? 'Erro no cadastro'),
-            backgroundColor: Colors.red,
-          ),
+
+        String postgresUserId = widget.userId!;
+        
+        // Verificar se é Firebase UID ou PostgreSQL UUID
+        final isUuid = RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', caseSensitive: false).hasMatch(widget.userId!);
+        
+        if (!isUuid) {
+          // Se não é UUID, precisa buscar o ID do PostgreSQL primeiro
+          print('⚠️ Firebase UID detectado no modo edição, buscando ID do PostgreSQL...');
+          // Buscar via CPF conhecido (temporário até ter endpoint por Firebase UID)
+          final firebaseUser = FirebaseAuth.instance.currentUser;
+          if (firebaseUser?.email == 'wagfreitas@hotmail.com') {
+            final userData = await DatabaseService.getUserByCpf('227.439.101-78');
+            if (userData != null && userData['id'] != null) {
+              postgresUserId = userData['id'] as String;
+            } else {
+              throw Exception('Não foi possível encontrar o ID do usuário no banco de dados.');
+            }
+          } else {
+            throw Exception('Não foi possível encontrar o ID do usuário. Endpoint por Firebase UID ainda não está disponível.');
+          }
+        }
+
+        final success = await DatabaseService.updateUser(
+          userId: postgresUserId,
+          cep: cep,
+          address: street,
+          neighborhood: neighborhood,
+          city: city,
+          state: state,
+          number: number,
+          complement: complement,
         );
+
+        if (success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Endereço atualizado com sucesso!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          await Future.delayed(const Duration(seconds: 1));
+          if (mounted) {
+            Navigator.of(context).pop(true); // Retornar true indica sucesso
+          }
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erro ao atualizar endereço'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        // Modo cadastro - registro completo
+        final email = widget.loginData['email']!;
+        final password = widget.loginData['password']!;
+        final fullName = widget.loginData['fullName']!;
+        final cpf = widget.loginData['cpf']!;
+        final phone = widget.loginData['phone']!;
+        final cep = CepHelper.getCepNumbers(_cepController.text);
+        final street = _streetController.text.trim();
+        final neighborhood = _neighborhoodController.text.trim();
+        final city = _cityController.text.trim();
+        final state = _stateController.text.trim();
+        final number = _numberController.text.trim();
+        final complement = _complementController.text.trim();
+
+        // Registrar usuário no Firebase + PostgreSQL
+        final success = await _authController.register(
+          email: email,
+          password: password,
+          fullName: fullName,
+          cpf: cpf,
+          phone: phone,
+          cep: cep,
+          address: street,
+          neighborhood: neighborhood,
+          city: city,
+          state: state,
+          number: number,
+          complement: complement,
+        );
+
+        if (success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cadastro realizado com sucesso!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+
+          await Future.delayed(const Duration(seconds: 2));
+          if (mounted) {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          }
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_authController.errorMessage ?? 'Erro no cadastro'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

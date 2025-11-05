@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:neves_capital/features/auth/presentation/controllers/auth_controller_real.dart';
-import 'package:neves_capital/features/auth/presentation/screens/login_screen_new.dart';
+import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:neves_capital/features/auth/presentation/screens/login_screen.dart';
 import 'package:neves_capital/features/auth/presentation/screens/login_data_screen.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 
@@ -73,7 +73,7 @@ class OnboardingScreen extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => LoginScreenNew(
+                              builder: (context) => LoginScreen(
                                 authController: authController,
                                 themeController: themeController,
                               ),

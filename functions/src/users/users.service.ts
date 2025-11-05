@@ -5,6 +5,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { VerifyPasswordDto } from './dto/verify-password.dto';
 import * as crypto from 'crypto';
+import * as admin from 'firebase-admin';
 
 @Injectable()
 export class UsersService {
@@ -173,12 +174,18 @@ export class UsersService {
 
       // Procurar o usuário com CPF correspondente
       let foundUser = null;
+      const allCpfs: string[] = [];
       for (const user of result.rows) {
         try {
           const decryptedCpf = this.decryptFromBytea(user.cpf_encrypted);
-          console.log(`🔐 CPF descriptografado: ${decryptedCpf}`);
+          allCpfs.push(decryptedCpf);
+          console.log(`🔐 CPF descriptografado: ${decryptedCpf} (buscando: ${cpf})`);
           
-          if (decryptedCpf === cpf) {
+          // Normalizar ambos os CPFs para comparação (remover formatação)
+          const normalizedDecrypted = decryptedCpf.replace(/\D/g, '');
+          const normalizedSearch = cpf.replace(/\D/g, '');
+          
+          if (normalizedDecrypted === normalizedSearch) {
             console.log(`✅ Usuário encontrado! ID: ${user.id}`);
             foundUser = user;
             break;
@@ -187,6 +194,10 @@ export class UsersService {
           console.error(`❌ Erro ao descriptografar CPF do usuário ${user.id}:`, error);
           continue;
         }
+      }
+      
+      if (allCpfs.length > 0) {
+        console.log(`📋 Todos os CPFs encontrados no banco: ${allCpfs.join(', ')}`);
       }
 
       if (!foundUser) {
@@ -217,27 +228,148 @@ export class UsersService {
         [user.id],
       );
 
+      // Descriptografar endereço (com verificação de null para cada campo)
+      let address = null;
+      if (addressResult.rows[0]) {
+        const addr = addressResult.rows[0];
+        try {
+          address = {
+            street: addr.street_encrypted ? this.decryptFromBytea(addr.street_encrypted) : null,
+            number: addr.number_encrypted ? this.decryptFromBytea(addr.number_encrypted) : null,
+            complement: addr.complement_encrypted ? this.decryptFromBytea(addr.complement_encrypted) : null,
+            neighborhood: addr.neighborhood_encrypted ? this.decryptFromBytea(addr.neighborhood_encrypted) : null,
+            city: addr.city_encrypted ? this.decryptFromBytea(addr.city_encrypted) : null,
+            state: addr.state_encrypted ? this.decryptFromBytea(addr.state_encrypted) : null,
+            cep: addr.cep || null,
+          };
+        } catch (addrError) {
+          console.error(`❌ Erro ao descriptografar endereço do usuário ${user.id}:`, addrError);
+          address = null;
+        }
+      }
+
       return {
         id: user.id,
         email: this.decryptFromBytea(user.email_encrypted),
         full_name: this.decryptFromBytea(user.full_name),
         cpf: this.decryptFromBytea(user.cpf_encrypted),
-        phone: phoneResult.rows[0] ? this.decryptFromBytea(phoneResult.rows[0].phone_encrypted) : null,
-        address: addressResult.rows[0] ? {
-          street: this.decryptFromBytea(addressResult.rows[0].street_encrypted),
-          number: addressResult.rows[0].number_encrypted ? this.decryptFromBytea(addressResult.rows[0].number_encrypted) : null,
-          complement: addressResult.rows[0].complement_encrypted ? this.decryptFromBytea(addressResult.rows[0].complement_encrypted) : null,
-          neighborhood: addressResult.rows[0].neighborhood_encrypted ? this.decryptFromBytea(addressResult.rows[0].neighborhood_encrypted) : null,
-          city: this.decryptFromBytea(addressResult.rows[0].city_encrypted),
-          state: this.decryptFromBytea(addressResult.rows[0].state_encrypted),
-          cep: addressResult.rows[0].cep,
-        } : null,
+        phone: phoneResult.rows[0]?.phone_encrypted ? this.decryptFromBytea(phoneResult.rows[0].phone_encrypted) : null,
+        address,
         kyc_status: user.kyc_status,
         created_at: user.created_at,
         mode: 'POSTGRESQL',
       };
     } catch (error) {
       console.error('Erro ao buscar usuário:', error);
+      throw error;
+    }
+  }
+
+  async findByEmail(email: string) {
+    try {
+      // Normalizar email: trim, lowercase
+      const normalizedEmail = email.trim().toLowerCase();
+      console.log(`🔍 Buscando usuário por email: ${normalizedEmail}`);
+      console.log(`🔍 Email original recebido: ${email}`);
+
+      // Buscar todos os usuários ativos (mesma lógica do findByCpf)
+      const result = await this.pool.query(
+        `SELECT 
+          u.id,
+          u.full_name,
+          u.cpf_encrypted,
+          u.email_encrypted,
+          u.kyc_status,
+          u.created_at
+        FROM users u
+        WHERE u.deleted_at IS NULL`,
+      );
+
+      console.log(`📊 Encontrados ${result.rows.length} usuários ativos para verificar`);
+
+      // Procurar o usuário com email correspondente (descriptografando - mesma lógica do findByCpf)
+      let foundUser = null;
+      for (const user of result.rows) {
+        try {
+          // Usar a mesma função decryptFromBytea que funciona no findByCpf
+          const decryptedEmail = this.decryptFromBytea(user.email_encrypted);
+          const normalizedDecryptedEmail = decryptedEmail.trim().toLowerCase();
+          console.log(`🔐 Email descriptografado: ${normalizedDecryptedEmail} (original: ${decryptedEmail})`);
+          
+          // Comparação case-insensitive e sem espaços
+          if (normalizedDecryptedEmail === normalizedEmail) {
+            console.log(`✅ Usuário encontrado! ID: ${user.id}`);
+            foundUser = user;
+            break;
+          }
+        } catch (error) {
+          console.error(`❌ Erro ao descriptografar email do usuário ${user.id}:`, error);
+          console.error(`   Erro detalhado:`, error);
+          continue;
+        }
+      }
+
+      if (!foundUser) {
+        console.log(`⚠️  Nenhum usuário encontrado com email: ${email}`);
+        throw new NotFoundException('Usuário não encontrado');
+      }
+
+      const user = foundUser;
+
+      // Buscar telefone
+      const phoneResult = await this.pool.query(
+        'SELECT phone_encrypted FROM user_phones WHERE user_id = $1 AND is_primary = true',
+        [user.id],
+      );
+
+      // Buscar endereço
+      const addressResult = await this.pool.query(
+        `SELECT 
+          street_encrypted,
+          number_encrypted,
+          complement_encrypted,
+          neighborhood_encrypted,
+          city_encrypted,
+          state_encrypted,
+          cep
+        FROM user_addresses 
+        WHERE user_id = $1 AND is_primary = true`,
+        [user.id],
+      );
+
+      // Descriptografar endereço (com verificação de null para cada campo)
+      let address = null;
+      if (addressResult.rows[0]) {
+        const addr = addressResult.rows[0];
+        try {
+          address = {
+            street: addr.street_encrypted ? this.decryptFromBytea(addr.street_encrypted) : null,
+            number: addr.number_encrypted ? this.decryptFromBytea(addr.number_encrypted) : null,
+            complement: addr.complement_encrypted ? this.decryptFromBytea(addr.complement_encrypted) : null,
+            neighborhood: addr.neighborhood_encrypted ? this.decryptFromBytea(addr.neighborhood_encrypted) : null,
+            city: addr.city_encrypted ? this.decryptFromBytea(addr.city_encrypted) : null,
+            state: addr.state_encrypted ? this.decryptFromBytea(addr.state_encrypted) : null,
+            cep: addr.cep || null,
+          };
+        } catch (addrError) {
+          console.error(`❌ Erro ao descriptografar endereço do usuário ${user.id}:`, addrError);
+          address = null;
+        }
+      }
+
+      return {
+        id: user.id,
+        email: this.decryptFromBytea(user.email_encrypted),
+        full_name: this.decryptFromBytea(user.full_name),
+        cpf: this.decryptFromBytea(user.cpf_encrypted),
+        phone: phoneResult.rows[0]?.phone_encrypted ? this.decryptFromBytea(phoneResult.rows[0].phone_encrypted) : null,
+        address,
+        kyc_status: user.kyc_status,
+        created_at: user.created_at,
+        mode: 'POSTGRESQL',
+      };
+    } catch (error) {
+      console.error('Erro ao buscar usuário por email:', error);
       throw error;
     }
   }
@@ -254,6 +386,16 @@ export class UsersService {
     try {
       await client.query('BEGIN');
 
+      // Verificar se usuário existe
+      const userExists = await client.query(
+        'SELECT id FROM users WHERE id = $1',
+        [id],
+      );
+
+      if (userExists.rows.length === 0) {
+        throw new NotFoundException(`Usuário com ID ${id} não encontrado`);
+      }
+
       // Atualizar nome se fornecido
       if (updateUserDto.fullName) {
         const fullNameEncrypted = this.encryptToBytea(updateUserDto.fullName);
@@ -263,28 +405,50 @@ export class UsersService {
         );
       }
 
+      // Atualizar email se fornecido
+      if (updateUserDto.email) {
+        const emailEncrypted = this.encryptToBytea(updateUserDto.email);
+        await client.query(
+          'UPDATE users SET email_encrypted = $1, updated_at = NOW() WHERE id = $2',
+          [emailEncrypted, id],
+        );
+      }
+
       // Atualizar telefone se fornecido
       if (updateUserDto.phone) {
         const phoneEncrypted = this.encryptToBytea(updateUserDto.phone);
         
-        // Verificar se já existe telefone
-        const existingPhone = await client.query(
-          'SELECT id FROM user_phones WHERE user_id = $1 AND is_primary = true',
-          [id],
-        );
+        try {
+          // Tentar usar tabela user_phones (estrutura nova)
+          const existingPhone = await client.query(
+            'SELECT id FROM user_phones WHERE user_id = $1 AND is_primary = true',
+            [id],
+          );
 
-        if (existingPhone.rows.length > 0) {
-          // Atualizar
-          await client.query(
-            'UPDATE user_phones SET phone_encrypted = $1, updated_at = NOW() WHERE user_id = $2 AND is_primary = true',
-            [phoneEncrypted, id],
-          );
-        } else {
-          // Inserir
-          await client.query(
-            'INSERT INTO user_phones (user_id, phone_encrypted, is_primary) VALUES ($1, $2, true)',
-            [id, phoneEncrypted],
-          );
+          if (existingPhone.rows.length > 0) {
+            // Atualizar em user_phones
+            await client.query(
+              'UPDATE user_phones SET phone_encrypted = $1, updated_at = NOW() WHERE user_id = $2 AND is_primary = true',
+              [phoneEncrypted, id],
+            );
+          } else {
+            // Inserir em user_phones
+            await client.query(
+              'INSERT INTO user_phones (user_id, phone_encrypted, is_primary, phone_type) VALUES ($1, $2, true, $3)',
+              [id, phoneEncrypted, 'mobile'],
+            );
+          }
+        } catch (error: any) {
+          // Se user_phones não existir, tentar atualizar diretamente na tabela users
+          if (error.code === '42P01' || error.message?.includes('does not exist')) {
+            console.log('Tabela user_phones não encontrada, atualizando diretamente em users');
+            await client.query(
+              'UPDATE users SET phone_encrypted = $1, updated_at = NOW() WHERE id = $2',
+              [phoneEncrypted, id],
+            );
+          } else {
+            throw error;
+          }
         }
       }
 
@@ -378,5 +542,74 @@ export class UsersService {
       user_id: result.rows[0].id,
       mode: 'POSTGRESQL',
     };
+  }
+
+  /**
+   * Sincronizar email do Firebase com PostgreSQL
+   * Busca o email atual no PostgreSQL por CPF e atualiza no Firebase usando o email antigo para localizar o usuário
+   */
+  async syncFirebaseEmail(cpf: string, oldEmail: string) {
+    try {
+      console.log(`🔄 Sincronizando email do Firebase para CPF: ${cpf}`);
+      
+      // 1. Buscar usuário no PostgreSQL por CPF para obter o email novo
+      const userData = await this.findByCpf(cpf);
+      if (!userData || !userData.email) {
+        throw new NotFoundException('Usuário não encontrado no PostgreSQL ou email não encontrado');
+      }
+
+      const newEmail = userData.email as string;
+      console.log(`📧 Email antigo (Firebase): ${oldEmail}`);
+      console.log(`📧 Email novo (PostgreSQL): ${newEmail}`);
+
+      if (oldEmail.toLowerCase() === newEmail.toLowerCase()) {
+        return {
+          success: true,
+          message: 'Emails já estão sincronizados',
+          oldEmail,
+          newEmail,
+        };
+      }
+
+      // 2. Buscar usuário no Firebase pelo email antigo
+      const auth = admin.auth();
+      let firebaseUser;
+      try {
+        firebaseUser = await auth.getUserByEmail(oldEmail);
+        console.log(`✅ Usuário encontrado no Firebase: ${firebaseUser.uid}`);
+      } catch (error: any) {
+        if (error.code === 'auth/user-not-found') {
+          throw new NotFoundException(`Usuário não encontrado no Firebase com email: ${oldEmail}`);
+        }
+        throw error;
+      }
+
+      // 3. Atualizar email no Firebase
+      try {
+        await auth.updateUser(firebaseUser.uid, {
+          email: newEmail,
+          emailVerified: false, // Marcar como não verificado pois o email mudou
+        });
+        console.log(`✅ Email atualizado no Firebase: ${oldEmail} → ${newEmail}`);
+
+        // 4. Enviar email de verificação
+        await auth.generateEmailVerificationLink(newEmail);
+        console.log(`📧 Link de verificação gerado para: ${newEmail}`);
+
+        return {
+          success: true,
+          message: 'Email sincronizado com sucesso',
+          oldEmail,
+          newEmail,
+          firebaseUid: firebaseUser.uid,
+        };
+      } catch (error: any) {
+        console.error(`❌ Erro ao atualizar email no Firebase:`, error);
+        throw new Error(`Falha ao atualizar email no Firebase: ${error.message}`);
+      }
+    } catch (error: any) {
+      console.error(`❌ Erro ao sincronizar email:`, error);
+      throw error;
+    }
   }
 }

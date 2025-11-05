@@ -1,9 +1,9 @@
-import { Controller, Post } from '@nestjs/common';
+import { Controller, Post, Inject } from '@nestjs/common';
 import { Pool } from 'pg';
 
 @Controller('migration')
 export class MigrationController {
-  constructor(private readonly pool: Pool) {}
+  constructor(@Inject('DATABASE_POOL') private readonly pool: Pool) {}
 
   @Post('setup-tables')
   async setupTables() {

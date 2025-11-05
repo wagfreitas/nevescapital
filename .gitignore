@@ -36,6 +36,12 @@ migrate_working_dir/
 
 # Symbolication related
 app.*.symbols
+*.dSYM.zip
+*.dSYM
+
+# iOS build artifacts
+*.ipa
+Runner.app.dSYM.zip
 
 # Obfuscation related
 app.*.map.json

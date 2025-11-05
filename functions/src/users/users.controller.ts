@@ -41,6 +41,18 @@ export class UsersController {
     return this.usersService.findByCpf(cpf);
   }
 
+  @Get('email/:email')
+  @ApiOperation({ summary: 'Buscar usuário por email' })
+  @ApiResponse({ status: 200, description: 'Usuário encontrado' })
+  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  async findByEmail(@Param('email') email: string) {
+    // Decodificar email da URL (pode vir codificado com %40 para @, etc)
+    const decodedEmail = decodeURIComponent(email);
+    console.log(`📧 Email recebido na URL: ${email}`);
+    console.log(`📧 Email decodificado: ${decodedEmail}`);
+    return this.usersService.findByEmail(decodedEmail);
+  }
+
   @Post('verify-password')
   @ApiOperation({ summary: 'Verificar senha do usuário' })
   @ApiResponse({ status: 200, description: 'Senha verificada' })
@@ -63,6 +75,14 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
+  }
+
+  @Post('sync-firebase-email')
+  @ApiOperation({ summary: 'Sincronizar email do Firebase com PostgreSQL' })
+  @ApiResponse({ status: 200, description: 'Email sincronizado com sucesso' })
+  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  syncFirebaseEmail(@Body() body: { cpf: string; oldEmail: string }) {
+    return this.usersService.syncFirebaseEmail(body.cpf, body.oldEmail);
   }
 }
 

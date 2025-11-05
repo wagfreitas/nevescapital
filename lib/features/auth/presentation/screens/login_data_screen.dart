@@ -8,7 +8,7 @@ import 'package:neves_capital/shared/helpers/email_helper.dart';
 import 'package:neves_capital/shared/helpers/password_helper.dart';
 import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/features/auth/presentation/screens/personal_data_screen.dart';
-import 'package:neves_capital/features/auth/presentation/controllers/auth_controller_real.dart';
+import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 
 class LoginDataScreen extends StatefulWidget {
   const LoginDataScreen({super.key});

@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:neves_capital/features/auth/presentation/screens/signup_screen.dart';
+import 'package:neves_capital/shared/components/cpf_input_field.dart';
+import 'package:neves_capital/shared/helpers/cpf_helper.dart';
+import 'package:neves_capital/shared/widgets/login_progress_widget.dart';
+import 'package:neves_capital/features/home/presentation/screens/dashboard_screen.dart';
+import 'package:neves_capital/core/theme/theme_controller.dart';
+import 'package:neves_capital/features/auth/presentation/screens/forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final AuthController authController;
+  final ThemeController? themeController;
   
   const LoginScreen({
     super.key,
     required this.authController,
+    this.themeController,
   });
 
   @override
@@ -23,36 +29,36 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
   void dispose() {
     _cpfController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.lightTheme.colorScheme.surface,
+      backgroundColor: const Color(0xFF122118), // bg-[#122118]
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Center(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 60.0),
-                  _buildLogo(),
-                  const SizedBox(height: 40.0),
-                  _buildLoginForm(),
-                  const SizedBox(height: 20.0),
-                  _buildForgotPassword(),
-                  const SizedBox(height: 40.0),
-                  _buildCreateAccount(),
-                ],
-              ),
-            ),
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16.0), // px-4
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildLogo(),
+              const SizedBox(height: 40.0), // mb-10
+              _buildWelcomeText(),
+              const SizedBox(height: 24.0), // mt-6
+              _buildForm(),
+            ],
           ),
         ),
       ),
@@ -60,200 +66,207 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildLogo() {
-    return Column(
-      children: [
-        // Logo "P" estilizado
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: AppTheme.lightTheme.colorScheme.primary,
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Text(
-              'P',
-              style: AppTheme.lightTheme.textTheme.headlineLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 40,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16.0),
-        // Texto "Pag Pag"
-        Column(
-          children: [
-            Text(
-              'Pag',
-              style: AppTheme.lightTheme.textTheme.headlineLarge?.copyWith(
-                color: AppTheme.lightTheme.colorScheme.primary,
-                fontWeight: FontWeight.bold,
-                fontSize: 32,
-              ),
-            ),
-            Text(
-              'Pag',
-              style: AppTheme.lightTheme.textTheme.headlineMedium?.copyWith(
-                color: AppTheme.lightTheme.colorScheme.primary,
-                fontWeight: FontWeight.bold,
-                fontSize: 24,
-              ),
-            ),
-          ],
-        ),
-      ],
+    return Image.asset(
+      'assets/icons/ios_120.png',
+      width: 100,
+      height: 100,
+      fit: BoxFit.contain,
     );
   }
 
-  Widget _buildLoginForm() {
-    return Container(
-      padding: const EdgeInsets.all(24.0),
-      decoration: BoxDecoration(
-        color: AppTheme.lightTheme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(12.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+  Widget _buildWelcomeText() {
+    return Text(
+      'Entre na sua conta:',
+      style: TextStyle(
+        fontSize: 24,
+        fontWeight: FontWeight.bold,
+        color: Colors.white,
       ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Entre na sua conta',
-              style: AppTheme.lightTheme.textTheme.headlineSmall?.copyWith(
-                color: AppTheme.lightTheme.colorScheme.onSurface,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24.0),
-            _buildCpfField(),
-            const SizedBox(height: 16.0),
-            _buildPasswordField(),
-            const SizedBox(height: 24.0),
-            _buildLoginButton(),
-          ],
-        ),
+      textAlign: TextAlign.left,
+    );
+  }
+
+  Widget _buildForm() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        children: [
+          _buildCpfField(),
+          const SizedBox(height: 24.0), // space-y-6
+          _buildPasswordField(),
+          const SizedBox(height: 16.0),
+          _buildForgotPasswordLink(),
+          const SizedBox(height: 24.0),
+          _buildLoginButton(),
+        ],
       ),
     );
   }
 
   Widget _buildCpfField() {
-    return TextFormField(
+    return CpfInputField(
       controller: _cpfController,
-      keyboardType: TextInputType.number,
-      decoration: InputDecoration(
-        hintText: 'Digite seu CPF',
-        prefixIcon: const Icon(Icons.credit_card),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8.0),
-        ),
-      ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'CPF é obrigatório';
-        }
-        if (value.length < 11) {
-          return 'CPF deve ter 11 dígitos';
-        }
-        return null;
+      hintText: 'Digite seu CPF',
+      onFocusLost: () {
+        // Validação automática quando perde foco
       },
     );
   }
 
   Widget _buildPasswordField() {
-    return TextFormField(
-      controller: _passwordController,
-      obscureText: _obscurePassword,
-      decoration: InputDecoration(
-        hintText: 'Digite sua Senha',
-        prefixIcon: const Icon(Icons.lock),
-        suffixIcon: IconButton(
-          icon: Icon(
-            _obscurePassword ? Icons.visibility : Icons.visibility_off,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8.0),
           ),
-          onPressed: () {
-            setState(() {
-              _obscurePassword = !_obscurePassword;
-            });
-          },
+          child: TextFormField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            style: const TextStyle(color: Colors.white),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Senha é obrigatória';
+              }
+              if (value.length < 6) {
+                return 'Senha deve ter pelo menos 6 caracteres';
+              }
+              return null;
+            },
+            decoration: InputDecoration(
+              hintText: 'Digite sua Senha',
+              hintStyle: const TextStyle(color: Colors.white70),
+              prefixIcon: const Icon(
+                Icons.lock_outline,
+                color: Color(0xFF9CA3AF),
+                size: 20,
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                  color: const Color(0xFF9CA3AF),
+                  size: 20,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: const BorderSide(color: Colors.white),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: const BorderSide(color: Colors.white),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: const BorderSide(
+                  color: Color(0xFF22C55E),
+                  width: 2,
+                ),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: const BorderSide(
+                  color: Colors.red,
+                  width: 2,
+                ),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: const BorderSide(
+                  color: Colors.red,
+                  width: 2,
+                ),
+              ),
+            ),
+          ),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8.0),
+      ],
+    );
+  }
+
+  Widget _buildForgotPasswordLink() {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => ForgotPasswordScreen(
+                authController: widget.authController,
+              ),
+            ),
+          );
+        },
+        child: const Text(
+          'Esqueceu sua senha ?',
+          style: TextStyle(
+            color: Color(0xFF4ADE80), // text-[var(--primary-400)]
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
         ),
       ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Senha é obrigatória';
-        }
-        if (value.length < 6) {
-          return 'Senha deve ter pelo menos 6 caracteres';
-        }
-        return null;
-      },
     );
   }
 
   Widget _buildLoginButton() {
-    return ElevatedButton(
-      onPressed: _isLoading ? null : _handleLogin,
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 16.0),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _isLoading ? null : _handleLogin,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF22C55E), // bg-[var(--primary-500)]
+              foregroundColor: const Color(0xFF122118), // text-[#122118]
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25), // rounded-full
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 14), // py-3.5
+              elevation: 0,
+            ),
+            child: _isLoading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF122118)),
+                    ),
+                  )
+                : const Text(
+                    'Entrar',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+          ),
         ),
-      ),
-      child: _isLoading
-          ? const SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Text('Entrar'),
+        
+        // Widget de progresso granular
+        if (_isLoading) ...[
+          const SizedBox(height: 16),
+          LoginProgressWidget(
+            progress: widget.authController.loginProgress,
+            errorMessage: widget.authController.errorMessage,
+          ),
+        ],
+      ],
     );
   }
 
-  Widget _buildForgotPassword() {
-    return TextButton(
-      onPressed: () {
-        // TODO: Implementar recuperação de senha
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Funcionalidade em desenvolvimento'),
-          ),
-        );
-      },
-      child: const Text('Esqueceu sua senha?'),
-    );
-  }
 
-  Widget _buildCreateAccount() {
-    return OutlinedButton(
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const SignupScreen(),
-          ),
-        );
-      },
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 16.0),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
-        ),
-      ),
-      child: const Text('Criar Conta'),
-    );
-  }
 
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
@@ -263,19 +276,40 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // Usar o AuthController para fazer login
-      await widget.authController.login(
-        email: _cpfController.text.trim(),
+      // Login com CPF e senha
+      final success = await widget.authController.loginWithCpf(
+        cpf: CpfHelper.getCpfNumbers(_cpfController.text),
         password: _passwordController.text.trim(),
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Login realizado com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+      if (!mounted) return;
+
+      if (success) {
+        // Login bem-sucedido - navegar para Dashboard mantendo AppWrapper na base
+        print('✅ Login realizado - navegando para Dashboard');
+        if (mounted) {
+          // pushAndRemoveUntil mas MANTÉM o AppWrapper (route.isFirst)
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => DashboardScreen(
+                authController: widget.authController,
+                themeController: widget.themeController ?? ThemeController(),
+              ),
+            ),
+            (route) => route.isFirst, // MANTÉM a primeira rota (AppWrapper)
+          );
+        }
+      } else {
+        // Login falhou - mostrar mensagem de erro
+        final errorMessage = widget.authController.errorMessage ?? 'Erro no login';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -295,3 +329,4 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 }
+

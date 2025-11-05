@@ -1,0 +1,152 @@
+# Fastfile de exemplo para Android
+# Copie este arquivo para android/fastlane/Fastfile e configure conforme necessário
+
+default_platform(:android)
+
+platform :android do
+  # Configurações gerais
+  before_all do
+    ENV["FLUTTER_ROOT"] = `which flutter | xargs dirname | xargs dirname`.strip
+  end
+
+  desc "📦 Build e upload para Google Play Internal Testing"
+  lane :beta do
+    # 1. Limpar projeto
+    sh("cd .. && flutter clean")
+    
+    # 2. Instalar dependências
+    sh("cd .. && flutter pub get")
+    
+    # 3. Incrementar versionCode automaticamente
+    increment_version_code(
+      gradle_file_path: "app/build.gradle.kts"
+    )
+    
+    # 4. Build AAB (Android App Bundle)
+    sh("cd .. && flutter build appbundle --release")
+    
+    # 5. Verificar se AAB foi criado
+    aab_path = "../build/app/outputs/bundle/release/app-release.aab"
+    unless File.exist?(aab_path)
+      UI.user_error!("❌ AAB não encontrado em #{aab_path}")
+    end
+    
+    # 6. Upload para Google Play Internal Testing
+    upload_to_play_store(
+      track: "internal",
+      aab: aab_path,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      skip_upload_changelogs: false,
+      release_status: "draft" # ou "completed"
+    )
+    
+    UI.success("✅ Build enviado para Google Play Internal Testing!")
+  end
+
+  desc "🚀 Build e upload para Google Play Production"
+  lane :release do
+    # Verificar que versão foi especificada
+    unless ENV["VERSION"]
+      UI.user_error!("❌ VERSION não especificada. Use: VERSION=1.0.1 fastlane release")
+    end
+    
+    # 1. Atualizar versão
+    increment_version_name(
+      version_name: ENV["VERSION"],
+      gradle_file_path: "app/build.gradle.kts"
+    )
+    
+    increment_version_code(
+      gradle_file_path: "app/build.gradle.kts"
+    )
+    
+    # 2. Limpar projeto
+    sh("cd .. && flutter clean")
+    sh("cd .. && flutter pub get")
+    
+    # 3. Build AAB
+    sh("cd .. && flutter build appbundle --release")
+    
+    # 4. Verificar AAB
+    aab_path = "../build/app/outputs/bundle/release/app-release.aab"
+    unless File.exist?(aab_path)
+      UI.user_error!("❌ AAB não encontrado")
+    end
+    
+    # 5. Upload para Production
+    upload_to_play_store(
+      track: "production",
+      aab: aab_path,
+      skip_upload_metadata: false,
+      skip_upload_images: false,
+      skip_upload_screenshots: false,
+      skip_upload_changelogs: false,
+      release_status: ENV["AUTO_RELEASE"] == "true" ? "completed" : "draft",
+      rollout: ENV["ROLLOUT"] ? ENV["ROLLOUT"].to_f : nil # Ex: 0.5 = 50%
+    )
+    
+    UI.success("✅ Versão #{ENV["VERSION"]} enviada para Google Play Production!")
+  end
+
+  desc "🔨 Build AAB (sem upload)"
+  lane :build_aab do
+    sh("cd .. && flutter clean")
+    sh("cd .. && flutter pub get")
+    sh("cd .. && flutter build appbundle --release")
+    
+    UI.success("✅ AAB criado em ../build/app/outputs/bundle/release/app-release.aab")
+  end
+
+  desc "🔨 Build APK (para testes locais)"
+  lane :build_apk do
+    sh("cd .. && flutter clean")
+    sh("cd .. && flutter pub get")
+    sh("cd .. && flutter build apk --release")
+    
+    UI.success("✅ APK criado em ../build/app/outputs/flutter-apk/app-release.apk")
+  end
+
+  desc "🧪 Build APK Debug (para desenvolvimento)"
+  lane :build_debug do
+    sh("cd .. && flutter clean")
+    sh("cd .. && flutter pub get")
+    sh("cd .. && flutter build apk --debug")
+    
+    UI.success("✅ APK Debug criado")
+  end
+
+  desc "🧹 Limpar builds e caches"
+  lane :clean do
+    sh("cd .. && flutter clean")
+    sh("cd .. && rm -rf build/")
+    sh("cd .. && rm -rf android/build/")
+    sh("cd .. && rm -rf android/app/build/")
+    sh("cd .. && rm -rf android/.gradle/")
+    
+    UI.success("✅ Projeto limpo!")
+  end
+
+  desc "📊 Ver informações do app"
+  lane :info do
+    # Lê versão do build.gradle.kts
+    version_name = `grep versionName app/build.gradle.kts | cut -d'"' -f2`.strip
+    version_code = `grep versionCode app/build.gradle.kts | cut -d'=' -f2 | tr -d ' '`.strip
+    
+    UI.message("📱 Informações do app:")
+    UI.message("   Version Name: #{version_name}")
+    UI.message("   Version Code: #{version_code}")
+    UI.message("   Package: com.nevescapital.pagpag")
+  end
+end
+
+# Tratamento de erros
+error do |lane, exception|
+  UI.error("❌ Erro na lane #{lane}: #{exception.message}")
+end
+
+# Após cada lane bem-sucedida
+after_all do |lane|
+  UI.success("✅ Lane #{lane} finalizada com sucesso!")
+end

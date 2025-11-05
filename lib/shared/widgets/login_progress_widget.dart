@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:neves_capital/features/auth/presentation/controllers/auth_controller_real.dart';
+import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 
 /// Widget para mostrar progresso granular do login
 class LoginProgressWidget extends StatelessWidget {

@@ -66,34 +66,42 @@ export class EmailSenderService {
 
   /**
    * Enviar via SendGrid
-   * npm install @sendgrid/mail
+   * npm install @sendgrid/mail (opcional)
    */
   private async sendViaSendGrid(email: string, htmlContent: string): Promise<void> {
-    const sendgrid = require('@sendgrid/mail');
-    const apiKey = this.configService.get<string>('SENDGRID_API_KEY');
-    
-    if (!apiKey) {
-      throw new Error('SENDGRID_API_KEY não configurada');
+    try {
+      const sendgrid = require('@sendgrid/mail');
+      const apiKey = this.configService.get<string>('SENDGRID_API_KEY');
+      
+      if (!apiKey) {
+        throw new Error('SENDGRID_API_KEY não configurada');
+      }
+
+      sendgrid.setApiKey(apiKey);
+
+      const msg = {
+        to: email,
+        from: this.configService.get<string>('EMAIL_FROM', 'noreply@pagpag.com.br'),
+        subject: 'Redefinir Senha - Pag Pag',
+        html: htmlContent,
+      };
+
+      await sendgrid.send(msg);
+    } catch (error) {
+      if (error.code === 'MODULE_NOT_FOUND') {
+        throw new Error('@sendgrid/mail não instalado. Execute: npm install @sendgrid/mail');
+      }
+      throw error;
     }
-
-    sendgrid.setApiKey(apiKey);
-
-    const msg = {
-      to: email,
-      from: this.configService.get<string>('EMAIL_FROM', 'noreply@pagpag.com.br'),
-      subject: 'Redefinir Senha - Pag Pag',
-      html: htmlContent,
-    };
-
-    await sendgrid.send(msg);
   }
 
   /**
    * Enviar via AWS SES
-   * npm install @aws-sdk/client-ses
+   * npm install @aws-sdk/client-ses (opcional)
    */
   private async sendViaAwsSes(email: string, htmlContent: string): Promise<void> {
-    const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
+    try {
+      const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
 
     const sesClient = new SESClient({
       region: this.configService.get<string>('AWS_REGION', 'us-east-1'),
@@ -112,29 +120,42 @@ export class EmailSenderService {
       },
     });
 
-    await sesClient.send(command);
+      await sesClient.send(command);
+    } catch (error) {
+      if (error.code === 'MODULE_NOT_FOUND') {
+        throw new Error('@aws-sdk/client-ses não instalado. Execute: npm install @aws-sdk/client-ses');
+      }
+      throw error;
+    }
   }
 
   /**
    * Enviar via Resend
-   * npm install resend
+   * npm install resend (opcional)
    */
   private async sendViaResend(email: string, htmlContent: string): Promise<void> {
-    const { Resend } = require('resend');
-    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+    try {
+      const { Resend } = require('resend');
+      const apiKey = this.configService.get<string>('RESEND_API_KEY');
 
-    if (!apiKey) {
-      throw new Error('RESEND_API_KEY não configurada');
+      if (!apiKey) {
+        throw new Error('RESEND_API_KEY não configurada');
+      }
+
+      const resend = new Resend(apiKey);
+
+      await resend.emails.send({
+        from: this.configService.get<string>('EMAIL_FROM', 'noreply@pagpag.com.br'),
+        to: email,
+        subject: 'Redefinir Senha - Pag Pag',
+        html: htmlContent,
+      });
+    } catch (error) {
+      if (error.code === 'MODULE_NOT_FOUND') {
+        throw new Error('resend não instalado. Execute: npm install resend');
+      }
+      throw error;
     }
-
-    const resend = new Resend(apiKey);
-
-    await resend.emails.send({
-      from: this.configService.get<string>('EMAIL_FROM', 'noreply@pagpag.com.br'),
-      to: email,
-      subject: 'Redefinir Senha - Pag Pag',
-      html: htmlContent,
-    });
   }
 }
 

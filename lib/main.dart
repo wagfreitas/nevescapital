@@ -3,7 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
-import 'features/auth/presentation/controllers/auth_controller_real.dart';
+import 'features/auth/presentation/controllers/auth_controller.dart';
 import 'features/auth/presentation/screens/onboarding_screen.dart';
 import 'features/home/presentation/screens/dashboard_screen.dart';
 

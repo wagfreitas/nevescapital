@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:neves_capital/shared/helpers/user_helper.dart';
 
 /// Service para gerenciar transações do usuário
 class UserTransactionService {
@@ -9,7 +10,7 @@ class UserTransactionService {
   /// Busca saldo do usuário logado
   static Future<Map<String, dynamic>> getSaldoUsuario() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = await UserHelper.getCurrentUser();
       if (user == null) {
         return {
           'success': false,
@@ -51,7 +52,7 @@ class UserTransactionService {
     int offset = 0,
   }) async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = await UserHelper.getCurrentUser();
       if (user == null) {
         return {
           'success': false,
@@ -91,7 +92,7 @@ class UserTransactionService {
   /// Busca estatísticas do usuário
   static Future<Map<String, dynamic>> getEstatisticasUsuario() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = await UserHelper.getCurrentUser();
       if (user == null) {
         return {
           'success': false,

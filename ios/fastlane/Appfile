@@ -1,0 +1,8 @@
+app_identifier("com.nevescapital.pagpag") # The bundle identifier of your app
+apple_id("adm@neves.capital") # Your Apple Developer Portal username
+
+itc_team_id("128197808") # App Store Connect Team ID
+team_id("3T4MG5QU7G") # Developer Portal Team ID
+
+# For more information about the Appfile, see:
+#     https://docs.fastlane.tools/advanced/#appfile
