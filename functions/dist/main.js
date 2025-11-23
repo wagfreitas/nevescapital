@@ -69,7 +69,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-var _a, _b, _c, _d;
+var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AuthController = void 0;
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
@@ -78,11 +78,21 @@ const throttler_1 = __webpack_require__(/*! @nestjs/throttler */ "@nestjs/thrott
 const api_key_guard_1 = __webpack_require__(/*! ../common/guards/api-key.guard */ "./src/common/guards/api-key.guard.ts");
 const email_sender_service_1 = __webpack_require__(/*! ./email-sender.service */ "./src/auth/email-sender.service.ts");
 const reset_password_dto_1 = __webpack_require__(/*! ./dto/reset-password.dto */ "./src/auth/dto/reset-password.dto.ts");
+const otp_dto_1 = __webpack_require__(/*! ./dto/otp.dto */ "./src/auth/dto/otp.dto.ts");
+const registration_otp_dto_1 = __webpack_require__(/*! ./dto/registration-otp.dto */ "./src/auth/dto/registration-otp.dto.ts");
 const users_service_1 = __webpack_require__(/*! ../users/users.service */ "./src/users/users.service.ts");
+const otp_service_1 = __webpack_require__(/*! ./services/otp.service */ "./src/auth/services/otp.service.ts");
+const sms_service_1 = __webpack_require__(/*! ./services/sms.service */ "./src/auth/services/sms.service.ts");
+const ycloud_service_1 = __webpack_require__(/*! ./services/ycloud.service */ "./src/auth/services/ycloud.service.ts");
+const encryption_service_1 = __webpack_require__(/*! ../common/services/encryption.service */ "./src/common/services/encryption.service.ts");
 let AuthController = class AuthController {
-    constructor(emailSenderService, usersService) {
+    constructor(emailSenderService, usersService, otpService, smsService, ycloudService, encryptionService) {
         this.emailSenderService = emailSenderService;
         this.usersService = usersService;
+        this.otpService = otpService;
+        this.smsService = smsService;
+        this.ycloudService = ycloudService;
+        this.encryptionService = encryptionService;
     }
     async resetPassword(resetPasswordDto) {
         try {
@@ -112,6 +122,140 @@ let AuthController = class AuthController {
             throw error;
         }
     }
+    async requestPasswordResetOtp(dto) {
+        try {
+            const userData = await this.usersService.findByCpf(dto.cpf);
+            if (!userData || !userData.id) {
+                throw new common_1.NotFoundException('CPF não encontrado');
+            }
+            if (!userData.phone) {
+                throw new common_1.BadRequestException('Telefone não cadastrado. Use a opção de recuperação por email.');
+            }
+            const { otpCode, expiresAt } = await this.otpService.createOtp(userData.id, userData.phone);
+            if (!this.smsService.isConfigured()) {
+                throw new common_1.BadRequestException('Serviço de SMS não configurado. Contate o suporte.');
+            }
+            const sendResult = await this.smsService.sendOtp(userData.phone, otpCode);
+            if (!sendResult.success) {
+                throw new common_1.BadRequestException(`Erro ao enviar código: ${sendResult.error}`);
+            }
+            return {
+                success: true,
+                message: `Código enviado com sucesso via ${sendResult.method === 'whatsapp' ? 'WhatsApp' : 'SMS'}`,
+                expires_at: expiresAt.toISOString(),
+            };
+        }
+        catch (error) {
+            throw error;
+        }
+    }
+    async verifyPasswordResetOtp(dto) {
+        try {
+            const userData = await this.usersService.findByCpf(dto.cpf);
+            if (!userData || !userData.id) {
+                throw new common_1.NotFoundException('CPF não encontrado');
+            }
+            const token = await this.otpService.verifyOtp(userData.id, dto.otp_code);
+            return {
+                success: true,
+                message: 'Código OTP verificado com sucesso',
+                token,
+                expires_in: 900,
+            };
+        }
+        catch (error) {
+            throw error;
+        }
+    }
+    async changePasswordWithOtp(dto) {
+        try {
+            const tokenValidation = await this.otpService.validateTempToken(dto.token);
+            if (!tokenValidation.valid) {
+                throw new common_1.UnauthorizedException('Token inválido ou expirado');
+            }
+            const userId = tokenValidation.userId;
+            const userData = await this.usersService.findById(userId);
+            if (!userData) {
+                throw new common_1.NotFoundException('Usuário não encontrado');
+            }
+            const isOldPasswordValid = await this.usersService.verifyPasswordInternal(userId, dto.old_password);
+            if (!isOldPasswordValid) {
+                throw new common_1.UnauthorizedException('Senha atual incorreta');
+            }
+            await this.usersService.updatePassword(userId, dto.new_password);
+            await this.otpService.invalidateToken(dto.token);
+            return {
+                success: true,
+                message: 'Senha alterada com sucesso',
+            };
+        }
+        catch (error) {
+            throw error;
+        }
+    }
+    async checkCpf(dto) {
+        try {
+            const userData = await this.usersService.findByCpf(dto.cpf);
+            return {
+                success: true,
+                exists: !!userData,
+                message: userData ? 'CPF já cadastrado' : 'CPF não cadastrado',
+            };
+        }
+        catch (error) {
+            if (error.status === 404) {
+                return {
+                    success: true,
+                    exists: false,
+                    message: 'CPF não cadastrado',
+                };
+            }
+            throw error;
+        }
+    }
+    async requestRegistrationOtp(dto) {
+        try {
+            try {
+                const userData = await this.usersService.findByCpf(dto.cpf);
+                if (userData) {
+                    throw new common_1.BadRequestException('CPF já cadastrado. Use a opção de login.');
+                }
+            }
+            catch (error) {
+                if (error.status !== 404) {
+                    throw error;
+                }
+            }
+            const { otpCode, expiresAt } = await this.otpService.createRegistrationOtp(dto.cpf, dto.phone);
+            if (!this.ycloudService.isConfigured()) {
+                throw new common_1.BadRequestException('Serviço de WhatsApp não configurado. Contate o suporte.');
+            }
+            const sendResult = await this.ycloudService.sendOtp(dto.phone, otpCode);
+            if (!sendResult.success) {
+                throw new common_1.BadRequestException(`Erro ao enviar código: ${sendResult.error}`);
+            }
+            return {
+                success: true,
+                message: 'Código enviado com sucesso via WhatsApp',
+                expires_at: expiresAt.toISOString(),
+            };
+        }
+        catch (error) {
+            throw error;
+        }
+    }
+    async verifyRegistrationOtp(dto) {
+        try {
+            await this.otpService.verifyRegistrationOtp(dto.cpf, dto.phone, dto.otp_code);
+            return {
+                success: true,
+                message: 'Código OTP verificado com sucesso',
+            };
+        }
+        catch (error) {
+            throw error;
+        }
+    }
 };
 exports.AuthController = AuthController;
 __decorate([
@@ -126,7 +270,7 @@ __decorate([
     (0, swagger_1.ApiResponse)({ status: 404, description: 'Usuário não encontrado no Firebase' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [typeof (_c = typeof reset_password_dto_1.ResetPasswordDto !== "undefined" && reset_password_dto_1.ResetPasswordDto) === "function" ? _c : Object]),
+    __metadata("design:paramtypes", [typeof (_g = typeof reset_password_dto_1.ResetPasswordDto !== "undefined" && reset_password_dto_1.ResetPasswordDto) === "function" ? _g : Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "resetPassword", null);
 __decorate([
@@ -140,15 +284,101 @@ __decorate([
     (0, swagger_1.ApiResponse)({ status: 404, description: 'CPF não encontrado' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [typeof (_d = typeof reset_password_dto_1.ResetPasswordByCpfDto !== "undefined" && reset_password_dto_1.ResetPasswordByCpfDto) === "function" ? _d : Object]),
+    __metadata("design:paramtypes", [typeof (_h = typeof reset_password_dto_1.ResetPasswordByCpfDto !== "undefined" && reset_password_dto_1.ResetPasswordByCpfDto) === "function" ? _h : Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "resetPasswordByCpf", null);
+__decorate([
+    (0, common_1.Post)('request-password-reset-otp'),
+    (0, throttler_1.Throttle)({ default: { limit: 3, ttl: 120000 } }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Solicitar código OTP para recuperação de senha via SMS/WhatsApp',
+        description: 'Gera código OTP e envia para o telefone cadastrado do usuário'
+    }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Código OTP enviado com sucesso' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'CPF não encontrado' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Telefone não cadastrado ou erro na requisição' }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [typeof (_j = typeof otp_dto_1.RequestPasswordResetOtpDto !== "undefined" && otp_dto_1.RequestPasswordResetOtpDto) === "function" ? _j : Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "requestPasswordResetOtp", null);
+__decorate([
+    (0, common_1.Post)('verify-password-reset-otp'),
+    (0, throttler_1.Throttle)({ default: { limit: 5, ttl: 60000 } }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Verificar código OTP e obter token temporário',
+        description: 'Valida código OTP e retorna token temporário para mudança de senha'
+    }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Código OTP verificado com sucesso' }),
+    (0, swagger_1.ApiResponse)({ status: 401, description: 'Código OTP inválido ou expirado' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'CPF não encontrado' }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [typeof (_k = typeof otp_dto_1.VerifyPasswordResetOtpDto !== "undefined" && otp_dto_1.VerifyPasswordResetOtpDto) === "function" ? _k : Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "verifyPasswordResetOtp", null);
+__decorate([
+    (0, common_1.Post)('change-password-with-otp'),
+    (0, throttler_1.Throttle)({ default: { limit: 5, ttl: 60000 } }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Alterar senha usando token OTP',
+        description: 'Altera senha do usuário após verificação do OTP. Requer senha antiga e nova senha.'
+    }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Senha alterada com sucesso' }),
+    (0, swagger_1.ApiResponse)({ status: 401, description: 'Token inválido ou senha antiga incorreta' }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [typeof (_l = typeof otp_dto_1.ChangePasswordWithOtpDto !== "undefined" && otp_dto_1.ChangePasswordWithOtpDto) === "function" ? _l : Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "changePasswordWithOtp", null);
+__decorate([
+    (0, common_1.Post)('check-cpf'),
+    (0, throttler_1.Throttle)({ default: { limit: 10, ttl: 60000 } }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Verificar se CPF já está cadastrado',
+        description: 'Verifica se um CPF já existe no sistema. Retorna true se existe, false se não existe.'
+    }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'CPF verificado com sucesso' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'CPF inválido' }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [typeof (_m = typeof registration_otp_dto_1.CheckCpfDto !== "undefined" && registration_otp_dto_1.CheckCpfDto) === "function" ? _m : Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "checkCpf", null);
+__decorate([
+    (0, common_1.Post)('request-registration-otp'),
+    (0, throttler_1.Throttle)({ default: { limit: 3, ttl: 120000 } }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Solicitar código OTP para cadastro via WhatsApp',
+        description: 'Gera código OTP e envia via WhatsApp usando Ycloud para usuários em processo de cadastro'
+    }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Código OTP enviado com sucesso' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'CPF já cadastrado ou erro na requisição' }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [typeof (_o = typeof registration_otp_dto_1.RequestRegistrationOtpDto !== "undefined" && registration_otp_dto_1.RequestRegistrationOtpDto) === "function" ? _o : Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "requestRegistrationOtp", null);
+__decorate([
+    (0, common_1.Post)('verify-registration-otp'),
+    (0, throttler_1.Throttle)({ default: { limit: 5, ttl: 60000 } }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Verificar código OTP de cadastro',
+        description: 'Valida código OTP enviado via WhatsApp durante o processo de cadastro'
+    }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Código OTP verificado com sucesso' }),
+    (0, swagger_1.ApiResponse)({ status: 401, description: 'Código OTP inválido ou expirado' }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [typeof (_p = typeof registration_otp_dto_1.VerifyRegistrationOtpDto !== "undefined" && registration_otp_dto_1.VerifyRegistrationOtpDto) === "function" ? _p : Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "verifyRegistrationOtp", null);
 exports.AuthController = AuthController = __decorate([
     (0, swagger_1.ApiTags)('Auth'),
     (0, common_1.Controller)('api/auth'),
     (0, common_1.UseGuards)(api_key_guard_1.ApiKeyGuard),
     (0, swagger_1.ApiSecurity)('api-key'),
-    __metadata("design:paramtypes", [typeof (_a = typeof email_sender_service_1.EmailSenderService !== "undefined" && email_sender_service_1.EmailSenderService) === "function" ? _a : Object, typeof (_b = typeof users_service_1.UsersService !== "undefined" && users_service_1.UsersService) === "function" ? _b : Object])
+    __metadata("design:paramtypes", [typeof (_a = typeof email_sender_service_1.EmailSenderService !== "undefined" && email_sender_service_1.EmailSenderService) === "function" ? _a : Object, typeof (_b = typeof users_service_1.UsersService !== "undefined" && users_service_1.UsersService) === "function" ? _b : Object, typeof (_c = typeof otp_service_1.OtpService !== "undefined" && otp_service_1.OtpService) === "function" ? _c : Object, typeof (_d = typeof sms_service_1.SmsService !== "undefined" && sms_service_1.SmsService) === "function" ? _d : Object, typeof (_e = typeof ycloud_service_1.YcloudService !== "undefined" && ycloud_service_1.YcloudService) === "function" ? _e : Object, typeof (_f = typeof encryption_service_1.EncryptionService !== "undefined" && encryption_service_1.EncryptionService) === "function" ? _f : Object])
 ], AuthController);
 
 
@@ -173,19 +403,217 @@ const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
 const config_1 = __webpack_require__(/*! @nestjs/config */ "@nestjs/config");
 const email_template_service_1 = __webpack_require__(/*! ./email-template.service */ "./src/auth/email-template.service.ts");
 const email_sender_service_1 = __webpack_require__(/*! ./email-sender.service */ "./src/auth/email-sender.service.ts");
+const otp_service_1 = __webpack_require__(/*! ./services/otp.service */ "./src/auth/services/otp.service.ts");
+const sms_service_1 = __webpack_require__(/*! ./services/sms.service */ "./src/auth/services/sms.service.ts");
+const ycloud_service_1 = __webpack_require__(/*! ./services/ycloud.service */ "./src/auth/services/ycloud.service.ts");
 const auth_controller_1 = __webpack_require__(/*! ./auth.controller */ "./src/auth/auth.controller.ts");
 const users_module_1 = __webpack_require__(/*! ../users/users.module */ "./src/users/users.module.ts");
+const database_module_1 = __webpack_require__(/*! ../database/database.module */ "./src/database/database.module.ts");
+const encryption_service_1 = __webpack_require__(/*! ../common/services/encryption.service */ "./src/common/services/encryption.service.ts");
 let AuthModule = class AuthModule {
 };
 exports.AuthModule = AuthModule;
 exports.AuthModule = AuthModule = __decorate([
     (0, common_1.Module)({
-        imports: [config_1.ConfigModule, users_module_1.UsersModule],
+        imports: [config_1.ConfigModule, users_module_1.UsersModule, database_module_1.DatabaseModule],
         controllers: [auth_controller_1.AuthController],
-        providers: [email_template_service_1.EmailTemplateService, email_sender_service_1.EmailSenderService],
-        exports: [email_template_service_1.EmailTemplateService, email_sender_service_1.EmailSenderService],
+        providers: [
+            email_template_service_1.EmailTemplateService,
+            email_sender_service_1.EmailSenderService,
+            otp_service_1.OtpService,
+            sms_service_1.SmsService,
+            ycloud_service_1.YcloudService,
+            encryption_service_1.EncryptionService,
+        ],
+        exports: [email_template_service_1.EmailTemplateService, email_sender_service_1.EmailSenderService, otp_service_1.OtpService, sms_service_1.SmsService, ycloud_service_1.YcloudService],
     })
 ], AuthModule);
+
+
+/***/ }),
+
+/***/ "./src/auth/dto/otp.dto.ts":
+/*!*********************************!*\
+  !*** ./src/auth/dto/otp.dto.ts ***!
+  \*********************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ChangePasswordWithOtpDto = exports.VerifyPasswordResetOtpDto = exports.RequestPasswordResetOtpDto = void 0;
+const swagger_1 = __webpack_require__(/*! @nestjs/swagger */ "@nestjs/swagger");
+const class_validator_1 = __webpack_require__(/*! class-validator */ "class-validator");
+class RequestPasswordResetOtpDto {
+}
+exports.RequestPasswordResetOtpDto = RequestPasswordResetOtpDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'CPF do usuário (apenas números)',
+        example: '12345678900',
+    }),
+    (0, class_validator_1.IsNotEmpty)({ message: 'CPF é obrigatório' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Matches)(/^\d{11}$/, { message: 'CPF deve ter 11 dígitos' }),
+    __metadata("design:type", String)
+], RequestPasswordResetOtpDto.prototype, "cpf", void 0);
+class VerifyPasswordResetOtpDto {
+}
+exports.VerifyPasswordResetOtpDto = VerifyPasswordResetOtpDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'CPF do usuário (apenas números)',
+        example: '12345678900',
+    }),
+    (0, class_validator_1.IsNotEmpty)({ message: 'CPF é obrigatório' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Matches)(/^\d{11}$/, { message: 'CPF deve ter 11 dígitos' }),
+    __metadata("design:type", String)
+], VerifyPasswordResetOtpDto.prototype, "cpf", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Código OTP de 6 dígitos',
+        example: '123456',
+    }),
+    (0, class_validator_1.IsNotEmpty)({ message: 'Código OTP é obrigatório' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Matches)(/^\d{6}$/, { message: 'Código OTP deve ter 6 dígitos' }),
+    __metadata("design:type", String)
+], VerifyPasswordResetOtpDto.prototype, "otp_code", void 0);
+class ChangePasswordWithOtpDto {
+}
+exports.ChangePasswordWithOtpDto = ChangePasswordWithOtpDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Token temporário recebido após validar OTP',
+        example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    }),
+    (0, class_validator_1.IsNotEmpty)({ message: 'Token é obrigatório' }),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ChangePasswordWithOtpDto.prototype, "token", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Senha atual do usuário',
+        example: 'SenhaAtual123!',
+    }),
+    (0, class_validator_1.IsNotEmpty)({ message: 'Senha atual é obrigatória' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MinLength)(6, { message: 'Senha deve ter pelo menos 6 caracteres' }),
+    __metadata("design:type", String)
+], ChangePasswordWithOtpDto.prototype, "old_password", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Nova senha do usuário',
+        example: 'NovaSenha123!',
+    }),
+    (0, class_validator_1.IsNotEmpty)({ message: 'Nova senha é obrigatória' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MinLength)(6, { message: 'Senha deve ter pelo menos 6 caracteres' }),
+    __metadata("design:type", String)
+], ChangePasswordWithOtpDto.prototype, "new_password", void 0);
+
+
+/***/ }),
+
+/***/ "./src/auth/dto/registration-otp.dto.ts":
+/*!**********************************************!*\
+  !*** ./src/auth/dto/registration-otp.dto.ts ***!
+  \**********************************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.VerifyRegistrationOtpDto = exports.RequestRegistrationOtpDto = exports.CheckCpfDto = void 0;
+const swagger_1 = __webpack_require__(/*! @nestjs/swagger */ "@nestjs/swagger");
+const class_validator_1 = __webpack_require__(/*! class-validator */ "class-validator");
+class CheckCpfDto {
+}
+exports.CheckCpfDto = CheckCpfDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'CPF do usuário (apenas números)',
+        example: '12345678901',
+    }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.Matches)(/^\d{11}$/, { message: 'CPF deve conter exatamente 11 dígitos' }),
+    __metadata("design:type", String)
+], CheckCpfDto.prototype, "cpf", void 0);
+class RequestRegistrationOtpDto {
+}
+exports.RequestRegistrationOtpDto = RequestRegistrationOtpDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'CPF do usuário (apenas números)',
+        example: '12345678901',
+    }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.Matches)(/^\d{11}$/, { message: 'CPF deve conter exatamente 11 dígitos' }),
+    __metadata("design:type", String)
+], RequestRegistrationOtpDto.prototype, "cpf", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Número de telefone celular',
+        example: '11999999999',
+    }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.Matches)(/^\d{10,11}$/, { message: 'Telefone deve conter 10 ou 11 dígitos' }),
+    __metadata("design:type", String)
+], RequestRegistrationOtpDto.prototype, "phone", void 0);
+class VerifyRegistrationOtpDto {
+}
+exports.VerifyRegistrationOtpDto = VerifyRegistrationOtpDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'CPF do usuário (apenas números)',
+        example: '12345678901',
+    }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.Matches)(/^\d{11}$/, { message: 'CPF deve conter exatamente 11 dígitos' }),
+    __metadata("design:type", String)
+], VerifyRegistrationOtpDto.prototype, "cpf", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Número de telefone celular',
+        example: '11999999999',
+    }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.Matches)(/^\d{10,11}$/, { message: 'Telefone deve conter 10 ou 11 dígitos' }),
+    __metadata("design:type", String)
+], VerifyRegistrationOtpDto.prototype, "phone", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Código OTP de 6 dígitos',
+        example: '123456',
+    }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.Length)(6, 6, { message: 'Código OTP deve conter exatamente 6 dígitos' }),
+    (0, class_validator_1.Matches)(/^\d{6}$/, { message: 'Código OTP deve conter apenas números' }),
+    __metadata("design:type", String)
+], VerifyRegistrationOtpDto.prototype, "otp_code", void 0);
 
 
 /***/ }),
@@ -524,6 +952,553 @@ exports.EmailTemplateService = EmailTemplateService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [typeof (_a = typeof config_1.ConfigService !== "undefined" && config_1.ConfigService) === "function" ? _a : Object])
 ], EmailTemplateService);
+
+
+/***/ }),
+
+/***/ "./src/auth/services/otp.service.ts":
+/*!******************************************!*\
+  !*** ./src/auth/services/otp.service.ts ***!
+  \******************************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+var _a, _b;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.OtpService = void 0;
+const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
+const pg_1 = __webpack_require__(/*! pg */ "pg");
+const encryption_service_1 = __webpack_require__(/*! ../../common/services/encryption.service */ "./src/common/services/encryption.service.ts");
+const crypto = __webpack_require__(/*! crypto */ "crypto");
+let OtpService = class OtpService {
+    constructor(pool, encryptionService) {
+        this.pool = pool;
+        this.encryptionService = encryptionService;
+        this.OTP_EXPIRY_MINUTES = 10;
+        this.MAX_ATTEMPTS = 3;
+        this.OTP_LENGTH = 6;
+    }
+    generateOtpCode() {
+        const min = 100000;
+        const max = 999999;
+        return Math.floor(Math.random() * (max - min + 1) + min).toString();
+    }
+    hashOtpCode(code) {
+        return crypto.createHash('sha256').update(code).digest('hex');
+    }
+    encryptPhone(phone) {
+        const encrypted = this.encryptionService.encrypt(phone);
+        if (!encrypted) {
+            throw new Error('Falha ao criptografar telefone');
+        }
+        return encrypted;
+    }
+    decryptPhone(encryptedPhone) {
+        const decrypted = this.encryptionService.decrypt(encryptedPhone);
+        if (!decrypted) {
+            throw new Error('Falha ao descriptografar telefone');
+        }
+        return decrypted;
+    }
+    async createOtp(userId, phone) {
+        const client = await this.pool.connect();
+        try {
+            const existingOtp = await client.query(`SELECT id, attempts, expires_at 
+         FROM password_reset_otps 
+         WHERE user_id = $1 AND verified = FALSE AND expires_at > NOW()
+         ORDER BY created_at DESC 
+         LIMIT 1`, [userId]);
+            if (existingOtp.rows.length > 0) {
+                const otp = existingOtp.rows[0];
+                const expiresAt = new Date(otp.expires_at);
+                const now = new Date();
+                const minutesRemaining = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60));
+                if (minutesRemaining > 2) {
+                    throw new common_1.BadRequestException(`Aguarde ${minutesRemaining} minutos antes de solicitar um novo código`);
+                }
+                await client.query(`UPDATE password_reset_otps SET verified = TRUE WHERE id = $1`, [otp.id]);
+            }
+            const otpCode = this.generateOtpCode();
+            const otpHash = this.hashOtpCode(otpCode);
+            const expiresAt = new Date();
+            expiresAt.setMinutes(expiresAt.getMinutes() + this.OTP_EXPIRY_MINUTES);
+            const encryptedPhone = this.encryptPhone(phone);
+            await client.query(`INSERT INTO password_reset_otps (
+          user_id, phone, otp_code_hash, otp_code, expires_at, verified, attempts
+        ) VALUES ($1, $2, $3, $4, $5, FALSE, 0)`, [userId, encryptedPhone, otpHash, otpCode, expiresAt]);
+            console.log(`✅ OTP criado para usuário ${userId}, expira em ${expiresAt.toISOString()}`);
+            return {
+                otpCode,
+                expiresAt,
+            };
+        }
+        finally {
+            client.release();
+        }
+    }
+    async verifyOtp(userId, otpCode) {
+        const client = await this.pool.connect();
+        try {
+            const result = await client.query(`SELECT id, otp_code_hash, otp_code, attempts, expires_at, verified
+         FROM password_reset_otps
+         WHERE user_id = $1 AND verified = FALSE AND expires_at > NOW()
+         ORDER BY created_at DESC
+         LIMIT 1`, [userId]);
+            if (result.rows.length === 0) {
+                throw new common_1.NotFoundException('Código OTP não encontrado ou expirado');
+            }
+            const otp = result.rows[0];
+            if (otp.attempts >= this.MAX_ATTEMPTS) {
+                await client.query(`UPDATE password_reset_otps SET verified = TRUE WHERE id = $1`, [otp.id]);
+                throw new common_1.UnauthorizedException('Máximo de tentativas excedido. Solicite um novo código.');
+            }
+            const otpHash = this.hashOtpCode(otpCode);
+            const isValid = otpHash === otp.otp_code_hash;
+            await client.query(`UPDATE password_reset_otps SET attempts = attempts + 1 WHERE id = $1`, [otp.id]);
+            if (!isValid) {
+                throw new common_1.UnauthorizedException('Código OTP inválido');
+            }
+            const token = this.generateTempToken(userId);
+            const tokenExpiresAt = new Date();
+            tokenExpiresAt.setMinutes(tokenExpiresAt.getMinutes() + 15);
+            await client.query(`UPDATE password_reset_otps 
+         SET verified = TRUE, verified_at = NOW(), otp_code = '', 
+             reset_token = $1, token_expires_at = $2
+         WHERE id = $3`, [token, tokenExpiresAt, otp.id]);
+            console.log(`✅ OTP verificado com sucesso para usuário ${userId}`);
+            return token;
+        }
+        finally {
+            client.release();
+        }
+    }
+    generateTempToken(userId) {
+        const payload = {
+            userId,
+            type: 'password_reset',
+            timestamp: Date.now(),
+        };
+        const token = crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+        return token;
+    }
+    async validateTempToken(token) {
+        const client = await this.pool.connect();
+        try {
+            const result = await client.query(`SELECT user_id, token_expires_at
+         FROM password_reset_otps
+         WHERE verified = TRUE 
+           AND reset_token = $1
+           AND token_expires_at > NOW()`, [token]);
+            if (result.rows.length === 0) {
+                return { userId: '', valid: false };
+            }
+            const otp = result.rows[0];
+            return { userId: otp.user_id, valid: true };
+        }
+        finally {
+            client.release();
+        }
+    }
+    async invalidateToken(token) {
+        const client = await this.pool.connect();
+        try {
+            await client.query(`UPDATE password_reset_otps 
+         SET reset_token = NULL, token_expires_at = NULL 
+         WHERE reset_token = $1`, [token]);
+        }
+        finally {
+            client.release();
+        }
+    }
+    async cleanupExpiredOtps() {
+        const client = await this.pool.connect();
+        try {
+            await client.query(`DELETE FROM password_reset_otps 
+         WHERE expires_at < NOW() - INTERVAL '1 hour'`);
+            console.log('✅ OTPs expirados removidos');
+        }
+        finally {
+            client.release();
+        }
+    }
+    encryptCpf(cpf) {
+        const encrypted = this.encryptionService.encrypt(cpf);
+        if (!encrypted) {
+            throw new Error('Falha ao criptografar CPF');
+        }
+        return encrypted;
+    }
+    async createRegistrationOtp(cpf, phone) {
+        const client = await this.pool.connect();
+        try {
+            const encryptedCpf = this.encryptCpf(cpf);
+            const encryptedPhone = this.encryptPhone(phone);
+            const existingOtp = await client.query(`SELECT id, attempts, expires_at 
+         FROM registration_otps 
+         WHERE cpf = $1 AND phone = $2 AND verified = FALSE AND expires_at > NOW()
+         ORDER BY created_at DESC 
+         LIMIT 1`, [encryptedCpf, encryptedPhone]);
+            if (existingOtp.rows.length > 0) {
+                const otp = existingOtp.rows[0];
+                const expiresAt = new Date(otp.expires_at);
+                const now = new Date();
+                const minutesRemaining = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60));
+                if (minutesRemaining > 2) {
+                    throw new common_1.BadRequestException(`Aguarde ${minutesRemaining} minutos antes de solicitar um novo código`);
+                }
+                await client.query(`UPDATE registration_otps SET verified = TRUE WHERE id = $1`, [otp.id]);
+            }
+            const otpCode = this.generateOtpCode();
+            const otpHash = this.hashOtpCode(otpCode);
+            const expiresAt = new Date();
+            expiresAt.setMinutes(expiresAt.getMinutes() + this.OTP_EXPIRY_MINUTES);
+            await client.query(`INSERT INTO registration_otps (
+          cpf, phone, otp_code_hash, otp_code, expires_at, verified, attempts
+        ) VALUES ($1, $2, $3, $4, $5, FALSE, 0)`, [encryptedCpf, encryptedPhone, otpHash, otpCode, expiresAt]);
+            console.log(`✅ OTP de cadastro criado para CPF ${cpf.substring(0, 3)}***, expira em ${expiresAt.toISOString()}`);
+            return {
+                otpCode,
+                expiresAt,
+            };
+        }
+        finally {
+            client.release();
+        }
+    }
+    async verifyRegistrationOtp(cpf, phone, otpCode) {
+        const client = await this.pool.connect();
+        try {
+            const encryptedCpf = this.encryptCpf(cpf);
+            const encryptedPhone = this.encryptPhone(phone);
+            const result = await client.query(`SELECT id, otp_code_hash, otp_code, attempts, expires_at, verified
+         FROM registration_otps
+         WHERE cpf = $1 AND phone = $2 AND verified = FALSE AND expires_at > NOW()
+         ORDER BY created_at DESC
+         LIMIT 1`, [encryptedCpf, encryptedPhone]);
+            if (result.rows.length === 0) {
+                throw new common_1.NotFoundException('Código OTP não encontrado ou expirado');
+            }
+            const otp = result.rows[0];
+            if (otp.attempts >= this.MAX_ATTEMPTS) {
+                await client.query(`UPDATE registration_otps SET verified = TRUE WHERE id = $1`, [otp.id]);
+                throw new common_1.UnauthorizedException('Máximo de tentativas excedido. Solicite um novo código.');
+            }
+            const otpHash = this.hashOtpCode(otpCode);
+            const isValid = otpHash === otp.otp_code_hash;
+            await client.query(`UPDATE registration_otps SET attempts = attempts + 1 WHERE id = $1`, [otp.id]);
+            if (!isValid) {
+                throw new common_1.UnauthorizedException('Código OTP inválido');
+            }
+            await client.query(`UPDATE registration_otps 
+         SET verified = TRUE, verified_at = NOW(), otp_code = ''
+         WHERE id = $1`, [otp.id]);
+            console.log(`✅ OTP de cadastro verificado com sucesso para CPF ${cpf.substring(0, 3)}***`);
+            return true;
+        }
+        finally {
+            client.release();
+        }
+    }
+    async cleanupExpiredRegistrationOtps() {
+        const client = await this.pool.connect();
+        try {
+            await client.query(`DELETE FROM registration_otps 
+         WHERE expires_at < NOW() - INTERVAL '1 hour'`);
+            console.log('✅ OTPs de cadastro expirados removidos');
+        }
+        finally {
+            client.release();
+        }
+    }
+};
+exports.OtpService = OtpService;
+exports.OtpService = OtpService = __decorate([
+    (0, common_1.Injectable)(),
+    __param(0, (0, common_1.Inject)('DATABASE_POOL')),
+    __metadata("design:paramtypes", [typeof (_a = typeof pg_1.Pool !== "undefined" && pg_1.Pool) === "function" ? _a : Object, typeof (_b = typeof encryption_service_1.EncryptionService !== "undefined" && encryption_service_1.EncryptionService) === "function" ? _b : Object])
+], OtpService);
+
+
+/***/ }),
+
+/***/ "./src/auth/services/sms.service.ts":
+/*!******************************************!*\
+  !*** ./src/auth/services/sms.service.ts ***!
+  \******************************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var _a;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.SmsService = void 0;
+const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
+const config_1 = __webpack_require__(/*! @nestjs/config */ "@nestjs/config");
+const twilio = __webpack_require__(/*! twilio */ "twilio");
+let SmsService = class SmsService {
+    constructor(configService) {
+        this.configService = configService;
+        this.twilioClient = null;
+        const accountSid = this.configService.get('TWILIO_ACCOUNT_SID');
+        const authToken = this.configService.get('TWILIO_AUTH_TOKEN');
+        this.fromPhoneNumber = this.configService.get('TWILIO_PHONE_NUMBER', '');
+        this.whatsappEnabled = this.configService.get('TWILIO_WHATSAPP_ENABLED', true);
+        if (accountSid && authToken) {
+            this.twilioClient = twilio(accountSid, authToken);
+            console.log('✅ Twilio inicializado com sucesso');
+        }
+        else {
+            console.warn('⚠️ Twilio não configurado. Variáveis TWILIO_ACCOUNT_SID e TWILIO_AUTH_TOKEN necessárias.');
+        }
+    }
+    formatPhoneNumber(phone) {
+        let cleaned = phone.replace(/\D/g, '');
+        if (!cleaned.startsWith('55')) {
+            cleaned = '55' + cleaned;
+        }
+        return '+' + cleaned;
+    }
+    async sendOtp(phone, otpCode) {
+        if (!this.twilioClient) {
+            return {
+                success: false,
+                method: null,
+                error: 'Twilio não configurado',
+            };
+        }
+        const formattedPhone = this.formatPhoneNumber(phone);
+        const message = `Seu código de recuperação de senha é: ${otpCode}\n\nEste código expira em 10 minutos.\n\nNão compartilhe este código com ninguém.`;
+        try {
+            if (this.whatsappEnabled && this.fromPhoneNumber.startsWith('whatsapp:')) {
+                try {
+                    await this.twilioClient.messages.create({
+                        body: message,
+                        from: this.fromPhoneNumber,
+                        to: `whatsapp:${formattedPhone}`,
+                    });
+                    console.log(`✅ OTP enviado via WhatsApp para ${formattedPhone}`);
+                    return { success: true, method: 'whatsapp' };
+                }
+                catch (whatsappError) {
+                    console.warn(`⚠️ Falha ao enviar via WhatsApp, tentando SMS: ${whatsappError.message}`);
+                }
+            }
+            const smsFromNumber = this.fromPhoneNumber.replace('whatsapp:', '');
+            await this.twilioClient.messages.create({
+                body: message,
+                from: smsFromNumber,
+                to: formattedPhone,
+            });
+            console.log(`✅ OTP enviado via SMS para ${formattedPhone}`);
+            return { success: true, method: 'sms' };
+        }
+        catch (error) {
+            console.error(`❌ Erro ao enviar OTP para ${formattedPhone}:`, error.message);
+            return {
+                success: false,
+                method: null,
+                error: error.message || 'Erro ao enviar mensagem',
+            };
+        }
+    }
+    isConfigured() {
+        return this.twilioClient !== null;
+    }
+};
+exports.SmsService = SmsService;
+exports.SmsService = SmsService = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [typeof (_a = typeof config_1.ConfigService !== "undefined" && config_1.ConfigService) === "function" ? _a : Object])
+], SmsService);
+
+
+/***/ }),
+
+/***/ "./src/auth/services/ycloud.service.ts":
+/*!*********************************************!*\
+  !*** ./src/auth/services/ycloud.service.ts ***!
+  \*********************************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var _a;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.YcloudService = void 0;
+const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
+const config_1 = __webpack_require__(/*! @nestjs/config */ "@nestjs/config");
+const https = __webpack_require__(/*! https */ "https");
+let YcloudService = class YcloudService {
+    constructor(configService) {
+        this.configService = configService;
+        this.apiUrl = 'https://api.ycloud.com/v1';
+        this.apiKey = this.configService.get('YCLOUD_API_KEY', '');
+        this.whatsappNumber = this.configService.get('YCLOUD_WHATSAPP_NUMBER', '');
+        if (!this.apiKey) {
+            console.warn('⚠️ Ycloud não configurado. Variável YCLOUD_API_KEY necessária.');
+        }
+        else {
+            console.log('✅ Ycloud inicializado com sucesso');
+        }
+    }
+    formatPhoneNumber(phone) {
+        let cleaned = phone.replace(/\D/g, '');
+        if (!cleaned.startsWith('55')) {
+            cleaned = '55' + cleaned;
+        }
+        return '+' + cleaned;
+    }
+    async sendOtp(phone, otpCode) {
+        if (!this.apiKey) {
+            return {
+                success: false,
+                error: 'Ycloud não configurado',
+            };
+        }
+        const formattedPhone = this.formatPhoneNumber(phone);
+        try {
+            const message = `Seu código de verificação é: ${otpCode}\n\nEste código expira em 10 minutos.\n\nNão compartilhe este código com ninguém.`;
+            const response = await this.makeRequest('POST', '/messages', {
+                to: formattedPhone,
+                type: 'text',
+                text: {
+                    body: message,
+                },
+                from: this.whatsappNumber || 'whatsapp',
+            });
+            if (response.success) {
+                console.log(`✅ OTP enviado via Ycloud WhatsApp para ${formattedPhone}`);
+                return {
+                    success: true,
+                    messageId: response.data?.id || response.data?.messageId,
+                };
+            }
+            else {
+                throw new Error(response.error || 'Erro ao enviar OTP');
+            }
+        }
+        catch (error) {
+            console.error(`❌ Erro ao enviar OTP via Ycloud para ${formattedPhone}:`, error.message);
+            return {
+                success: false,
+                error: error.message || 'Erro ao enviar mensagem',
+            };
+        }
+    }
+    async verifyOtp(phone, otpCode) {
+        if (!this.apiKey) {
+            return {
+                success: false,
+                error: 'Ycloud não configurado',
+            };
+        }
+        const formattedPhone = this.formatPhoneNumber(phone);
+        try {
+            const response = await this.makeRequest('POST', '/verify/check', {
+                to: formattedPhone,
+                code: otpCode,
+            });
+            if (response.success && response.data?.valid === true) {
+                console.log(`✅ OTP verificado com sucesso para ${formattedPhone}`);
+                return { success: true };
+            }
+            else {
+                return {
+                    success: false,
+                    error: 'Código OTP inválido',
+                };
+            }
+        }
+        catch (error) {
+            console.error(`❌ Erro ao verificar OTP via Ycloud:`, error.message);
+            return {
+                success: false,
+                error: error.message || 'Erro ao verificar código',
+            };
+        }
+    }
+    async makeRequest(method, endpoint, data) {
+        return new Promise((resolve, reject) => {
+            const url = `${this.apiUrl}${endpoint}`;
+            const postData = JSON.stringify(data);
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': this.apiKey,
+                    'Content-Length': Buffer.byteLength(postData),
+                },
+            };
+            const req = https.request(url, options, (res) => {
+                let responseData = '';
+                res.on('data', (chunk) => {
+                    responseData += chunk;
+                });
+                res.on('end', () => {
+                    try {
+                        const parsed = JSON.parse(responseData);
+                        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+                            resolve({ success: true, data: parsed });
+                        }
+                        else {
+                            resolve({
+                                success: false,
+                                error: parsed.message || parsed.error || 'Erro na requisição',
+                            });
+                        }
+                    }
+                    catch (e) {
+                        resolve({
+                            success: false,
+                            error: 'Erro ao processar resposta',
+                        });
+                    }
+                });
+            });
+            req.on('error', (error) => {
+                reject(error);
+            });
+            req.write(postData);
+            req.end();
+        });
+    }
+    isConfigured() {
+        return !!this.apiKey;
+    }
+};
+exports.YcloudService = YcloudService;
+exports.YcloudService = YcloudService = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [typeof (_a = typeof config_1.ConfigService !== "undefined" && config_1.ConfigService) === "function" ? _a : Object])
+], YcloudService);
 
 
 /***/ }),
@@ -994,6 +1969,108 @@ __decorate([
 
 /***/ }),
 
+/***/ "./src/users/dto/pix-key.dto.ts":
+/*!**************************************!*\
+  !*** ./src/users/dto/pix-key.dto.ts ***!
+  \**************************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ReorderPixKeysDto = exports.UpdatePixKeyDto = exports.CreatePixKeyDto = void 0;
+const class_validator_1 = __webpack_require__(/*! class-validator */ "class-validator");
+const swagger_1 = __webpack_require__(/*! @nestjs/swagger */ "@nestjs/swagger");
+class CreatePixKeyDto {
+}
+exports.CreatePixKeyDto = CreatePixKeyDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: '11999999999' }),
+    (0, class_validator_1.IsNotEmpty)({ message: 'Chave PIX é obrigatória' }),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreatePixKeyDto.prototype, "pix_key", void 0);
+class UpdatePixKeyDto {
+}
+exports.UpdatePixKeyDto = UpdatePixKeyDto;
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: false }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], UpdatePixKeyDto.prototype, "is_primary", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 1 }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(10),
+    __metadata("design:type", Number)
+], UpdatePixKeyDto.prototype, "display_order", void 0);
+class ReorderPixKeysDto {
+}
+exports.ReorderPixKeysDto = ReorderPixKeysDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: ['uuid1', 'uuid2', 'uuid3'] }),
+    (0, class_validator_1.IsNotEmpty)({ message: 'Lista de IDs é obrigatória' }),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], ReorderPixKeysDto.prototype, "key_ids", void 0);
+
+
+/***/ }),
+
+/***/ "./src/users/dto/store-data.dto.ts":
+/*!*****************************************!*\
+  !*** ./src/users/dto/store-data.dto.ts ***!
+  \*****************************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.StoreDataDto = void 0;
+const class_validator_1 = __webpack_require__(/*! class-validator */ "class-validator");
+const swagger_1 = __webpack_require__(/*! @nestjs/swagger */ "@nestjs/swagger");
+class StoreDataDto {
+}
+exports.StoreDataDto = StoreDataDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 'Minha Loja LTDA' }),
+    (0, class_validator_1.IsNotEmpty)({ message: 'Nome da loja é obrigatório' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MinLength)(3, { message: 'Nome da loja deve ter pelo menos 3 caracteres' }),
+    (0, class_validator_1.MaxLength)(255, { message: 'Nome da loja deve ter no máximo 255 caracteres' }),
+    __metadata("design:type", String)
+], StoreDataDto.prototype, "store_name", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 'Alimentação' }),
+    (0, class_validator_1.IsNotEmpty)({ message: 'Ramo de atividade é obrigatório' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MinLength)(2, { message: 'Ramo de atividade deve ter pelo menos 2 caracteres' }),
+    (0, class_validator_1.MaxLength)(100, { message: 'Ramo de atividade deve ter no máximo 100 caracteres' }),
+    __metadata("design:type", String)
+], StoreDataDto.prototype, "business_type", void 0);
+
+
+/***/ }),
+
 /***/ "./src/users/dto/update-user.dto.ts":
 /*!******************************************!*\
   !*** ./src/users/dto/update-user.dto.ts ***!
@@ -1114,6 +2191,136 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], VerifyPasswordDto.prototype, "password", void 0);
+
+
+/***/ }),
+
+/***/ "./src/users/services/pix-validation.service.ts":
+/*!******************************************************!*\
+  !*** ./src/users/services/pix-validation.service.ts ***!
+  \******************************************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var _a;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.PixValidationService = void 0;
+const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
+const config_1 = __webpack_require__(/*! @nestjs/config */ "@nestjs/config");
+let PixValidationService = class PixValidationService {
+    constructor(configService) {
+        this.configService = configService;
+        this.pagarmeApiKey = this.configService.get('PAGARME_API_KEY') || null;
+    }
+    async validatePixKeyReal(key) {
+        const formatValidation = this.validatePixKey(key);
+        if (!formatValidation.valid) {
+            return { valid: false, error: formatValidation.error };
+        }
+        if (!this.pagarmeApiKey) {
+            console.warn('⚠️ PAGARME_API_KEY não configurada. Apenas validação de formato será realizada.');
+            return {
+                valid: true,
+                accountData: {
+                    message: 'Chave PIX com formato válido (validação real não disponível)',
+                    validated: 'format_only',
+                },
+            };
+        }
+        console.log('✅ Chave PIX com formato válido (validação real requer acesso ao DICT)');
+        return {
+            valid: true,
+            accountData: {
+                message: 'Chave PIX com formato válido',
+                validated: 'format',
+                note: 'Validação real no DICT requer integração adicional',
+            },
+        };
+    }
+    validatePixKey(key) {
+        if (!key || key.trim().length === 0) {
+            return { valid: false, type: null, error: 'Chave PIX não pode ser vazia' };
+        }
+        const cleanedKey = key.trim().replace(/\D/g, '');
+        if (cleanedKey.length === 11 && /^\d{11}$/.test(cleanedKey)) {
+            if (this.isValidCpf(cleanedKey)) {
+                return { valid: true, type: 'CPF' };
+            }
+            return { valid: false, type: null, error: 'CPF inválido' };
+        }
+        if ((cleanedKey.length === 10 || cleanedKey.length === 11) && /^\d{10,11}$/.test(cleanedKey)) {
+            const ddd = cleanedKey.substring(0, 2);
+            if (parseInt(ddd) >= 11 && parseInt(ddd) <= 99) {
+                return { valid: true, type: 'PHONE' };
+            }
+            return { valid: false, type: null, error: 'DDD inválido' };
+        }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (emailRegex.test(key)) {
+            return { valid: true, type: 'EMAIL' };
+        }
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(key)) {
+            return { valid: true, type: 'RANDOM' };
+        }
+        return { valid: false, type: null, error: 'Formato de chave PIX inválido' };
+    }
+    isValidCpf(cpf) {
+        if (cpf.length !== 11)
+            return false;
+        if (/^(\d)\1{10}$/.test(cpf))
+            return false;
+        let sum = 0;
+        let remainder;
+        for (let i = 1; i <= 9; i++) {
+            sum += parseInt(cpf.substring(i - 1, i)) * (11 - i);
+        }
+        remainder = (sum * 10) % 11;
+        if (remainder === 10 || remainder === 11)
+            remainder = 0;
+        if (remainder !== parseInt(cpf.substring(9, 10)))
+            return false;
+        sum = 0;
+        for (let i = 1; i <= 10; i++) {
+            sum += parseInt(cpf.substring(i - 1, i)) * (12 - i);
+        }
+        remainder = (sum * 10) % 11;
+        if (remainder === 10 || remainder === 11)
+            remainder = 0;
+        if (remainder !== parseInt(cpf.substring(10, 11)))
+            return false;
+        return true;
+    }
+    formatPixKey(key, type) {
+        switch (type) {
+            case 'CPF':
+                return key.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+            case 'PHONE':
+                if (key.length === 11) {
+                    return key.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+                }
+                return key.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+            case 'EMAIL':
+            case 'RANDOM':
+            default:
+                return key;
+        }
+    }
+};
+exports.PixValidationService = PixValidationService;
+exports.PixValidationService = PixValidationService = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [typeof (_a = typeof config_1.ConfigService !== "undefined" && config_1.ConfigService) === "function" ? _a : Object])
+], PixValidationService);
 
 
 /***/ }),
@@ -1474,7 +2681,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-var _a, _b, _c, _d;
+var _a, _b, _c, _d, _e, _f;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.UsersController = void 0;
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
@@ -1484,6 +2691,8 @@ const users_service_1 = __webpack_require__(/*! ./users.service */ "./src/users/
 const create_user_dto_1 = __webpack_require__(/*! ./dto/create-user.dto */ "./src/users/dto/create-user.dto.ts");
 const update_user_dto_1 = __webpack_require__(/*! ./dto/update-user.dto */ "./src/users/dto/update-user.dto.ts");
 const verify_password_dto_1 = __webpack_require__(/*! ./dto/verify-password.dto */ "./src/users/dto/verify-password.dto.ts");
+const store_data_dto_1 = __webpack_require__(/*! ./dto/store-data.dto */ "./src/users/dto/store-data.dto.ts");
+const pix_key_dto_1 = __webpack_require__(/*! ./dto/pix-key.dto */ "./src/users/dto/pix-key.dto.ts");
 const api_key_guard_1 = __webpack_require__(/*! ../common/guards/api-key.guard */ "./src/common/guards/api-key.guard.ts");
 let UsersController = class UsersController {
     constructor(usersService) {
@@ -1512,6 +2721,21 @@ let UsersController = class UsersController {
     }
     syncFirebaseEmail(body) {
         return this.usersService.syncFirebaseEmail(body.cpf, body.oldEmail);
+    }
+    getStoreData(id) {
+        return this.usersService.getStoreData(id);
+    }
+    upsertStoreData(id, storeDataDto) {
+        return this.usersService.upsertStoreData(id, storeDataDto);
+    }
+    getPixKeys(id) {
+        return this.usersService.getPixKeys(id);
+    }
+    addPixKey(id, createPixKeyDto) {
+        return this.usersService.addPixKey(id, createPixKeyDto);
+    }
+    removePixKey(id, keyId) {
+        return this.usersService.removePixKey(id, keyId);
     }
 };
 exports.UsersController = UsersController;
@@ -1588,6 +2812,60 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "syncFirebaseEmail", null);
+__decorate([
+    (0, common_1.Get)(':id/store'),
+    (0, swagger_1.ApiOperation)({ summary: 'Buscar dados da loja do usuário' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Dados da loja encontrados' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'Dados da loja não encontrados' }),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], UsersController.prototype, "getStoreData", null);
+__decorate([
+    (0, common_1.Put)(':id/store'),
+    (0, swagger_1.ApiOperation)({ summary: 'Criar ou atualizar dados da loja do usuário' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Dados da loja salvos com sucesso' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'Usuário não encontrado' }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, typeof (_e = typeof store_data_dto_1.StoreDataDto !== "undefined" && store_data_dto_1.StoreDataDto) === "function" ? _e : Object]),
+    __metadata("design:returntype", void 0)
+], UsersController.prototype, "upsertStoreData", null);
+__decorate([
+    (0, common_1.Get)(':id/pix-keys'),
+    (0, swagger_1.ApiOperation)({ summary: 'Buscar chaves PIX do usuário' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Chaves PIX encontradas' }),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], UsersController.prototype, "getPixKeys", null);
+__decorate([
+    (0, common_1.Post)(':id/pix-keys'),
+    (0, swagger_1.ApiOperation)({ summary: 'Adicionar chave PIX' }),
+    (0, swagger_1.ApiResponse)({ status: 201, description: 'Chave PIX cadastrada com sucesso' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Chave PIX inválida' }),
+    (0, swagger_1.ApiResponse)({ status: 409, description: 'Chave PIX já cadastrada' }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, typeof (_f = typeof pix_key_dto_1.CreatePixKeyDto !== "undefined" && pix_key_dto_1.CreatePixKeyDto) === "function" ? _f : Object]),
+    __metadata("design:returntype", void 0)
+], UsersController.prototype, "addPixKey", null);
+__decorate([
+    (0, common_1.Delete)(':id/pix-keys/:keyId'),
+    (0, swagger_1.ApiOperation)({ summary: 'Remover chave PIX' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Chave PIX removida com sucesso' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'Chave PIX não encontrada' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Não é possível remover a única chave PIX' }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)('keyId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", void 0)
+], UsersController.prototype, "removePixKey", null);
 exports.UsersController = UsersController = __decorate([
     (0, swagger_1.ApiTags)('Users'),
     (0, common_1.Controller)('api/users'),
@@ -1615,18 +2893,21 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.UsersModule = void 0;
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
+const config_1 = __webpack_require__(/*! @nestjs/config */ "@nestjs/config");
 const users_service_1 = __webpack_require__(/*! ./users.service */ "./src/users/users.service.ts");
 const users_controller_1 = __webpack_require__(/*! ./users.controller */ "./src/users/users.controller.ts");
 const user_transaction_service_1 = __webpack_require__(/*! ./user-transaction.service */ "./src/users/user-transaction.service.ts");
 const user_transaction_controller_1 = __webpack_require__(/*! ./user-transaction.controller */ "./src/users/user-transaction.controller.ts");
 const encryption_service_1 = __webpack_require__(/*! ../common/services/encryption.service */ "./src/common/services/encryption.service.ts");
+const pix_validation_service_1 = __webpack_require__(/*! ./services/pix-validation.service */ "./src/users/services/pix-validation.service.ts");
 let UsersModule = class UsersModule {
 };
 exports.UsersModule = UsersModule;
 exports.UsersModule = UsersModule = __decorate([
     (0, common_1.Module)({
+        imports: [config_1.ConfigModule],
         controllers: [users_controller_1.UsersController, user_transaction_controller_1.UserTransactionController],
-        providers: [users_service_1.UsersService, user_transaction_service_1.UserTransactionService, encryption_service_1.EncryptionService],
+        providers: [users_service_1.UsersService, user_transaction_service_1.UserTransactionService, encryption_service_1.EncryptionService, pix_validation_service_1.PixValidationService],
         exports: [users_service_1.UsersService, user_transaction_service_1.UserTransactionService],
     })
 ], UsersModule);
@@ -1653,17 +2934,19 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-var _a, _b;
+var _a, _b, _c;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.UsersService = void 0;
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
 const pg_1 = __webpack_require__(/*! pg */ "pg");
 const encryption_service_1 = __webpack_require__(/*! ../common/services/encryption.service */ "./src/common/services/encryption.service.ts");
+const pix_validation_service_1 = __webpack_require__(/*! ./services/pix-validation.service */ "./src/users/services/pix-validation.service.ts");
 const admin = __webpack_require__(/*! firebase-admin */ "firebase-admin");
 let UsersService = class UsersService {
-    constructor(pool, encryptionService) {
+    constructor(pool, encryptionService, pixValidationService) {
         this.pool = pool;
         this.encryptionService = encryptionService;
+        this.pixValidationService = pixValidationService;
     }
     encryptToBytea(text) {
         const encrypted = this.encryptionService.encrypt(text);
@@ -1938,7 +3221,85 @@ let UsersService = class UsersService {
         }
     }
     async verifyPassword(verifyPasswordDto) {
-        throw new common_1.NotFoundException('Verificação de senha não implementada. Use Firebase Authentication.');
+        const userData = await this.findByCpf(verifyPasswordDto.cpf);
+        if (!userData || !userData.email) {
+            throw new common_1.NotFoundException('Usuário não encontrado');
+        }
+        try {
+            const auth = admin.auth();
+            const user = await auth.getUserByEmail(userData.email);
+            return {
+                valid: true,
+                message: 'Validação de senha deve ser feita no cliente usando Firebase Auth',
+            };
+        }
+        catch (error) {
+            return {
+                valid: false,
+                message: 'Erro ao verificar senha',
+            };
+        }
+    }
+    async verifyPasswordInternal(userId, password) {
+        try {
+            const userData = await this.findById(userId);
+            if (!userData || !userData.email) {
+                return false;
+            }
+            return true;
+        }
+        catch (error) {
+            return false;
+        }
+    }
+    async findById(userId) {
+        try {
+            const result = await this.pool.query(`SELECT 
+          u.id,
+          u.full_name,
+          u.cpf_encrypted,
+          u.email_encrypted,
+          u.kyc_status,
+          u.created_at
+        FROM users u
+        WHERE u.id = $1 AND u.deleted_at IS NULL`, [userId]);
+            if (result.rows.length === 0) {
+                return null;
+            }
+            const user = result.rows[0];
+            const phoneResult = await this.pool.query('SELECT phone_encrypted FROM user_phones WHERE user_id = $1 AND is_primary = true', [user.id]);
+            return {
+                id: user.id,
+                email: this.decryptFromBytea(user.email_encrypted),
+                full_name: this.decryptFromBytea(user.full_name),
+                cpf: this.decryptFromBytea(user.cpf_encrypted),
+                phone: phoneResult.rows[0]?.phone_encrypted ? this.decryptFromBytea(phoneResult.rows[0].phone_encrypted) : null,
+                kyc_status: user.kyc_status,
+                created_at: user.created_at,
+            };
+        }
+        catch (error) {
+            console.error('Erro ao buscar usuário por ID:', error);
+            throw error;
+        }
+    }
+    async updatePassword(userId, newPassword) {
+        try {
+            const userData = await this.findById(userId);
+            if (!userData || !userData.email) {
+                throw new common_1.NotFoundException('Usuário não encontrado');
+            }
+            const auth = admin.auth();
+            const firebaseUser = await auth.getUserByEmail(userData.email);
+            await auth.updateUser(firebaseUser.uid, {
+                password: newPassword,
+            });
+            console.log(`✅ Senha atualizada no Firebase para usuário ${userId}`);
+        }
+        catch (error) {
+            console.error(`❌ Erro ao atualizar senha:`, error);
+            throw new Error(`Falha ao atualizar senha: ${error.message}`);
+        }
     }
     async update(id, updateUserDto) {
         const client = await this.pool.connect();
@@ -2102,12 +3463,127 @@ let UsersService = class UsersService {
             throw error;
         }
     }
+    async getStoreData(userId) {
+        const result = await this.pool.query('SELECT id, store_name, business_type, created_at, updated_at FROM user_stores WHERE user_id = $1', [userId]);
+        if (result.rows.length === 0) {
+            return null;
+        }
+        return result.rows[0];
+    }
+    async upsertStoreData(userId, storeData) {
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+            const existing = await client.query('SELECT id FROM user_stores WHERE user_id = $1', [userId]);
+            if (existing.rows.length > 0) {
+                await client.query('UPDATE user_stores SET store_name = $1, business_type = $2, updated_at = NOW() WHERE user_id = $3', [storeData.store_name, storeData.business_type, userId]);
+            }
+            else {
+                await client.query('INSERT INTO user_stores (user_id, store_name, business_type) VALUES ($1, $2, $3)', [userId, storeData.store_name, storeData.business_type]);
+            }
+            await client.query('COMMIT');
+            return {
+                success: true,
+                message: 'Dados da loja salvos com sucesso',
+            };
+        }
+        catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        }
+        finally {
+            client.release();
+        }
+    }
+    async getPixKeys(userId) {
+        const result = await this.pool.query('SELECT id, pix_key, key_type, is_verified, is_primary, display_order, created_at, updated_at FROM user_pix_keys WHERE user_id = $1 ORDER BY display_order ASC, created_at ASC', [userId]);
+        return result.rows.map((row) => ({
+            ...row,
+            pix_key_formatted: this.pixValidationService.formatPixKey(row.pix_key, row.key_type),
+        }));
+    }
+    async addPixKey(userId, createPixKeyDto) {
+        const client = await this.pool.connect();
+        try {
+            const formatValidation = this.pixValidationService.validatePixKey(createPixKeyDto.pix_key);
+            if (!formatValidation.valid) {
+                throw new common_1.BadRequestException(formatValidation.error || 'Formato de chave PIX inválido');
+            }
+            const realValidation = await this.pixValidationService.validatePixKeyReal(createPixKeyDto.pix_key);
+            if (!realValidation.valid) {
+                throw new common_1.BadRequestException(realValidation.error || 'Chave PIX não encontrada ou inválida no sistema bancário');
+            }
+            const keyType = formatValidation.type;
+            await client.query('BEGIN');
+            const existing = await client.query('SELECT id, user_id FROM user_pix_keys WHERE pix_key = $1', [createPixKeyDto.pix_key]);
+            if (existing.rows.length > 0) {
+                throw new common_1.ConflictException('Esta chave PIX já está cadastrada');
+            }
+            const countResult = await client.query('SELECT COUNT(*) as count FROM user_pix_keys WHERE user_id = $1', [userId]);
+            const count = parseInt(countResult.rows[0].count);
+            if (count >= 5) {
+                throw new common_1.BadRequestException('Limite máximo de 5 chaves PIX atingido');
+            }
+            const isFirstKey = count === 0;
+            const maxOrderResult = await client.query('SELECT MAX(display_order) as max_order FROM user_pix_keys WHERE user_id = $1', [userId]);
+            const nextOrder = (maxOrderResult.rows[0].max_order || 0) + 1;
+            await client.query(`INSERT INTO user_pix_keys (user_id, pix_key, key_type, is_verified, is_primary, display_order)
+         VALUES ($1, $2, $3, TRUE, $4, $5)`, [userId, createPixKeyDto.pix_key, keyType, isFirstKey, nextOrder]);
+            await client.query('COMMIT');
+            return {
+                success: true,
+                message: 'Chave PIX cadastrada com sucesso',
+            };
+        }
+        catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        }
+        finally {
+            client.release();
+        }
+    }
+    async removePixKey(userId, keyId) {
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+            const keyResult = await client.query('SELECT is_primary FROM user_pix_keys WHERE id = $1 AND user_id = $2', [keyId, userId]);
+            if (keyResult.rows.length === 0) {
+                throw new common_1.NotFoundException('Chave PIX não encontrada');
+            }
+            const countResult = await client.query('SELECT COUNT(*) as count FROM user_pix_keys WHERE user_id = $1', [userId]);
+            const count = parseInt(countResult.rows[0].count);
+            if (count === 1) {
+                throw new common_1.BadRequestException('Não é possível remover a única chave PIX cadastrada');
+            }
+            const wasPrimary = keyResult.rows[0].is_primary;
+            await client.query('DELETE FROM user_pix_keys WHERE id = $1 AND user_id = $2', [keyId, userId]);
+            if (wasPrimary) {
+                const firstKeyResult = await client.query('SELECT id FROM user_pix_keys WHERE user_id = $1 ORDER BY display_order ASC LIMIT 1', [userId]);
+                if (firstKeyResult.rows.length > 0) {
+                    await client.query('UPDATE user_pix_keys SET is_primary = TRUE WHERE id = $1', [firstKeyResult.rows[0].id]);
+                }
+            }
+            await client.query('COMMIT');
+            return {
+                success: true,
+                message: 'Chave PIX removida com sucesso',
+            };
+        }
+        catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        }
+        finally {
+            client.release();
+        }
+    }
 };
 exports.UsersService = UsersService;
 exports.UsersService = UsersService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, common_1.Inject)('DATABASE_POOL')),
-    __metadata("design:paramtypes", [typeof (_a = typeof pg_1.Pool !== "undefined" && pg_1.Pool) === "function" ? _a : Object, typeof (_b = typeof encryption_service_1.EncryptionService !== "undefined" && encryption_service_1.EncryptionService) === "function" ? _b : Object])
+    __metadata("design:paramtypes", [typeof (_a = typeof pg_1.Pool !== "undefined" && pg_1.Pool) === "function" ? _a : Object, typeof (_b = typeof encryption_service_1.EncryptionService !== "undefined" && encryption_service_1.EncryptionService) === "function" ? _b : Object, typeof (_c = typeof pix_validation_service_1.PixValidationService !== "undefined" && pix_validation_service_1.PixValidationService) === "function" ? _c : Object])
 ], UsersService);
 
 
@@ -2253,6 +3729,26 @@ module.exports = require("resend");
 
 /***/ }),
 
+/***/ "twilio":
+/*!*************************!*\
+  !*** external "twilio" ***!
+  \*************************/
+/***/ ((module) => {
+
+module.exports = require("twilio");
+
+/***/ }),
+
+/***/ "crypto":
+/*!*************************!*\
+  !*** external "crypto" ***!
+  \*************************/
+/***/ ((module) => {
+
+module.exports = require("crypto");
+
+/***/ }),
+
 /***/ "fs":
 /*!*********************!*\
   !*** external "fs" ***!
@@ -2260,6 +3756,16 @@ module.exports = require("resend");
 /***/ ((module) => {
 
 module.exports = require("fs");
+
+/***/ }),
+
+/***/ "https":
+/*!************************!*\
+  !*** external "https" ***!
+  \************************/
+/***/ ((module) => {
+
+module.exports = require("https");
 
 /***/ }),
 

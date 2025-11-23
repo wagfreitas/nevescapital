@@ -27,7 +27,7 @@ mkdir -p public/assets/images
 # Copia a logo
 echo "📋 Copiando assets..."
 cp assets/icons/PagPag.png public/assets/icons/PagPag.png
-cp assets/icons/ios_120.png public/assets/icons/ios_120.png
+cp assets/icons/logo_ios_filled.png public/assets/icons/logo_ios_filled.png
 
 # Cria arquivo de configuração do Firebase Hosting se não existir
 if [ ! -f firebase.json ]; then

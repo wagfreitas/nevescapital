@@ -39,4 +39,24 @@ abstract class AuthRepository {
     required String currentPassword,
     required String newPassword,
   });
+  
+  // ===== Métodos OTP (fluxo atual do app) =====
+  
+  /// Solicita código OTP via WhatsApp
+  Future<Result<Map<String, dynamic>>> requestOtp({
+    required String cpf,
+    required String phone,
+  });
+  
+  /// Verifica código OTP
+  Future<Result<bool>> verifyOtp({
+    required String cpf,
+    required String phone,
+    required String otpCode,
+  });
+  
+  /// Busca usuário por CPF
+  Future<Result<User?>> getUserByCpf({
+    required String cpf,
+  });
 }

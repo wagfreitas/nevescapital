@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/helpers/format_helpers.dart';
+import 'package:neves_capital/core/utils/app_logger.dart';
 
 /// Tela 5: Resultado do pagamento
 class PaymentResultScreen extends StatelessWidget {
@@ -24,8 +25,8 @@ class PaymentResultScreen extends StatelessWidget {
     final valorFormatado = FormatHelpers.formatCurrency(valorCentavos / 100);
     
     // Debug: Log do valor
-    print('🔍 PaymentResultScreen - valorCentavos: $valorCentavos');
-    print('🔍 PaymentResultScreen - valorFormatado: $valorFormatado');
+    AppLogger.debug('PaymentResultScreen - valorCentavos: $valorCentavos');
+    AppLogger.debug('PaymentResultScreen - valorFormatado: $valorFormatado');
 
     return Scaffold(
       backgroundColor: Colors.grey[900],

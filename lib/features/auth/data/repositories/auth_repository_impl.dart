@@ -4,6 +4,7 @@ import '../datasources/auth_remote_datasource.dart';
 import '../datasources/auth_local_datasource.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/network/network_info.dart';
+import '../../../../shared/services/firestore_service.dart';
 
 /// Implementação do repositório de autenticação
 class AuthRepositoryImpl implements AuthRepository {
@@ -190,5 +191,81 @@ class AuthRepositoryImpl implements AuthRepository {
     }
     
     return const Success(null);
+  }
+  
+  // ===== Implementação dos métodos OTP =====
+  
+  @override
+  Future<Result<Map<String, dynamic>>> requestOtp({
+    required String cpf,
+    required String phone,
+  }) async {
+    // Verifica conectividade
+    if (!await _networkInfo.isConnected) {
+      return const Error(message: 'Sem conexão com a internet');
+    }
+    
+    try {
+      // Chama serviço para solicitar OTP
+      // Por enquanto, retorna sucesso mock até implementar no backend
+      return Success({'success': true, 'message': 'OTP enviado via WhatsApp'});
+    } catch (e) {
+      return Error(message: e.toString().replaceAll('Exception: ', ''));
+    }
+  }
+  
+  @override
+  Future<Result<bool>> verifyOtp({
+    required String cpf,
+    required String phone,
+    required String otpCode,
+  }) async {
+    // Verifica conectividade
+    if (!await _networkInfo.isConnected) {
+      return const Error(message: 'Sem conexão com a internet');
+    }
+    
+    try {
+      // MOCK: Aceita código 1234 para testes
+      // TODO: Implementar verificação real no backend
+      final isValid = otpCode == '1234';
+      return Success(isValid);
+    } catch (e) {
+      return Error(message: e.toString().replaceAll('Exception: ', ''));
+    }
+  }
+  
+  @override
+  Future<Result<User?>> getUserByCpf({
+    required String cpf,
+  }) async {
+    // Verifica conectividade
+    if (!await _networkInfo.isConnected) {
+      return const Error(message: 'Sem conexão com a internet');
+    }
+    
+    try {
+      // Busca usuário no Firestore
+      final userData = await FirestoreService.getUserByCpf(cpf);
+      
+      if (userData == null) {
+        return const Success(null);
+      }
+      
+      // Converte para entidade User
+      final user = User(
+        id: userData['id'] as String? ?? '',
+        email: userData['email'] as String? ?? '',
+        name: userData['fullName'] as String? ?? '',
+        phone: userData['phone'] as String?,
+        avatar: null,
+        createdAt: DateTime.now(), // TODO: pegar do Firestore se disponível
+        updatedAt: DateTime.now(),
+      );
+      
+      return Success(user);
+    } catch (e) {
+      return Error(message: e.toString().replaceAll('Exception: ', ''));
+    }
   }
 }

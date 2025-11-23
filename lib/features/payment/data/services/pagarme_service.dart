@@ -1,13 +1,15 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:neves_capital/core/config/env_service.dart';
+import 'package:neves_capital/core/utils/app_logger.dart';
 
 /// Service para integração com a API do Pagar.me
+/// 
+/// SEGURANÇA: API Key carregada de variáveis de ambiente (.env)
 class PagarmeService {
-  // Chave de API do ambiente Sandbox
-  static const String _apiKey = 'sk_test_6483ab5348254353b94b703a2af0f839';
-  
-  // Base URL da API V5 do Pagar.me
-  static const String _baseUrl = 'https://api.pagar.me/core/v5';
+  // Chave de API e URL carregadas de variáveis de ambiente
+  static String get _apiKey => EnvService.pagarmeApiKey;
+  static String get _baseUrl => EnvService.pagarmeBaseUrl;
   
   /// Processa um pagamento com cartão de crédito
   Future<Map<String, dynamic>> processarPagamentoCartao({

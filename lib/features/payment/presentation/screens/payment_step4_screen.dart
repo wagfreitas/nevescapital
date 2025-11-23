@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/components/custom_text_field.dart';
 import 'package:neves_capital/shared/helpers/card_brand_detector.dart';
+import 'package:neves_capital/core/utils/app_logger.dart';
 // import 'package:credit_card_scanner/credit_card_scanner.dart'; // TEMPORARIAMENTE DESABILITADO
 import 'payment_step5_screen.dart';
 
@@ -60,7 +61,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
       setState(() {
         _detectedBrand = detectedBrand;
       });
-      print('💳 Bandeira detectada: ${CardBrandDetector.getBrandName(detectedBrand)}');
+      AppLogger.debug('Bandeira detectada: ${CardBrandDetector.getBrandName(detectedBrand)}');
     }
   }
 
@@ -69,16 +70,16 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
   /*
   Future<void> _scanCard() async {
     try {
-      print('📷 Iniciando scan de cartão...');
+      AppLogger.debug('Iniciando scan de cartão...');
       
       final scanResult = await CreditCardScanner.scanCard();
 
       if (scanResult != null) {
-        print('📷 Cartão escaneado com sucesso!');
+        AppLogger.info('Cartão escaneado com sucesso!');
         // ... código de preenchimento ...
       }
     } catch (e) {
-      print('❌ Erro ao escanear cartão: $e');
+      AppLogger.error('Erro ao escanear cartão: $e');
     }
   }
   */

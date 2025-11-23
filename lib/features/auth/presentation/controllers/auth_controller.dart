@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:neves_capital/shared/services/auth_service.dart';
-import 'package:neves_capital/shared/services/database_service.dart';
+import 'package:neves_capital/shared/services/firestore_service.dart';
 import 'package:neves_capital/shared/services/biometric_service.dart';
 import 'package:neves_capital/shared/services/user_cache_service.dart';
 import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/shared/helpers/user_helper.dart';
+import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/core/utils/result.dart';
+import 'package:neves_capital/features/auth/presentation/factories/auth_usecase_factory.dart';
 
 /// Estados de progresso do login
 enum LoginProgress {
@@ -27,13 +30,15 @@ class AuthController extends ChangeNotifier {
   LoginProgress _loginProgress = LoginProgress.idle;
   bool _isDisposed = false;
   StreamSubscription<firebase_auth.User?>? _authStateSubscription;
+  bool _isLoggedInOtp = false; // Estado de login via OTP (sem Firebase)
+  static const String _isLoggedInKey = 'is_logged_in_otp'; // Chave no SharedPreferences
 
   // Getters
   firebase_auth.User? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   bool get isBiometricAvailable => _isBiometricAvailable;
   String? get errorMessage => _errorMessage;
-  bool get isLoggedIn => _currentUser != null;
+  bool get isLoggedIn => _currentUser != null || _isLoggedInOtp; // Login via Firebase OU OTP
   LoginProgress get loginProgress => _loginProgress;
   bool get isDisposed => _isDisposed;
 
@@ -42,29 +47,31 @@ class AuthController extends ChangeNotifier {
     _setLoading(true);
     
     try {
-      // Verificar usuário atual do Firebase primeiro (mais rápido)
-      _currentUser = AuthService.currentUser;
-      print('🔍 AuthController.initialize() - _currentUser: ${_currentUser?.uid}');
-      print('🔍 AuthController.initialize() - isLoggedIn: $isLoggedIn');
+      // 1. Verificar estado de login via OTP no SharedPreferences
+      await _loadOtpLoginState();
       
-      // Escutar mudanças de autenticação
+      // 2. Verificar usuário atual do Firebase (para compatibilidade com login antigo)
+      _currentUser = AuthService.currentUser;
+      AppLogger.debug('AuthController.initialize() - currentUser: ${_currentUser != null}');
+      AppLogger.debug('AuthController.initialize() - isLoggedInOtp: $_isLoggedInOtp');
+      AppLogger.debug('AuthController.initialize() - isLoggedIn: $isLoggedIn');
+      
+      // Escutar mudanças de autenticação (apenas para login via Firebase)
       _authStateSubscription = AuthService.authStateChanges.listen((firebase_auth.User? user) {
         if (_isDisposed) {
-          print('⚠️ AuthController - authStateChanges ignorado - controller disposed');
+          AppLogger.warning('AuthController - authStateChanges ignorado - controller disposed');
           return;
         }
-        print('');
-        print('🔥 AuthController - authStateChanges RECEBIDO');
-        print('🔥 User do evento: ${user?.uid}');
-        print('🔥 _currentUser antes: ${_currentUser?.uid}');
-        print('🔥 isLoggedIn antes: $isLoggedIn');
+        AppLogger.debug('AuthController - authStateChanges RECEBIDO');
+        AppLogger.debug('User do evento: ${user != null}');
+        AppLogger.debug('currentUser antes: ${_currentUser != null}');
+        AppLogger.debug('isLoggedIn antes: $isLoggedIn');
         _currentUser = user;
-        print('🔥 _currentUser depois: ${_currentUser?.uid}');
-        print('🔥 isLoggedIn depois: $isLoggedIn');
-        print('🔥 Chamando notifyListeners()');
+        AppLogger.debug('currentUser depois: ${_currentUser != null}');
+        AppLogger.debug('isLoggedIn depois: $isLoggedIn');
+        AppLogger.debug('Chamando notifyListeners()');
         notifyListeners();
-        print('🔥 notifyListeners() concluído');
-        print('');
+        AppLogger.debug('notifyListeners() concluído');
       });
       
       // Verificar disponibilidade biométrica em paralelo (não bloqueia)
@@ -77,13 +84,37 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  /// Carregar estado de login via OTP do SharedPreferences
+  Future<void> _loadOtpLoginState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _isLoggedInOtp = prefs.getBool(_isLoggedInKey) ?? false;
+      AppLogger.debug('Estado de login OTP carregado: $_isLoggedInOtp');
+    } catch (e) {
+      AppLogger.error('Erro ao carregar estado de login OTP', e);
+      _isLoggedInOtp = false;
+    }
+  }
+
+  /// Salvar estado de login via OTP no SharedPreferences
+  Future<void> _saveOtpLoginState(bool isLoggedIn) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_isLoggedInKey, isLoggedIn);
+      _isLoggedInOtp = isLoggedIn;
+      AppLogger.debug('Estado de login OTP salvo: $isLoggedIn');
+    } catch (e) {
+      AppLogger.error('Erro ao salvar estado de login OTP', e);
+    }
+  }
+
   /// Verificar disponibilidade biométrica em background
   void _checkBiometricAvailability() async {
     try {
       _isBiometricAvailable = await BiometricService.isAvailable();
-      print('🔍 Biometria disponível: $_isBiometricAvailable');
+      AppLogger.debug('Biometria disponível: $_isBiometricAvailable');
     } catch (e) {
-      print('❌ Erro ao verificar biometria: $e');
+      AppLogger.error('Erro ao verificar biometria', e);
       _isBiometricAvailable = false;
     }
   }
@@ -106,18 +137,15 @@ class AuthController extends ChangeNotifier {
     _setLoading(true);
     _clearError();
 
-    String? postgresUserId;
-    firebase_auth.User? firebaseUser;
-
     try {
       // ==========================================
-      // ETAPA 1: GRAVAR NO POSTGRESQL PRIMEIRO
+      // CRIAR USUÁRIO NO FIRESTORE
       // ==========================================
-      print('📝 Etapa 1: Criando usuário no PostgreSQL...');
+      AppLogger.info('Criando usuário no Firestore...');
       
-      final postgresResult = await DatabaseService.createUser(
+      // Gerar ID único para o usuário (Firestore gera automaticamente se não fornecido)
+      await FirestoreService.createUser(
         email: email,
-        password: password,
         fullName: fullName,
         cpf: cpf,
         phone: phone,
@@ -130,82 +158,26 @@ class AuthController extends ChangeNotifier {
         complement: complement,
       );
 
-      // ==========================================
-      // VALIDAÇÃO CRÍTICA: VERIFICAR SE POSTGRESQL FOI CRIADO
-      // ==========================================
-      if (postgresResult['success'] != true || postgresResult['user_id'] == null) {
-        throw Exception('Falha ao criar usuário no PostgreSQL. Resposta inválida.');
-      }
-
-      postgresUserId = postgresResult['user_id'] as String;
-      print('✅ Usuário criado no PostgreSQL: $postgresUserId');
+      AppLogger.info('Usuário criado no Firestore com sucesso');
 
       // ==========================================
-      // ETAPA 2: GRAVAR NO FIREBASE (SOMENTE SE POSTGRESQL OK)
+      // SUCESSO: USUÁRIO CRIADO NO FIRESTORE
       // ==========================================
-      print('');
-      print('✅ PostgreSQL confirmado! Prosseguindo para Firebase...');
-      print('📝 Etapa 2: Criando usuário no Firebase...');
-      print('⚠️  ATENÇÃO: Se você está vendo esta mensagem e a API estava desligada,');
-      print('⚠️  significa que há um problema no fluxo do código!');
-      print('');
+      // Não usa Firebase Auth - login será feito via OTP
+      // Salvar CPF para uso futuro
+      await SecureStorageService.saveLastCpf(cpf);
       
-      try {
-        final credential = await AuthService.createUserWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-
-        if (credential.user == null) {
-          throw Exception('Falha ao criar conta no Firebase');
-        }
-
-        firebaseUser = credential.user;
-        print('✅ Usuário criado no Firebase: ${firebaseUser?.uid}');
-
-        // Atualizar displayName no Firebase
-        await firebaseUser?.updateDisplayName(fullName);
-        await firebaseUser?.reload();
-        firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
-        print('✅ DisplayName atualizado: $fullName');
-
-        // ==========================================
-        // SUCESSO: AMBOS OS BANCOS SINCRONIZADOS
-        // ==========================================
-        _currentUser = firebaseUser;
-        notifyListeners();
-        print('✅ Cadastro completo! Usuário em PostgreSQL e Firebase');
-        
-        return true;
-
-      } catch (firebaseError) {
-        // ==========================================
-        // ROLLBACK: DELETAR DO POSTGRESQL
-        // ==========================================
-        print('❌ Erro ao criar no Firebase: $firebaseError');
-        print('🔄 ROLLBACK: Deletando usuário do PostgreSQL...');
-        
-        try {
-          await DatabaseService.deleteUser(postgresUserId);
-          print('✅ Rollback concluído - Usuário removido do PostgreSQL');
-        } catch (deleteError) {
-          print('❌ ERRO CRÍTICO: Falha no rollback! Usuário órfão no PostgreSQL: $postgresUserId');
-          print('❌ Erro do rollback: $deleteError');
-        }
-
-        throw Exception('Erro ao criar no Firebase: $firebaseError');
-      }
+      // Marcar como logado (após cadastro, usuário já está logado)
+      _isLoggedInOtp = true;
+      await _saveOtpLoginState(true);
+      
+      notifyListeners();
+      AppLogger.info('Cadastro completo! Usuário criado no Firestore');
+      
+      return true;
 
     } catch (e) {
-      print('');
-      print('═══════════════════════════════════════════════');
-      print('❌ ERRO NO CADASTRO - NADA FOI GRAVADO');
-      print('═══════════════════════════════════════════════');
-      print('Erro: $e');
-      print('PostgreSQL foi criado? ${postgresUserId != null ? "SIM (ID: $postgresUserId)" : "NÃO"}');
-      print('Firebase foi criado? ${firebaseUser != null ? "SIM (UID: ${firebaseUser.uid})" : "NÃO"}');
-      print('═══════════════════════════════════════════════');
-      print('');
+      AppLogger.error('ERRO NO CADASTRO - NADA FOI GRAVADO', e);
       
       _setError('Erro no cadastro: $e');
       return false;
@@ -215,6 +187,8 @@ class AuthController extends ChangeNotifier {
   }
 
   /// Login com CPF e senha (otimizado)
+  /// 
+  /// **REFATORADO**: Agora usa GetUserByCpfUseCase (Clean Architecture)
   Future<bool> loginWithCpf({
     required String cpf,
     required String password,
@@ -224,22 +198,27 @@ class AuthController extends ChangeNotifier {
     _setLoginProgress(LoginProgress.searchingUser);
 
     try {
-      print('🔐 Iniciando login otimizado com CPF: $cpf');
+      AppLogger.sensitive('Iniciando login otimizado com CPF', cpf);
       
-      // 1. Buscar usuário (com cache otimizado)
-      final userData = await DatabaseService.getUserByCpf(cpf);
+      // 1. Buscar usuário usando UseCase (Clean Architecture)
+      final getUserUseCase = await AuthUseCaseFactory.createGetUserByCpfUseCase();
+      final result = await getUserUseCase(cpf: cpf);
       
-      if (userData == null) {
+      if (result.isError) {
+        throw Exception(result.errorMessage ?? 'Erro ao buscar usuário');
+      }
+      
+      final user = result.dataOrNull;
+      if (user == null) {
         throw Exception('CPF não cadastrado');
       }
 
-      final email = userData['email'] as String;
-      final mode = userData['mode'] as String?;
-      print('✅ Usuário encontrado: $email (${mode ?? 'API'})');
+      final email = user.email;
+      AppLogger.info('Usuário encontrado via UseCase');
 
       // 2. Fazer login no Firebase com email + senha
       _setLoginProgress(LoginProgress.authenticating);
-      print('🔐 Fazendo login no Firebase...');
+      AppLogger.debug('Fazendo login no Firebase...');
       
       final credential = await AuthService.signInWithEmailAndPassword(
         email: email,
@@ -253,26 +232,26 @@ class AuthController extends ChangeNotifier {
       _currentUser = credential.user;
       
       // 3. SEMPRE atualizar e recarregar displayName para garantir que está correto
-      final userFullName = userData['name'] as String?;
+      final userFullName = user.name;
       
       // Salvar CPF após login bem-sucedido (para uso na edição de dados)
       await SecureStorageService.saveLastCpf(cpf);
-      print('💾 CPF salvo no SecureStorage para uso futuro');
+      AppLogger.debug('CPF salvo no SecureStorage para uso futuro');
 
-      if (userFullName != null && userFullName.isNotEmpty) {
+      if (userFullName.isNotEmpty) {
         final currentDisplayName = _currentUser?.displayName;
-        print('📝 displayName atual: "$currentDisplayName"');
-        print('📝 displayName esperado: "$userFullName"');
+        AppLogger.debug('displayName atual: "$currentDisplayName"');
+        AppLogger.debug('displayName esperado: "$userFullName"');
         
         // Verificar se precisa atualizar
         if (currentDisplayName != userFullName) {
-          print('📝 Atualizando displayName...');
+          AppLogger.debug('Atualizando displayName...');
           await _currentUser?.updateDisplayName(userFullName);
           await _currentUser?.reload();
           _currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
-          print('✅ DisplayName atualizado para: ${_currentUser?.displayName}');
+          AppLogger.debug('DisplayName atualizado');
         } else {
-          print('✅ DisplayName já está correto');
+          AppLogger.debug('DisplayName já está correto');
         }
         
         // Sempre recarregar o usuário para garantir dados frescos
@@ -285,22 +264,20 @@ class AuthController extends ChangeNotifier {
       
       _setLoginProgress(LoginProgress.success);
       
-      print('');
-      print('✅✅✅ Login realizado com sucesso! ✅✅✅');
-      print('✅ _currentUser setado: ${_currentUser?.uid}');
-      print('✅ isLoggedIn: $isLoggedIn');
-      print('✅ Chamando notifyListeners()...');
+      AppLogger.info('Login realizado com sucesso!');
+      AppLogger.debug('currentUser setado: ${_currentUser != null}');
+      AppLogger.debug('isLoggedIn: $isLoggedIn');
+      AppLogger.debug('Chamando notifyListeners()...');
       
       // Notificar para atualizar UI
       notifyListeners();
       
-      print('✅ notifyListeners() concluído');
-      print('');
+      AppLogger.debug('notifyListeners() concluído');
       
       return true;
       
     } catch (e) {
-      print('❌ Erro no login: $e');
+      AppLogger.error('Erro no login', e);
       _setLoginProgress(LoginProgress.error);
       
       // Traduzir erros do Firebase
@@ -359,44 +336,127 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  /// Login com OTP (sem Firebase, apenas validação do código)
+  /// Após validação do OTP, marca o usuário como logado no SharedPreferences
+  /// 
+  /// **REFATORADO**: Agora usa GetUserByCpfUseCase (Clean Architecture)
+  Future<bool> loginWithOtpMock(String cpf) async {
+    _setLoading(true);
+    _clearError();
+    _setLoginProgress(LoginProgress.searchingUser);
+
+    try {
+      AppLogger.sensitive('OTP: Iniciando login com OTP para CPF', cpf);
+      
+      // 1. Buscar usuário usando UseCase (Clean Architecture)
+      final getUserUseCase = await AuthUseCaseFactory.createGetUserByCpfUseCase();
+      final result = await getUserUseCase(cpf: cpf);
+      
+      if (result.isError) {
+        throw Exception(result.errorMessage ?? 'Erro ao buscar usuário');
+      }
+      
+      final user = result.dataOrNull;
+      if (user == null) {
+        throw Exception('CPF não cadastrado');
+      }
+
+      AppLogger.info('OTP: Usuário encontrado via UseCase');
+
+      // 2. OTP foi validado na tela anterior, então apenas marcamos como logado
+      // Em produção, aqui seria feita a validação do OTP com o backend
+      _setLoginProgress(LoginProgress.authenticating);
+      
+      // 3. Salvar estado de login no SharedPreferences
+      await _saveOtpLoginState(true);
+      
+      // 4. Salvar CPF e timestamp de login
+      await SecureStorageService.saveLastCpf(cpf);
+      await UserCacheService.saveLastLogin();
+
+      _setLoginProgress(LoginProgress.success);
+      
+      AppLogger.info('OTP: Login com OTP realizado com sucesso!');
+      AppLogger.debug('isLoggedIn: $isLoggedIn');
+      
+      notifyListeners();
+      
+      return true;
+      
+    } catch (e) {
+      AppLogger.error('OTP: Erro no login com OTP', e);
+      _setLoginProgress(LoginProgress.error);
+      
+      String errorMessage = 'Erro no login';
+      if (e.toString().contains('CPF não cadastrado')) {
+        errorMessage = 'CPF não cadastrado';
+      } else {
+        errorMessage = e.toString().replaceAll('Exception: ', '');
+      }
+      
+      _setError(errorMessage);
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   /// Logout
   Future<void> logout() async {
-    print('🔐 Iniciando logout...');
+    AppLogger.debug('Iniciando logout...');
     _setLoading(true);
     
     try {
-      print('🔐 Fazendo signOut no Firebase...');
-      await AuthService.signOut();
+      // 1. Fazer signOut no Firebase (se estiver logado via Firebase)
+      if (_currentUser != null) {
+        AppLogger.debug('Fazendo signOut no Firebase...');
+        await AuthService.signOut();
+        _currentUser = null;
+      }
       
-      print('🔐 Limpando _currentUser...');
-      _currentUser = null;
+      // 2. Limpar estado de login via OTP (resetar variável E SharedPreferences)
+      AppLogger.debug('Limpando estado de login OTP...');
+      _isLoggedInOtp = false; // Resetar variável em memória primeiro
+      await _saveOtpLoginState(false); // Depois salvar no SharedPreferences
       
-      // Limpar dados locais (cache, secure storage, prefs)
-      print('🔐 Limpando dados locais...');
+      // 3. Limpar dados locais (cache, secure storage, prefs)
+      AppLogger.debug('Limpando dados locais...');
       await _clearLocalData();
       
-      // Limpar cache do usuário (memória e local)
+      // 4. Limpar cache do usuário (memória e local)
       UserHelper.clearCache();
       await UserHelper.clearLocalCache();
       
-      print('🔐 Dados locais limpos');
+      AppLogger.debug('Dados locais limpos');
 
-      // Limpar progresso de login
+      // 5. Limpar progresso de login
       _loginProgress = LoginProgress.idle;
       _errorMessage = null;
 
-      print('🔐 Notificando listeners...');
+      AppLogger.debug('Verificando estado antes de notificar...');
+      AppLogger.debug('currentUser: ${_currentUser != null}');
+      AppLogger.debug('isLoggedInOtp: $_isLoggedInOtp');
+      AppLogger.debug('isLoggedIn: $isLoggedIn');
+      
+      AppLogger.debug('Notificando listeners...');
       notifyListeners();
       
-      print('✅ Logout realizado com sucesso!');
-      print('✅ _currentUser após logout: $_currentUser');
-      print('✅ isLoggedIn após logout: $isLoggedIn');
+      AppLogger.info('Logout realizado com sucesso!');
+      AppLogger.debug('currentUser após logout: ${_currentUser != null}');
+      AppLogger.debug('isLoggedInOtp após logout: $_isLoggedInOtp');
+      AppLogger.debug('isLoggedIn após logout: $isLoggedIn');
     } catch (e) {
-      print('❌ Erro no logout: $e');
+      AppLogger.error('Erro no logout', e);
       _setError('Erro ao fazer logout: $e');
       // Garantir que mesmo em caso de erro, limpamos o estado
       _currentUser = null;
+      _isLoggedInOtp = false; // Garantir reset da variável
       _loginProgress = LoginProgress.idle;
+      try {
+        await _saveOtpLoginState(false); // Tentar salvar mesmo em caso de erro
+      } catch (_) {
+        // Ignorar erro ao salvar, mas garantir que a variável está resetada
+      }
       notifyListeners();
     } finally {
       _setLoading(false);
@@ -408,20 +468,26 @@ class AuthController extends ChangeNotifier {
     try {
       // Limpar cache do usuário
       await UserCacheService.clearCache();
-      print('🗑️ Cache do usuário limpo');
+      AppLogger.debug('Cache do usuário limpo');
       
       // Limpar todos os dados sensíveis do secure storage
       await SecureStorageService.clearAll();
-      print('🗑️ Dados sensíveis limpos');
+      AppLogger.debug('Dados sensíveis limpos');
       
-      // Limpar dados do SharedPreferences
+      // Limpar dados do SharedPreferences (incluindo estado de login OTP)
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('auth_token');
       await prefs.remove('auth_user');
-      print('🗑️ SharedPreferences limpo');
+      await prefs.remove(_isLoggedInKey); // Limpar estado de login OTP
+      // Garantir que a variável em memória também está resetada
+      _isLoggedInOtp = false;
+      AppLogger.debug('SharedPreferences limpo (incluindo estado de login OTP)');
+      AppLogger.debug('Variável _isLoggedInOtp resetada para: $_isLoggedInOtp');
       
     } catch (e) {
-      print('❌ Erro ao limpar dados locais: $e');
+      AppLogger.error('Erro ao limpar dados locais', e);
+      // Mesmo em caso de erro, garantir que a variável está resetada
+      _isLoggedInOtp = false;
     }
   }
 
@@ -442,31 +508,39 @@ class AuthController extends ChangeNotifier {
   }
 
   /// Redefinir senha usando CPF (busca email no PostgreSQL)
+  /// 
+  /// **REFATORADO**: Agora usa GetUserByCpfUseCase (Clean Architecture)
   Future<bool> resetPasswordByCpf(String cpf) async {
     _setLoading(true);
     _clearError();
 
     try {
-      print('🔐 Iniciando recuperação de senha com CPF: $cpf');
+      AppLogger.sensitive('Iniciando recuperação de senha com CPF', cpf);
 
-      // 1. Buscar usuário por CPF no PostgreSQL
-      final userData = await DatabaseService.getUserByCpf(cpf);
+      // 1. Buscar usuário usando UseCase (Clean Architecture)
+      final getUserUseCase = await AuthUseCaseFactory.createGetUserByCpfUseCase();
+      final result = await getUserUseCase(cpf: cpf);
 
-      if (userData == null) {
+      if (result.isError) {
+        throw Exception(result.errorMessage ?? 'Erro ao buscar usuário');
+      }
+
+      final user = result.dataOrNull;
+      if (user == null) {
         throw Exception('CPF não cadastrado');
       }
 
-      final email = userData['email'] as String;
-      print('✅ Email encontrado: $email');
+      final email = user.email;
+      AppLogger.info('Email encontrado via UseCase');
 
       // 2. Enviar email de redefinição de senha via Firebase
-      print('📧 Enviando email de redefinição de senha...');
+      AppLogger.debug('Enviando email de redefinição de senha...');
       await AuthService.resetPassword(email);
 
-      print('✅ Email de redefinição enviado com sucesso!');
+      AppLogger.info('Email de redefinição enviado com sucesso!');
       return true;
     } catch (e) {
-      print('❌ Erro ao recuperar senha: $e');
+      AppLogger.error('Erro ao recuperar senha', e);
       
       // Traduzir erros
       String errorMessage = 'Erro ao recuperar senha';

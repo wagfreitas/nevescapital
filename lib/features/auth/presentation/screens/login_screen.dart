@@ -3,6 +3,7 @@ import 'package:neves_capital/features/auth/presentation/controllers/auth_contro
 import 'package:neves_capital/shared/components/cpf_input_field.dart';
 import 'package:neves_capital/shared/helpers/cpf_helper.dart';
 import 'package:neves_capital/shared/widgets/login_progress_widget.dart';
+import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/features/home/presentation/screens/dashboard_screen.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/features/auth/presentation/screens/forgot_password_screen.dart';
@@ -46,19 +47,19 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF122118), // bg-[#122118]
       body: SafeArea(
-        child: Container(
+            child: Container(
           width: double.infinity,
           height: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16.0), // px-4
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildLogo(),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildLogo(),
               const SizedBox(height: 40.0), // mb-10
               _buildWelcomeText(),
               const SizedBox(height: 24.0), // mt-6
               _buildForm(),
-            ],
+                ],
           ),
         ),
       ),
@@ -67,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildLogo() {
     return Image.asset(
-      'assets/icons/ios_120.png',
+      'assets/icons/logo_ios_filled.png',
       width: 100,
       height: 100,
       fit: BoxFit.contain,
@@ -79,26 +80,26 @@ class _LoginScreenState extends State<LoginScreen> {
       'Entre na sua conta:',
       style: TextStyle(
         fontSize: 24,
-        fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.bold,
         color: Colors.white,
-      ),
+              ),
       textAlign: TextAlign.left,
     );
   }
 
   Widget _buildForm() {
     return Form(
-      key: _formKey,
-      child: Column(
-        children: [
-          _buildCpfField(),
+        key: _formKey,
+        child: Column(
+          children: [
+            _buildCpfField(),
           const SizedBox(height: 24.0), // space-y-6
           _buildPasswordField(),
-          const SizedBox(height: 16.0),
+            const SizedBox(height: 16.0),
           _buildForgotPasswordLink(),
-          const SizedBox(height: 24.0),
-          _buildLoginButton(),
-        ],
+            const SizedBox(height: 24.0),
+            _buildLoginButton(),
+          ],
       ),
     );
   }
@@ -106,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildCpfField() {
     return CpfInputField(
       controller: _cpfController,
-      hintText: 'Digite seu CPF',
+        hintText: 'Digite seu CPF',
       onFocusLost: () {
         // Validação automática quando perde foco
       },
@@ -122,8 +123,8 @@ class _LoginScreenState extends State<LoginScreen> {
             borderRadius: BorderRadius.circular(8.0),
           ),
           child: TextFormField(
-            controller: _passwordController,
-            obscureText: _obscurePassword,
+      controller: _passwordController,
+      obscureText: _obscurePassword,
             style: const TextStyle(color: Colors.white),
             validator: (value) {
               if (value == null || value.isEmpty) {
@@ -134,30 +135,30 @@ class _LoginScreenState extends State<LoginScreen> {
               }
               return null;
             },
-            decoration: InputDecoration(
-              hintText: 'Digite sua Senha',
+      decoration: InputDecoration(
+        hintText: 'Digite sua Senha',
               hintStyle: const TextStyle(color: Colors.white70),
               prefixIcon: const Icon(
                 Icons.lock_outline,
                 color: Color(0xFF9CA3AF),
                 size: 20,
               ),
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _obscurePassword ? Icons.visibility : Icons.visibility_off,
+        suffixIcon: IconButton(
+          icon: Icon(
+            _obscurePassword ? Icons.visibility : Icons.visibility_off,
                   color: const Color(0xFF9CA3AF),
                   size: 20,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _obscurePassword = !_obscurePassword;
-                  });
-                },
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8.0),
+          ),
+          onPressed: () {
+            setState(() {
+              _obscurePassword = !_obscurePassword;
+            });
+          },
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8.0),
                 borderSide: const BorderSide(color: Colors.white),
-              ),
+      ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8.0),
                 borderSide: const BorderSide(color: Colors.white),
@@ -206,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           );
-        },
+      },
         child: const Text(
           'Esqueceu sua senha ?',
           style: TextStyle(
@@ -225,31 +226,31 @@ class _LoginScreenState extends State<LoginScreen> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _isLoading ? null : _handleLogin,
-            style: ElevatedButton.styleFrom(
+      onPressed: _isLoading ? null : _handleLogin,
+      style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF22C55E), // bg-[var(--primary-500)]
               foregroundColor: const Color(0xFF122118), // text-[#122118]
-              shape: RoundedRectangleBorder(
+        shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(25), // rounded-full
-              ),
+        ),
               padding: const EdgeInsets.symmetric(vertical: 14), // py-3.5
               elevation: 0,
-            ),
-            child: _isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
+      ),
+      child: _isLoading
+          ? const SizedBox(
+              height: 20,
+              width: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF122118)),
                     ),
-                  )
+            )
                 : const Text(
                     'Entrar',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                    ),
+          ),
                   ),
           ),
         ),
@@ -260,7 +261,7 @@ class _LoginScreenState extends State<LoginScreen> {
           LoginProgressWidget(
             progress: widget.authController.loginProgress,
             errorMessage: widget.authController.errorMessage,
-          ),
+        ),
         ],
       ],
     );
@@ -286,7 +287,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (success) {
         // Login bem-sucedido - navegar para Dashboard mantendo AppWrapper na base
-        print('✅ Login realizado - navegando para Dashboard');
+        AppLogger.info('Login realizado - navegando para Dashboard');
         if (mounted) {
           // pushAndRemoveUntil mas MANTÉM o AppWrapper (route.isFirst)
           Navigator.of(context).pushAndRemoveUntil(
@@ -302,13 +303,13 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         // Login falhou - mostrar mensagem de erro
         final errorMessage = widget.authController.errorMessage ?? 'Erro no login';
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(errorMessage),
               backgroundColor: Colors.red,
-            ),
-          );
+          ),
+        );
         }
       }
     } catch (e) {

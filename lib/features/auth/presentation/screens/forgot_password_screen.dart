@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/shared/components/cpf_input_field.dart';
 import 'package:neves_capital/shared/helpers/cpf_helper.dart';
+import 'package:neves_capital/features/auth/presentation/screens/reset_password_otp_screen.dart';
+import 'package:neves_capital/core/config/feature_flags.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   final AuthController authController;
@@ -57,6 +59,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ] else ...[
                   _buildDescription(),
                   const SizedBox(height: 24.0),
+                  _buildOptionButtons(),
+                  const SizedBox(height: 24.0),
                   _buildForm(),
                 ],
               ],
@@ -69,7 +73,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   Widget _buildLogo() {
     return Image.asset(
-      'assets/icons/ios_120.png',
+      'assets/icons/logo_ios_filled.png',
       width: 80,
       height: 80,
       fit: BoxFit.contain,
@@ -90,7 +94,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   Widget _buildDescription() {
     return const Text(
-      'Digite seu CPF para receber um email com instruções para redefinir sua senha.',
+      'Escolha como deseja recuperar sua senha:',
       style: TextStyle(
         fontSize: 14,
         color: Colors.white70,
@@ -167,8 +171,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       child: Column(
         children: [
           _buildCpfField(),
-          const SizedBox(height: 24.0),
-          _buildSubmitButton(),
         ],
       ),
     );
@@ -178,6 +180,66 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return CpfInputField(
       controller: _cpfController,
       hintText: 'Digite seu CPF',
+    );
+  }
+
+  Widget _buildOptionButtons() {
+    return Column(
+      children: [
+        // Botão WhatsApp/SMS (apenas se feature flag estiver ativa)
+        if (FeatureFlags.enableOtpPasswordRecovery) ...[
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isLoading ? null : () {
+                final cpf = CpfHelper.getCpfNumbers(_cpfController.text);
+                if (cpf.length == 11) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => ResetPasswordOtpScreen(cpf: cpf),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Digite um CPF válido primeiro'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.phone_android, size: 20),
+              label: const Text('WhatsApp/SMS'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF22C55E),
+                foregroundColor: const Color(0xFF122118),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12.0),
+        ],
+        const SizedBox(height: 12.0),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _isLoading ? null : _handleResetPassword,
+            icon: const Icon(Icons.email, size: 20),
+            label: const Text('Email'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Color(0xFF22C55E), width: 2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import 'edit_personal_data_screen.dart';
+import 'edit_store_data_screen.dart';
+import 'edit_pix_keys_screen.dart';
+import 'package:neves_capital/core/utils/app_logger.dart';
 
 /// Tela de perfil do usuário
 class ProfileScreen extends StatefulWidget {
@@ -20,16 +23,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('');
-    print('🟣 ProfileScreen - BUILD iniciado');
-    print('🟣 authController.isDisposed: ${widget.authController.isDisposed}');
-    print('🟣 authController.currentUser: ${widget.authController.currentUser?.uid}');
-    print('🟣 authController.isLoggedIn: ${widget.authController.isLoggedIn}');
+    AppLogger.debug('ProfileScreen - BUILD iniciado');
+    AppLogger.debug('authController.isDisposed: ${widget.authController.isDisposed}');
+    AppLogger.debug('authController.currentUser: ${widget.authController.currentUser != null}');
+    AppLogger.debug('authController.isLoggedIn: ${widget.authController.isLoggedIn}');
     
     // Verificar se o controller ainda está ativo antes de usar
     try {
       if (widget.authController.isDisposed) {
-        print('🟣 Controller disposed - mostrando tela de erro');
+        AppLogger.warning('Controller disposed - mostrando tela de erro');
         return Scaffold(
           appBar: AppBar(
             leading: IconButton(
@@ -60,9 +62,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
 
-      final user = widget.authController.currentUser;
-      
-      if (user == null) {
+      // Verificar se o usuário está logado (via Firebase OU OTP)
+      if (!widget.authController.isLoggedIn) {
         return Scaffold(
           appBar: AppBar(
             leading: IconButton(
@@ -92,8 +93,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       }
+
+      // Se chegou aqui, o usuário está logado (via Firebase ou OTP)
+      // Se não tem currentUser (login via OTP), ainda podemos mostrar a tela
+      // mas alguns dados podem não estar disponíveis
     } catch (e) {
-      print('⚠️ Erro ao acessar authController no build: $e');
+      AppLogger.warning('Erro ao acessar authController no build');
       return Scaffold(
         appBar: AppBar(
           leading: IconButton(
@@ -211,9 +216,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               title: 'Dados da Loja',
               subtitle: 'Nome, ramo de atividade',
               onTap: () {
-                // TODO: Navegar para edição de dados da loja
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Funcionalidade em desenvolvimento')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EditStoreDataScreen(
+                      authController: widget.authController,
+                    ),
+                  ),
                 );
               },
             ),
@@ -226,9 +235,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               title: 'Chave Pix',
               subtitle: 'Gerenciar chaves cadastradas',
               onTap: () {
-                // TODO: Navegar para gestão de chaves PIX
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Funcionalidade em desenvolvimento')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const EditPixKeysScreen(),
+                  ),
                 );
               },
             ),
@@ -276,18 +287,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 // Fazer logout - isso vai disparar notifyListeners()
                 // que vai fazer o AppWrapper refletir o novo estado (deslogado)
                 if (!widget.authController.isDisposed) {
+                  AppLogger.debug('ProfileScreen: Iniciando logout...');
                   await widget.authController.logout();
+                  AppLogger.debug('ProfileScreen: Logout concluído');
+                  AppLogger.debug('ProfileScreen: isLoggedIn = ${widget.authController.isLoggedIn}');
                 }
                 
-                // Após logout, apenas voltar - o AppWrapper vai gerenciar a navegação
-                // Não precisamos navegar manualmente aqui
+                // Após logout, voltar para a primeira rota (AppWrapper)
+                // O AppWrapper vai detectar que isLoggedIn = false e mostrar OnboardingScreen
                 if (context.mounted) {
-                  // Popar todas as rotas até voltar ao AppWrapper
+                  AppLogger.debug('Navegando de volta para AppWrapper');
+                  // Popar todas as rotas até voltar ao AppWrapper (primeira rota)
                   Navigator.of(context).popUntil((route) => route.isFirst);
+                  AppLogger.debug('Navegação concluída');
                 }
               } catch (e) {
-                print('⚠️ Erro no logout: $e');
-                // Em caso de erro, voltar para a primeira rota
+                AppLogger.error('Erro no logout', e);
+                // Em caso de erro, garantir que voltamos para a primeira rota
                 if (context.mounted) {
                   Navigator.of(context).popUntil((route) => route.isFirst);
                 }

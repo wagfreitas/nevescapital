@@ -76,4 +76,49 @@ class PhoneHelper {
   static String getPhoneNumbers(String phone) {
     return cleanPhone(phone);
   }
+
+  /// Mascara o telefone mostrando apenas os últimos 4 dígitos
+  /// Exemplo: "+55 (11) 98765-4321" -> "+55 (11) XXXXX-4321"
+  static String maskPhoneLast4(String phone) {
+    final cleanPhoneValue = cleanPhone(phone);
+    
+    if (cleanPhoneValue.length < 4) {
+      return phone; // Retorna original se não tiver pelo menos 4 dígitos
+    }
+    
+    final last4 = cleanPhoneValue.substring(cleanPhoneValue.length - 4);
+    
+    // Se o telefone tem formatação, tentar manter a estrutura
+    if (phone.contains('(') && phone.contains(')')) {
+      // Formato: (XX) XXXXX-XXXX ou (XX) XXXX-XXXX
+      final parts = phone.split(')');
+      if (parts.length == 2) {
+        final ddd = parts[0].replaceAll('(', '').replaceAll(' ', '');
+        final number = parts[1].trim();
+        
+        // Contar quantos dígitos tem no número (sem contar o hífen)
+        final numberDigits = number.replaceAll('-', '').replaceAll(' ', '');
+        final maskedDigits = 'X' * (numberDigits.length - 4);
+        
+        if (number.contains('-')) {
+          // Formato com hífen: XXXXX-4321
+          final afterHyphen = number.split('-')[1];
+          
+          if (afterHyphen.length >= 4) {
+            return '+55 ($ddd) $maskedDigits-$last4';
+          } else {
+            // Se o hífen está no lugar errado, ajustar
+            return '+55 ($ddd) $maskedDigits$last4';
+          }
+        } else {
+          // Sem hífen
+          return '+55 ($ddd) $maskedDigits$last4';
+        }
+      }
+    }
+    
+    // Se não tem formatação conhecida, retornar formato padrão
+    final maskedDigits = 'X' * (cleanPhoneValue.length - 4);
+    return '+55 ($maskedDigits$last4)';
+  }
 }

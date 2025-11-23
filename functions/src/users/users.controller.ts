@@ -14,6 +14,8 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { VerifyPasswordDto } from './dto/verify-password.dto';
+import { StoreDataDto } from './dto/store-data.dto';
+import { CreatePixKeyDto } from './dto/pix-key.dto';
 import { ApiKeyGuard } from '../common/guards/api-key.guard';
 
 @ApiTags('Users')
@@ -83,6 +85,47 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
   syncFirebaseEmail(@Body() body: { cpf: string; oldEmail: string }) {
     return this.usersService.syncFirebaseEmail(body.cpf, body.oldEmail);
+  }
+
+  @Get(':id/store')
+  @ApiOperation({ summary: 'Buscar dados da loja do usuário' })
+  @ApiResponse({ status: 200, description: 'Dados da loja encontrados' })
+  @ApiResponse({ status: 404, description: 'Dados da loja não encontrados' })
+  getStoreData(@Param('id') id: string) {
+    return this.usersService.getStoreData(id);
+  }
+
+  @Put(':id/store')
+  @ApiOperation({ summary: 'Criar ou atualizar dados da loja do usuário' })
+  @ApiResponse({ status: 200, description: 'Dados da loja salvos com sucesso' })
+  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  upsertStoreData(@Param('id') id: string, @Body() storeDataDto: StoreDataDto) {
+    return this.usersService.upsertStoreData(id, storeDataDto);
+  }
+
+  @Get(':id/pix-keys')
+  @ApiOperation({ summary: 'Buscar chaves PIX do usuário' })
+  @ApiResponse({ status: 200, description: 'Chaves PIX encontradas' })
+  getPixKeys(@Param('id') id: string) {
+    return this.usersService.getPixKeys(id);
+  }
+
+  @Post(':id/pix-keys')
+  @ApiOperation({ summary: 'Adicionar chave PIX' })
+  @ApiResponse({ status: 201, description: 'Chave PIX cadastrada com sucesso' })
+  @ApiResponse({ status: 400, description: 'Chave PIX inválida' })
+  @ApiResponse({ status: 409, description: 'Chave PIX já cadastrada' })
+  addPixKey(@Param('id') id: string, @Body() createPixKeyDto: CreatePixKeyDto) {
+    return this.usersService.addPixKey(id, createPixKeyDto);
+  }
+
+  @Delete(':id/pix-keys/:keyId')
+  @ApiOperation({ summary: 'Remover chave PIX' })
+  @ApiResponse({ status: 200, description: 'Chave PIX removida com sucesso' })
+  @ApiResponse({ status: 404, description: 'Chave PIX não encontrada' })
+  @ApiResponse({ status: 400, description: 'Não é possível remover a única chave PIX' })
+  removePixKey(@Param('id') id: string, @Param('keyId') keyId: string) {
+    return this.usersService.removePixKey(id, keyId);
   }
 }
 

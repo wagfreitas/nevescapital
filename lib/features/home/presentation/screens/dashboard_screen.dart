@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../payment/presentation/screens/payment_step1_screen.dart';
+import 'package:neves_capital/core/utils/app_logger.dart';
 import 'sales_history_screen.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -70,22 +71,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (user.displayName != null && user.displayName!.isNotEmpty) {
           // Pegar apenas o primeiro nome
           userName = user.displayName!.split(' ').first;
-          print('👤 Nome do usuário obtido do displayName: $userName');
+          AppLogger.debug('Nome do usuário obtido do displayName');
         } else if (user.email != null) {
           // Se não tem displayName, usar a parte antes do @ do email
           userName = user.email!.split('@').first;
-          print('⚠️ Nome obtido do email (displayName vazio): $userName');
-          print('⚠️ displayName: "${user.displayName}", email: "${user.email}"');
+          AppLogger.debug('Nome obtido do email (displayName vazio)');
         }
         
-        print('👤 Nome final exibido: $userName');
+        AppLogger.debug('Nome de usuário definido para exibição');
       } else {
-        print('⚠️ Usuário não encontrado no authController');
-        print('⚠️ isDisposed: ${widget.authController.isDisposed}');
-        print('⚠️ currentUser: ${widget.authController.currentUser?.uid}');
+        AppLogger.warning('Usuário não encontrado no authController');
       }
     } catch (e) {
-      print('⚠️ Erro ao acessar authController: $e');
+      AppLogger.warning('Erro ao acessar authController');
     }
     
     return Column(
@@ -217,15 +215,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 label: 'Conta',
                 isActive: false,
                 onTap: () {
-                  print('');
-                  print('👤 CLICOU EM CONTA');
-                  print('👤 authController.isDisposed: ${widget.authController.isDisposed}');
-                  print('👤 authController.currentUser: ${widget.authController.currentUser?.uid}');
-                  print('👤 authController.isLoggedIn: ${widget.authController.isLoggedIn}');
+                  AppLogger.debug('Navegação para conta iniciada');
                   
                   // Verificar se o usuário está logado e o controller está válido
                   if (widget.authController.isLoggedIn && !widget.authController.isDisposed) {
-                    print('👤 Navegando para ProfileScreen...');
+                    AppLogger.debug('Navegando para ProfileScreen');
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -234,11 +228,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                     );
-                    print('👤 Navegação para ProfileScreen concluída');
                   } else {
-                    print('⚠️ Não é possível navegar - usuário não logado ou controller inválido');
-                    print('⚠️ isLoggedIn: ${widget.authController.isLoggedIn}');
-                    print('⚠️ isDisposed: ${widget.authController.isDisposed}');
+                    AppLogger.warning('Não é possível navegar - usuário não logado ou controller inválido');
                     // Não fazer nada - o AppWrapper vai lidar com o estado
                   }
                 },

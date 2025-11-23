@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
+import 'package:neves_capital/core/utils/app_logger.dart';
 
 /// Cliente HTTP Seguro
 /// 
@@ -36,11 +37,11 @@ class SecureHttpClient {
     
     // MASVS-NETWORK-2: Validação de certificado
     httpClient.badCertificateCallback = (cert, host, port) {
-      print('⚠️  Verificando certificado para $host:$port');
+      AppLogger.debug('Verificando certificado para $host:$port');
       
       // Em desenvolvimento, permitir localhost
       if (host == 'localhost' || host == '127.0.0.1') {
-        print('✅ Certificado localhost aceito (desenvolvimento)');
+        AppLogger.debug('Certificado localhost aceito (desenvolvimento)');
         return true;
       }
 
@@ -50,11 +51,11 @@ class SecureHttpClient {
         final isAllowed = _allowedCertificates.contains(certFingerprint);
         
         if (!isAllowed) {
-          print('❌ Certificado não autorizado: $certFingerprint');
+          AppLogger.error('Certificado não autorizado: $certFingerprint', null);
           return false;
         }
         
-        print('✅ Certificado validado com sucesso');
+        AppLogger.debug('Certificado validado com sucesso');
         return true;
       }
 

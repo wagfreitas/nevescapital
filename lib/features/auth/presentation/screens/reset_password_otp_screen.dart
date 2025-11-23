@@ -1,0 +1,369 @@
+import 'package:flutter/material.dart';
+import 'package:neves_capital/shared/components/cpf_input_field.dart';
+import 'package:neves_capital/shared/helpers/cpf_helper.dart';
+import 'package:neves_capital/shared/services/database_service.dart';
+import 'package:neves_capital/features/auth/presentation/screens/change_password_screen.dart';
+
+class ResetPasswordOtpScreen extends StatefulWidget {
+  final String cpf;
+
+  const ResetPasswordOtpScreen({
+    super.key,
+    required this.cpf,
+  });
+
+  @override
+  State<ResetPasswordOtpScreen> createState() => _ResetPasswordOtpScreenState();
+}
+
+class _ResetPasswordOtpScreenState extends State<ResetPasswordOtpScreen> {
+  final TextEditingController _otpController = TextEditingController();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
+  bool _codeSent = false;
+  bool _codeVerified = false;
+  String? _resetToken;
+  DateTime? _expiresAt;
+  int _resendCountdown = 0;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _requestOtp();
+  }
+
+  @override
+  void dispose() {
+    _otpController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _requestOtp() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final result = await DatabaseService.requestPasswordResetOtp(widget.cpf);
+      
+      if (!mounted) return;
+
+      setState(() {
+        _codeSent = true;
+        _isLoading = false;
+        _resendCountdown = 120; // 2 minutos
+        _expiresAt = DateTime.parse(result['expires_at']);
+      });
+
+      // Iniciar contador regressivo
+      _startResendCountdown();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
+
+  void _startResendCountdown() {
+    if (_resendCountdown > 0) {
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          setState(() {
+            _resendCountdown--;
+          });
+          _startResendCountdown();
+        }
+      });
+    }
+  }
+
+  Future<void> _verifyOtp() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final otpCode = _otpController.text.trim();
+      final result = await DatabaseService.verifyPasswordResetOtp(widget.cpf, otpCode);
+      
+      if (!mounted) return;
+
+      setState(() {
+        _codeVerified = true;
+        _resetToken = result['token'];
+        _isLoading = false;
+      });
+
+      // Navegar para tela de mudança de senha
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => ChangePasswordScreen(
+            resetToken: _resetToken!,
+            cpf: widget.cpf,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF122118),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: SafeArea(
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildLogo(),
+                const SizedBox(height: 40.0),
+                _buildTitle(),
+                const SizedBox(height: 24.0),
+                if (_errorMessage != null) ...[
+                  _buildErrorMessage(),
+                  const SizedBox(height: 16.0),
+                ],
+                if (_codeSent && !_codeVerified) ...[
+                  _buildSuccessMessage(),
+                  const SizedBox(height: 24.0),
+                  _buildOtpForm(),
+                ] else if (!_codeSent) ...[
+                  _buildDescription(),
+                  const SizedBox(height: 24.0),
+                  if (_isLoading)
+                    const CircularProgressIndicator(color: Color(0xFF22C55E))
+                  else
+                    ElevatedButton(
+                      onPressed: _requestOtp,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF22C55E),
+                        foregroundColor: const Color(0xFF122118),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 32),
+                      ),
+                      child: const Text(
+                        'Enviar Código',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogo() {
+    return Image.asset(
+      'assets/icons/logo_ios_filled.png',
+      width: 80,
+      height: 80,
+      fit: BoxFit.contain,
+    );
+  }
+
+  Widget _buildTitle() {
+    return const Text(
+      'Código de Verificação',
+      style: TextStyle(
+        fontSize: 24,
+        fontWeight: FontWeight.bold,
+        color: Colors.white,
+      ),
+      textAlign: TextAlign.center,
+    );
+  }
+
+  Widget _buildDescription() {
+    return const Text(
+      'Um código de verificação será enviado para o seu telefone cadastrado.',
+      style: TextStyle(
+        fontSize: 14,
+        color: Colors.white70,
+      ),
+      textAlign: TextAlign.center,
+    );
+  }
+
+  Widget _buildErrorMessage() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.red.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.red, width: 1),
+      ),
+      child: Text(
+        _errorMessage!,
+        style: const TextStyle(color: Colors.red, fontSize: 14),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
+  Widget _buildSuccessMessage() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF22C55E).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF22C55E), width: 1),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 32),
+          const SizedBox(height: 8),
+          const Text(
+            'Código enviado!',
+            style: TextStyle(
+              color: Color(0xFF22C55E),
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Verifique seu WhatsApp ou SMS',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOtpForm() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        children: [
+          TextFormField(
+            controller: _otpController,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            maxLength: 6,
+            style: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: 8,
+            ),
+            decoration: InputDecoration(
+              hintText: '000000',
+              hintStyle: TextStyle(
+                fontSize: 32,
+                color: Colors.white.withOpacity(0.3),
+                letterSpacing: 8,
+              ),
+              counterText: '',
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.1),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Digite o código';
+              }
+              if (value.trim().length != 6) {
+                return 'Código deve ter 6 dígitos';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 24.0),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _verifyOtp,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF22C55E),
+                foregroundColor: const Color(0xFF122118),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF122118)),
+                      ),
+                    )
+                  : const Text(
+                      'Verificar Código',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 16.0),
+          if (_resendCountdown > 0)
+            Text(
+              'Reenviar código em ${_resendCountdown}s',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 12,
+              ),
+            )
+          else
+            TextButton(
+              onPressed: _requestOtp,
+              child: const Text(
+                'Reenviar código',
+                style: TextStyle(
+                  color: Color(0xFF22C55E),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+

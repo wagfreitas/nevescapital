@@ -7,6 +7,7 @@ import 'package:neves_capital/shared/services/auth_service.dart';
 import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/features/auth/presentation/screens/personal_data_screen.dart';
+import 'package:neves_capital/core/utils/app_logger.dart';
 
 /// Tela para alterar dados pessoais (Email, Telefone, Endereço)
 /// Conforme wireframe fornecido
@@ -53,7 +54,7 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
     });
 
     try {
-      print('🔍 Iniciando carregamento de dados do usuário...');
+      AppLogger.debug('Iniciando carregamento de dados do usuário...');
 
       // 1. Buscar CPF do SecureStorage (salvo após login)
       final cpf = await SecureStorageService.getLastCpf();
@@ -62,10 +63,10 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
         throw Exception('CPF não encontrado. Faça login novamente.');
       }
 
-      print('✅ CPF encontrado no SecureStorage: $cpf');
+      AppLogger.sensitive('CPF encontrado no SecureStorage', cpf);
 
       // 2. Buscar dados completos do PostgreSQL usando CPF (como no login)
-      print('🔍 Buscando dados do PostgreSQL usando CPF...');
+      AppLogger.debug('Buscando dados do PostgreSQL usando CPF...');
       final userData = await DatabaseService.getUserByCpf(cpf);
       
       if (userData != null && userData['id'] != null) {
@@ -79,16 +80,14 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
           _phoneController.text = userData['phone'] ?? '';
         });
         
-        print('✅ Dados carregados e guardados em _userData');
-        print('   UUID: ${_userId}');
-        print('   Email: ${_userData!['email']}');
-        print('   Telefone: ${_userData!['phone']}');
-        print('   CPF: ${userData['cpf'] ?? 'não informado'}');
+        AppLogger.info('Dados carregados e guardados em _userData');
+        AppLogger.debug('UUID presente: ${_userId != null}');
+        AppLogger.debug('Dados carregados com sucesso');
       } else {
         throw Exception('Não foi possível carregar seus dados do banco de dados.');
       }
     } catch (e) {
-      print('❌ Erro ao carregar dados: $e');
+      AppLogger.error('Erro ao carregar dados', e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -202,7 +201,7 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
     });
 
     try {
-      print('📝 Iniciando atualização de dados...');
+      AppLogger.debug('Iniciando atualização de dados...');
       
       // 1. Obter CPF do SecureStorage (necessário para buscar dados)
       final cpf = await SecureStorageService.getLastCpf();
@@ -210,10 +209,10 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
         throw Exception('CPF não encontrado. Faça login novamente.');
       }
       
-      print('✅ CPF obtido: $cpf');
+      AppLogger.sensitive('CPF obtido', cpf);
       
       // 2. Buscar dados atuais do usuário usando CPF (como no login)
-      print('🔍 Buscando dados atuais do usuário usando CPF...');
+      AppLogger.debug('Buscando dados atuais do usuário usando CPF...');
       final userDataAtual = await DatabaseService.getUserByCpf(cpf);
       
       if (userDataAtual == null || userDataAtual['id'] == null) {
@@ -224,10 +223,8 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
       final emailAtualPostgres = userDataAtual['email'] as String? ?? '';
       final telefoneAtualPostgres = userDataAtual['phone'] as String? ?? '';
       
-      print('📊 Dados atuais:');
-      print('   UUID PostgreSQL: $userIdPostgres');
-      print('   Email atual: $emailAtualPostgres');
-      print('   Telefone atual: $telefoneAtualPostgres');
+      AppLogger.debug('Dados atuais carregados');
+      AppLogger.debug('UUID PostgreSQL presente: ${userIdPostgres.isNotEmpty}');
       
       // 3. Obter valores dos campos editados
       final novoEmail = _emailController.text.trim();
@@ -237,9 +234,9 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
       final emailMudou = novoEmail != emailAtualPostgres && novoEmail.isNotEmpty;
       final telefoneMudou = novoTelefone != telefoneAtualPostgres && novoTelefone.isNotEmpty;
       
-      print('📊 Verificando mudanças:');
-      print('   Email mudou: $emailMudou ($emailAtualPostgres → $novoEmail)');
-      print('   Telefone mudou: $telefoneMudou');
+      AppLogger.debug('Verificando mudanças...');
+      AppLogger.debug('Email mudou: $emailMudou');
+      AppLogger.debug('Telefone mudou: $telefoneMudou');
       
       if (!emailMudou && !telefoneMudou) {
         throw Exception('Nenhuma alteração foi feita');
@@ -247,7 +244,7 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
       
       // CASO 1: Email NÃO mudou - Atualizar apenas telefone no PostgreSQL
       if (!emailMudou && telefoneMudou) {
-        print('📞 Email não mudou - Atualizando apenas telefone no PostgreSQL...');
+        AppLogger.debug('Email não mudou - Atualizando apenas telefone no PostgreSQL');
         
         final success = await DatabaseService.updateUser(
           userId: userIdPostgres,
@@ -258,7 +255,7 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
           throw Exception('Erro ao atualizar telefone no servidor');
         }
         
-        print('✅ Telefone atualizado com sucesso no PostgreSQL!');
+        AppLogger.info('Telefone atualizado com sucesso no PostgreSQL');
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -278,10 +275,10 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
       
       // CASO 2: Email mudou - Atualizar no PostgreSQL E no Firebase, depois deslogar
       if (emailMudou) {
-        print('📧 Email mudou - Iniciando atualização completa...');
+        AppLogger.debug('Email mudou - Iniciando atualização completa');
         
         // 2.1. Atualizar dados no PostgreSQL (email criptografado + telefone se mudou)
-        print('📝 Passo 1: Atualizando dados no PostgreSQL...');
+        AppLogger.debug('Passo 1: Atualizando dados no PostgreSQL');
         final successPostgres = await DatabaseService.updateUser(
           userId: userIdPostgres,
           email: novoEmail,
@@ -292,42 +289,42 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
           throw Exception('Erro ao atualizar dados no PostgreSQL');
         }
         
-        print('✅ Dados atualizados no PostgreSQL');
+        AppLogger.info('Dados atualizados no PostgreSQL');
         
         // 2.2. Atualizar email no Firebase (NÃO altera o ID do usuário)
-        print('📝 Passo 2: Atualizando email no Firebase...');
+        AppLogger.debug('Passo 2: Atualizando email no Firebase');
         bool firebaseUpdated = false;
         
         // Tentar atualizar diretamente primeiro (método mais rápido)
         try {
           await AuthService.updateEmail(novoEmail);
-          print('✅ Email atualizado no Firebase via cliente (ID do usuário preservado)');
+          AppLogger.info('Email atualizado no Firebase via cliente (ID preservado)');
           firebaseUpdated = true;
         } catch (e) {
-          print('⚠️ Erro ao atualizar email no Firebase via cliente: $e');
-          print('🔄 Tentando sincronização via backend como fallback...');
+          AppLogger.warning('Erro ao atualizar email no Firebase via cliente');
+          AppLogger.debug('Tentando sincronização via backend como fallback');
           
           // Fallback: usar endpoint do backend que atualiza via Admin SDK
           try {
             final syncSuccess = await DatabaseService.syncFirebaseEmail(cpf, emailAtualPostgres);
             if (syncSuccess) {
-              print('✅ Email sincronizado no Firebase via backend');
+              AppLogger.info('Email sincronizado no Firebase via backend');
               firebaseUpdated = true;
             } else {
-              print('❌ Falha ao sincronizar email via backend');
+              AppLogger.error('Falha ao sincronizar email via backend', null);
             }
           } catch (syncError) {
-            print('❌ Erro ao sincronizar email via backend: $syncError');
+            AppLogger.error('Erro ao sincronizar email via backend', syncError);
           }
         }
         
         if (!firebaseUpdated) {
-          print('⚠️ ATENÇÃO: Email atualizado no PostgreSQL mas não no Firebase');
-          print('⚠️ O usuário precisará usar o endpoint de sincronização manualmente');
+          AppLogger.warning('ATENÇÃO: Email atualizado no PostgreSQL mas não no Firebase');
+          AppLogger.warning('O usuário precisará usar o endpoint de sincronização manualmente');
         }
         
         // 2.3. Deslogar usuário para que ele faça login novamente com o novo email
-        print('📝 Passo 3: Deslogando usuário para login com novo email...');
+        AppLogger.debug('Passo 3: Deslogando usuário para login com novo email');
         if (mounted) {
           // Mostrar mensagem informativa
           ScaffoldMessenger.of(context).showSnackBar(
@@ -353,7 +350,7 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
         return;
       }
     } catch (e) {
-      print('❌ Erro ao atualizar dados: $e');
+      AppLogger.error('Erro ao atualizar dados', e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

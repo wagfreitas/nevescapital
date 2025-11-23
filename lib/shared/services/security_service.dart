@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'package:neves_capital/core/utils/app_logger.dart';
 
 /// Serviço de Segurança da Plataforma
 /// 
@@ -16,14 +17,14 @@ class SecurityService {
     try {
       if (Platform.isAndroid) {
         await _channel.invokeMethod('enableScreenshotProtection');
-        print('🔒 Proteção contra screenshots habilitada (Android)');
+        AppLogger.info('Proteção contra screenshots habilitada (Android)');
       } else if (Platform.isIOS) {
         // iOS não permite bloquear screenshots completamente
         // Mas podemos detectar quando ocorrem
-        print('ℹ️  iOS não suporta bloqueio de screenshots');
+        AppLogger.info('iOS não suporta bloqueio de screenshots');
       }
     } catch (e) {
-      print('⚠️  Erro ao habilitar proteção contra screenshots: $e');
+      AppLogger.warning('Erro ao habilitar proteção contra screenshots: $e');
     }
   }
 
@@ -32,10 +33,10 @@ class SecurityService {
     try {
       if (Platform.isAndroid) {
         await _channel.invokeMethod('disableScreenshotProtection');
-        print('🔓 Proteção contra screenshots desabilitada (Android)');
+        AppLogger.info('Proteção contra screenshots desabilitada (Android)');
       }
     } catch (e) {
-      print('⚠️  Erro ao desabilitar proteção contra screenshots: $e');
+      AppLogger.warning('Erro ao desabilitar proteção contra screenshots: $e');
     }
   }
 
@@ -45,12 +46,12 @@ class SecurityService {
     try {
       if (Platform.isAndroid) {
         await _channel.invokeMethod('setWindowSecure', {'secure': secure});
-        print(secure 
-          ? '🔒 Janela marcada como segura'
-          : '🔓 Janela desmarcada como segura');
+        AppLogger.info(secure 
+          ? 'Janela marcada como segura'
+          : 'Janela desmarcada como segura');
       }
     } catch (e) {
-      print('⚠️  Erro ao configurar segurança da janela: $e');
+      AppLogger.warning('Erro ao configurar segurança da janela: $e');
     }
   }
 
@@ -61,7 +62,7 @@ class SecurityService {
       final result = await _channel.invokeMethod<bool>('isDeviceCompromised');
       return result ?? false;
     } catch (e) {
-      print('⚠️  Erro ao verificar dispositivo: $e');
+      AppLogger.warning('Erro ao verificar dispositivo: $e');
       return false;
     }
   }
@@ -73,7 +74,7 @@ class SecurityService {
       final result = await _channel.invokeMethod<bool>('isDebuggerConnected');
       return result ?? false;
     } catch (e) {
-      print('⚠️  Erro ao verificar debugger: $e');
+      AppLogger.warning('Erro ao verificar debugger: $e');
       return false;
     }
   }
@@ -117,13 +118,26 @@ class SecurityService {
   /// MASVS-STORAGE-1: Não registra dados sensíveis em logs
   static void secureLog(String message, {String level = 'INFO'}) {
     final sanitized = sanitizeLog(message);
-    print('[$level] $sanitized');
+    // Usar AppLogger com sanitização automática
+    switch(level.toUpperCase()) {
+      case 'ERROR':
+        AppLogger.error(sanitized);
+        break;
+      case 'WARNING':
+        AppLogger.warning(sanitized);
+        break;
+      case 'DEBUG':
+        AppLogger.debug(sanitized);
+        break;
+      default:
+        AppLogger.info(sanitized);
+    }
   }
 
   /// Inicializar configurações de segurança
   /// MASVS-PLATFORM: Configurações iniciais de segurança
   static Future<void> initialize() async {
-    print('🔐 Inicializando configurações de segurança...');
+    AppLogger.info('Inicializando configurações de segurança...');
     
     // Habilitar proteção contra screenshots em telas sensíveis
     await enableScreenshotProtection();
@@ -131,18 +145,18 @@ class SecurityService {
     // Verificar se dispositivo está comprometido
     final isCompromised = await isDeviceCompromised();
     if (isCompromised) {
-      print('⚠️  ALERTA: Dispositivo pode estar comprometido (root/jailbreak)');
+      AppLogger.warning('ALERTA: Dispositivo pode estar comprometido (root/jailbreak)');
       // Em produção, você pode querer bloquear o app ou mostrar um aviso
     }
     
     // Verificar debugger
     final hasDebugger = await isDebuggerConnected();
     if (hasDebugger) {
-      print('⚠️  ALERTA: Debugger detectado');
+      AppLogger.warning('ALERTA: Debugger detectado');
       // Em produção, você pode querer bloquear o app
     }
     
-    print('✅ Configurações de segurança inicializadas');
+    AppLogger.info('Configurações de segurança inicializadas');
   }
 }
 

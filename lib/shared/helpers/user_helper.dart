@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:neves_capital/core/utils/app_logger.dart';
 
 /// Helper para obter usuário atual com cache local
 /// Prioridade: AuthController (memória) > SharedPreferences (cache) > Firebase
@@ -24,7 +25,7 @@ class UserHelper {
     if (_cachedUser != null && _cacheTimestamp != null) {
       final age = DateTime.now().difference(_cacheTimestamp!);
       if (age.inMinutes < _cacheExpiryMinutes) {
-        print('✅ Usuário obtido do cache em memória');
+        AppLogger.debug('Usuário obtido do cache em memória');
         return _cachedUser;
       } else {
         // Cache expirado, limpar
@@ -39,7 +40,7 @@ class UserHelper {
       final user = await _reconstructUserFromCache(cachedUserData);
       if (user != null) {
         _cacheUser(user);
-        print('✅ Usuário obtido do cache local');
+        AppLogger.debug('Usuário obtido do cache local');
         return user;
       }
     }
@@ -50,11 +51,11 @@ class UserHelper {
       if (firebaseUser != null) {
         _cacheUser(firebaseUser);
         await _saveUserToCache(firebaseUser);
-        print('✅ Usuário obtido do Firebase e cacheado');
+        AppLogger.debug('Usuário obtido do Firebase e cacheado');
       }
       return firebaseUser;
     } catch (e) {
-      print('❌ Erro ao buscar usuário do Firebase: $e');
+      AppLogger.error('Erro ao buscar usuário do Firebase', e);
       return null;
     }
   }
@@ -78,9 +79,9 @@ class UserHelper {
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       };
       await prefs.setString('cached_firebase_user', jsonEncode(userData));
-      print('💾 Usuário salvo no cache local');
+      AppLogger.debug('Usuário salvo no cache local');
     } catch (e) {
-      print('❌ Erro ao salvar usuário no cache: $e');
+      AppLogger.error('Erro ao salvar usuário no cache', e);
     }
   }
 
@@ -105,7 +106,7 @@ class UserHelper {
         return null;
       }
     } catch (e) {
-      print('❌ Erro ao ler cache local: $e');
+      AppLogger.error('Erro ao ler cache local', e);
       return null;
     }
   }
@@ -123,7 +124,7 @@ class UserHelper {
         return firebaseUser;
       }
     } catch (e) {
-      print('⚠️ Erro ao validar usuário do cache: $e');
+      AppLogger.warning('Erro ao validar usuário do cache');
     }
     return null;
   }
@@ -139,9 +140,9 @@ class UserHelper {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('cached_firebase_user');
-      print('🗑️ Cache local limpo');
+      AppLogger.debug('Cache local limpo');
     } catch (e) {
-      print('❌ Erro ao limpar cache local: $e');
+      AppLogger.error('Erro ao limpar cache local', e);
     }
   }
 }

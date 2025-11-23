@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:neves_capital/core/utils/app_logger.dart';
 
 /// Serviço HTTP otimizado com timeout e retry
 class OptimizedHttpService {
@@ -77,12 +78,12 @@ class OptimizedHttpService {
 
     while (attempts < maxRetries) {
       try {
-        print('🌐 Tentativa ${attempts + 1}/$maxRetries');
+        AppLogger.debug('Tentativa ${attempts + 1}/$maxRetries');
         final response = await request();
         
         // Se a resposta foi bem-sucedida, retornar
         if (response.statusCode >= 200 && response.statusCode < 300) {
-          print('✅ Requisição bem-sucedida');
+          AppLogger.debug('Requisição bem-sucedida');
           return response;
         }
         
@@ -100,13 +101,13 @@ class OptimizedHttpService {
         
         // Se não é erro de rede, não tentar novamente
         if (!_isNetworkError(e)) {
-          print('❌ Erro não relacionado à rede: $e');
+          AppLogger.error('Erro não relacionado à rede: $e');
           break;
         }
         
         if (attempts < maxRetries) {
           final delay = _calculateDelay(attempts);
-          print('⏳ Aguardando ${delay.inMilliseconds}ms antes da próxima tentativa...');
+          AppLogger.debug('Aguardando ${delay.inMilliseconds}ms antes da próxima tentativa...');
           await Future.delayed(delay);
         }
       }

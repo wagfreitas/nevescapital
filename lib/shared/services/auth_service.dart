@@ -47,6 +47,18 @@ class AuthService {
     }
   }
 
+  /// Fazer login com custom token (usado após validação OTP)
+  static Future<firebase_auth.UserCredential> signInWithCustomToken({
+    required String token,
+  }) async {
+    try {
+      final credential = await _auth.signInWithCustomToken(token);
+      return credential;
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
   /// Fazer logout
   static Future<void> signOut() async {
     await _auth.signOut();

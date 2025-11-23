@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:neves_capital/core/utils/app_logger.dart';
 
 /// Serviço para autenticação biométrica (Face ID / Touch ID)
 class BiometricService {
@@ -8,10 +9,17 @@ class BiometricService {
   /// Verifica se a autenticação biométrica está disponível
   static Future<bool> isAvailable() async {
     try {
-      final bool isAvailable = await _localAuth.canCheckBiometrics;
+      final bool canCheck = await _localAuth.canCheckBiometrics;
       final bool isDeviceSupported = await _localAuth.isDeviceSupported();
-      return isAvailable && isDeviceSupported;
+      final List<BiometricType> availableBiometrics = await _localAuth.getAvailableBiometrics();
+      
+      final bool isAvailable = canCheck && isDeviceSupported && availableBiometrics.isNotEmpty;
+      
+      AppLogger.debug('Biometria disponível: $isAvailable');
+      
+      return isAvailable;
     } catch (e) {
+      AppLogger.error('Erro ao verificar disponibilidade de biometria', e);
       return false;
     }
   }
@@ -30,20 +38,58 @@ class BiometricService {
     String reason = 'Use sua biometria para fazer login',
   }) async {
     try {
-      final bool isAvailable = await BiometricService.isAvailable();
-      if (!isAvailable) {
+      // Verificar disponibilidade
+      final bool canCheck = await _localAuth.canCheckBiometrics;
+      final bool isDeviceSupported = await _localAuth.isDeviceSupported();
+      
+      if (!canCheck || !isDeviceSupported) {
+        AppLogger.warning('Biometria não disponível');
         return false;
       }
 
+      // Verificar quais tipos de biometria estão disponíveis
+      final List<BiometricType> availableBiometrics = await _localAuth.getAvailableBiometrics();
+      AppLogger.debug('Biometrias disponíveis: ${availableBiometrics.length}');
+      
+      if (availableBiometrics.isEmpty) {
+        AppLogger.warning('Nenhum tipo de biometria disponível');
+        return false;
+      }
+
+      // Realizar autenticação com parâmetros otimizados para iOS
       final bool didAuthenticate = await _localAuth.authenticate(
         localizedReason: reason,
+        options: const AuthenticationOptions(
+          biometricOnly: true, // Usar apenas biometria, não senha de dispositivo
+          stickyAuth: false, // Sempre solicitar autenticação (não reutilizar autenticação anterior)
+          useErrorDialogs: true, // Mostrar diálogos de erro nativos do iOS
+          sensitiveTransaction: false, // Transação não é extremamente sensível
+        ),
       );
 
+      AppLogger.debug('Autenticação biométrica: $didAuthenticate');
       return didAuthenticate;
-    } on PlatformException {
-      // Usuário cancelou ou erro de autenticação
+    } on PlatformException catch (e) {
+      // Tratamento específico de erros da plataforma
+      AppLogger.error('Erro PlatformException na biometria: ${e.code}', e);
+      
+      if (e.code == 'NotAvailable') {
+        AppLogger.warning('Biometria não disponível no dispositivo');
+      } else if (e.code == 'NotEnrolled') {
+        AppLogger.warning('Biometria não configurada no dispositivo');
+      } else if (e.code == 'LockedOut') {
+        AppLogger.warning('Biometria bloqueada (muitas tentativas falhadas)');
+      } else if (e.code == 'PermanentlyLockedOut') {
+        AppLogger.warning('Biometria permanentemente bloqueada');
+      } else if (e.code == 'UserCancel') {
+        AppLogger.info('Usuário cancelou a autenticação');
+      } else if (e.code == 'AuthenticationFailed') {
+        AppLogger.warning('Autenticação falhou (Face ID/Touch ID não reconhecido)');
+      }
+      
       return false;
-    } catch (_) {
+    } catch (e) {
+      AppLogger.error('Erro desconhecido na biometria', e);
       return false;
     }
   }

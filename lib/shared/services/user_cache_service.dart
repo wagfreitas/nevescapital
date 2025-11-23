@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:neves_capital/core/utils/app_logger.dart';
 
 /// Serviço para cache local de dados do usuário
 class UserCacheService {
@@ -18,9 +19,9 @@ class UserCacheService {
       };
       
       await prefs.setString(_cpfEmailKey, jsonEncode(cacheData));
-      print('💾 Email cacheado para CPF: $cpf');
+      AppLogger.debug('Email cacheado para CPF: ${cpf.substring(0, 3)}***');
     } catch (e) {
-      print('❌ Erro ao salvar cache: $e');
+      AppLogger.error('Erro ao salvar cache: $e');
     }
   }
 
@@ -43,17 +44,17 @@ class UserCacheService {
         final cacheAgeHours = cacheAge / (1000 * 60 * 60);
         
         if (cacheAgeHours < _cacheExpiryHours) {
-          print('✅ Email encontrado no cache: $email');
+          AppLogger.debug('Email encontrado no cache');
           return email;
         } else {
-          print('⏰ Cache expirado, removendo...');
+          AppLogger.debug('Cache expirado, removendo...');
           await clearCache();
         }
       }
       
       return null;
     } catch (e) {
-      print('❌ Erro ao ler cache: $e');
+      AppLogger.error('Erro ao ler cache: $e');
       return null;
     }
   }
@@ -64,9 +65,9 @@ class UserCacheService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_cpfEmailKey);
       await prefs.remove(_lastLoginKey);
-      print('🗑️ Cache limpo');
+      AppLogger.debug('Cache limpo');
     } catch (e) {
-      print('❌ Erro ao limpar cache: $e');
+      AppLogger.error('Erro ao limpar cache: $e');
     }
   }
 
@@ -76,7 +77,7 @@ class UserCacheService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_lastLoginKey, DateTime.now().millisecondsSinceEpoch);
     } catch (e) {
-      print('❌ Erro ao salvar último login: $e');
+      AppLogger.error('Erro ao salvar último login: $e');
     }
   }
 
@@ -93,7 +94,7 @@ class UserCacheService {
       
       return hoursSinceLogin < 1; // Login recente se foi há menos de 1 hora
     } catch (e) {
-      print('❌ Erro ao verificar último login: $e');
+      AppLogger.error('Erro ao verificar último login: $e');
       return false;
     }
   }
