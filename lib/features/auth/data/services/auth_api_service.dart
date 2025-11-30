@@ -128,4 +128,61 @@ class AuthApiService {
       };
     }
   }
+
+  /// Verifica usuário pelo CPF completo após validação OTP
+  /// Retorna o status do usuário e determina o fluxo (login, cadastro, etc)
+  static Future<Map<String, dynamic>> checkUserByCpf(
+      String token, String cpf) async {
+    final url = Uri.parse('$_baseUrl/api/auth/check-user-by-cpf');
+
+    try {
+      AppLogger.info('🚀 [API] Verificando usuário pelo CPF completo...');
+
+      final response = await http.post(
+        url,
+        headers: _headers,
+        body: jsonEncode({
+          'token': token,
+          'cpf': cpf,
+        }),
+      );
+
+      AppLogger.debug('📡 [API] Response status: ${response.statusCode}');
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        final status = data['status'] as String;
+
+        // Status possíveis:
+        // - LOGIN_SUCCESS: CPF encontrado + telefone correspondente
+        // - PHONE_CHANGE_DETECTED: CPF encontrado + telefone diferente
+        // - PRE_REGISTRATION_FOUND: Pré-cadastro encontrado
+        // - NEW_USER: CPF não encontrado
+
+        return {
+          'success': true,
+          'status': status,
+          'token': data['token'], // Presente em LOGIN_SUCCESS
+          'phone': data['phone'], // Telefone cadastrado (se houver)
+          'oldPhone':
+              data['oldPhone'], // Telefone anterior (se PHONE_CHANGE_DETECTED)
+          'currentStep':
+              data['currentStep'], // Etapa atual (se PRE_REGISTRATION_FOUND)
+          'message': data['message'] ?? '',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Dados não conferem',
+        };
+      }
+    } catch (e) {
+      AppLogger.error('❌ [API] Erro em checkUserByCpf: $e');
+      return {
+        'success': false,
+        'message': 'Erro de conexão. Tente novamente.',
+      };
+    }
+  }
 }

@@ -32,6 +32,10 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
   String? _phone;
   int _resendCountdown = 0;
   bool _isOtpComplete = false;
+  bool _isFakeMode = false;
+
+  // 🎭 OTP FAKE para testes
+  static const String _fakeOtpCode = '123456';
 
   @override
   void initState() {
@@ -41,6 +45,11 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
       final args =
           ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       _phone = args?['phone'] as String?;
+      _isFakeMode = args?['isFakeMode'] as bool? ?? false;
+
+      if (_isFakeMode) {
+        AppLogger.info('🎭 MODO FAKE OTP - Use o código: $_fakeOtpCode');
+      }
     });
 
     // Listener para habilitar/desabilitar botão
@@ -71,6 +80,46 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
     try {
       final otpCode = _otpController.text.trim();
 
+      // 🎭 MODO FAKE: Validar OTP fake
+      if (_isFakeMode) {
+        AppLogger.info('🎭 Verificando OTP FAKE...');
+
+        // Simular delay de rede
+        await Future.delayed(const Duration(milliseconds: 800));
+
+        if (otpCode != _fakeOtpCode) {
+          throw Exception('Código inválido. Use: $_fakeOtpCode');
+        }
+
+        AppLogger.info('✅ OTP FAKE validado com sucesso!');
+
+        // No modo fake, vamos criar um usuário temporário ou pular direto para cadastro
+        // Por enquanto, vamos apenas mostrar mensagem de sucesso e navegar
+        if (!mounted) return;
+
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Simular fluxo: ir para verificação de CPF
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CpfCheckScreen(
+              authController: widget.authController,
+              themeController: widget.themeController,
+            ),
+            settings: const RouteSettings(
+              arguments: {
+                'token': 'fake-token-for-testing',
+              },
+            ),
+          ),
+        );
+        return;
+      }
+
+      // MODO REAL: Verificar no Firebase
       // Recuperar verificationId dos argumentos
       final args =
           ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
@@ -269,6 +318,34 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
                           ),
                         ),
                         const SizedBox(height: 40),
+                        // 🎭 BANNER DE MODO FAKE
+                        if (_isFakeMode) ...[
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.orange),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.science,
+                                    color: Colors.orange, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '🎭 MODO TESTE: Use o código $_fakeOtpCode',
+                                    style: const TextStyle(
+                                        color: Colors.orange,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         TextFormField(
                           controller: _otpController,
                           keyboardType: TextInputType.number,

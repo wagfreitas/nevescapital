@@ -34,6 +34,10 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
     super.dispose();
   }
 
+  // 🎭 MODO FAKE OTP PARA DESENVOLVIMENTO
+  static const bool _useFakeOtp = true;
+  static const String _fakeVerificationId = 'fake-verification-id-123';
+
   Future<void> _handleNext() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -57,6 +61,41 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
       AppLogger.info(
           '🚀 Iniciando login Firebase para telefone: $formattedPhone');
 
+      // 🎭 MODO FAKE: Simular envio de OTP
+      if (_useFakeOtp) {
+        AppLogger.info('🎭 MODO FAKE OTP ATIVADO - Código: 123456');
+
+        // Simular delay de rede
+        await Future.delayed(const Duration(milliseconds: 800));
+
+        if (!mounted) return;
+
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Navegar para tela de OTP com dados fake
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => LoginStep3OtpScreen(
+              authController: widget.authController,
+              themeController: widget.themeController,
+            ),
+            settings: RouteSettings(
+              arguments: {
+                'phone': phone,
+                'verificationId': _fakeVerificationId,
+                'maskedPhone': PhoneHelper.maskPhoneLast4(phone),
+                'isFakeMode': true,
+              },
+            ),
+          ),
+        );
+        return;
+      }
+
+      // MODO REAL: Firebase Phone Auth
       await FirebaseAuth.instance.verifyPhoneNumber(
         phoneNumber: formattedPhone,
         verificationCompleted: (PhoneAuthCredential credential) async {

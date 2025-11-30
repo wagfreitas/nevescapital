@@ -4,9 +4,10 @@ import 'package:neves_capital/features/auth/presentation/controllers/auth_contro
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/features/auth/data/services/auth_api_service.dart';
+import 'package:neves_capital/shared/helpers/cpf_helper.dart';
 
 /// Tela de Verificação de CPF (Segundo Fator)
-/// Pede os primeiros 5 dígitos do CPF para confirmar identidade
+/// Pede o CPF COMPLETO (11 dígitos) para confirmar identidade e determinar o fluxo
 class CpfCheckScreen extends StatefulWidget {
   final AuthController? authController;
   final ThemeController? themeController;
@@ -27,14 +28,18 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   String? _token;
+  int _attemptCount = 0;
+  static const int _maxAttempts = 5;
+  DateTime? _blockedUntil;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      final args =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       _token = args?['token'] as String?;
-      
+
       if (_token == null) {
         setState(() {
           _errorMessage = 'Sessão inválida. Reinicie o login.';
@@ -49,9 +54,38 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
     super.dispose();
   }
 
+  bool _isBlocked() {
+    if (_blockedUntil == null) return false;
+    if (DateTime.now().isBefore(_blockedUntil!)) {
+      return true;
+    }
+    // Desbloqueou
+    _blockedUntil = null;
+    _attemptCount = 0;
+    return false;
+  }
+
+  String _getRemainingBlockTime() {
+    if (_blockedUntil == null) return '';
+    final remaining = _blockedUntil!.difference(DateTime.now());
+    if (remaining.inMinutes > 0) {
+      return '${remaining.inMinutes} minutos';
+    }
+    return '${remaining.inSeconds} segundos';
+  }
+
   Future<void> _handleCompleteLogin() async {
     if (!_formKey.currentState!.validate()) return;
     if (_token == null) return;
+
+    // Verificar se está bloqueado
+    if (_isBlocked()) {
+      setState(() {
+        _errorMessage =
+            'Muitas tentativas. Aguarde ${_getRemainingBlockTime()}.';
+      });
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -59,39 +93,70 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
     });
 
     try {
-      final cpfPrefix = _cpfController.text.trim();
-      
-      AppLogger.info('🔐 Verificando prefixo do CPF...');
-      
-      final result = await AuthApiService.loginComplete(_token!, cpfPrefix);
+      final cpfFull = _cpfController.text.trim();
+
+      AppLogger.info('🔐 Verificando CPF completo...');
+
+      // Incrementar contador de tentativas
+      _attemptCount++;
+
+      final result = await AuthApiService.checkUserByCpf(_token!, cpfFull);
 
       if (!mounted) return;
 
       final success = result['success'] as bool? ?? false;
+      final status = result['status'] as String?;
 
       if (success) {
-        final token = result['token'] as String;
-        AppLogger.info('✅ CPF confirmado! Token recebido.');
+        // Resetar contador em caso de sucesso
+        _attemptCount = 0;
 
-        // Login no Firebase
-        if (widget.authController != null) {
-          final loginSuccess = await widget.authController!.loginWithCustomToken(token);
-          
-          if (!mounted) return;
+        switch (status) {
+          case 'LOGIN_SUCCESS':
+            // Caso A: CPF encontrado + Telefone correspondente
+            final token = result['token'] as String;
+            AppLogger.info('✅ Login direto - CPF e telefone correspondem!');
+            await _loginWithToken(token);
+            break;
 
-          if (loginSuccess) {
-            // Login completo!
-            Navigator.of(context).popUntil((route) => route.isFirst);
-          } else {
+          case 'PHONE_CHANGE_DETECTED':
+            // Caso B: CPF encontrado + Telefone diferente
+            AppLogger.info('⚠️ Novo telefone detectado');
+            _handlePhoneChange(result);
+            break;
+
+          case 'PRE_REGISTRATION_FOUND':
+            // Caso C: Pré-cadastro encontrado
+            AppLogger.info('📝 Retomando cadastro pendente');
+            _handlePreRegistration(result);
+            break;
+
+          case 'NEW_USER':
+            // Caso D: CPF não encontrado - novo usuário
+            AppLogger.info('🆕 Novo usuário - iniciando cadastro');
+            _handleNewRegistration();
+            break;
+
+          default:
             setState(() {
-              _errorMessage = widget.authController!.errorMessage ?? 'Erro ao autenticar';
+              _errorMessage = 'Status desconhecido';
             });
-          }
         }
       } else {
-        setState(() {
-          _errorMessage = result['message'] as String? ?? 'CPF incorreto';
-        });
+        // Falha na verificação
+        if (_attemptCount >= _maxAttempts) {
+          _blockedUntil = DateTime.now().add(const Duration(minutes: 30));
+          setState(() {
+            _errorMessage =
+                'Muitas tentativas falhas. Conta bloqueada por 30 minutos.';
+          });
+        } else {
+          final remainingAttempts = _maxAttempts - _attemptCount;
+          setState(() {
+            _errorMessage =
+                'Dados não conferem. $remainingAttempts tentativas restantes.';
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -106,6 +171,64 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
         });
       }
     }
+  }
+
+  Future<void> _loginWithToken(String token) async {
+    if (widget.authController != null) {
+      final loginSuccess =
+          await widget.authController!.loginWithCustomToken(token);
+
+      if (!mounted) return;
+
+      if (loginSuccess) {
+        // Login completo! Ir para Dashboard
+        Navigator.of(context)
+            .pushNamedAndRemoveUntil('/dashboard', (route) => false);
+      } else {
+        setState(() {
+          _errorMessage =
+              widget.authController!.errorMessage ?? 'Erro ao autenticar';
+        });
+      }
+    }
+  }
+
+  void _handlePhoneChange(Map<String, dynamic> result) {
+    // TODO: Implementar fluxo de validação adicional para troca de telefone
+    // Por enquanto, mostrar alerta
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Novo telefone detectado'),
+        content: const Text(
+            'Por segurança, precisamos de informações adicionais para confirmar sua identidade.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handlePreRegistration(Map<String, dynamic> result) {
+    final currentStep = result['currentStep'] as String?;
+    // TODO: Navegar para a tela correta do cadastro
+    Navigator.pushReplacementNamed(context, '/registration/$currentStep');
+  }
+
+  void _handleNewRegistration() {
+    // Ir para início do cadastro
+    Navigator.pushReplacementNamed(context, '/registration/start');
+  }
+
+  String _formatCpfInput(String value) {
+    return CpfHelper.formatCpf(value);
+  }
+
+  bool _isValidCpf(String cpf) {
+    return CpfHelper.isValidCpf(cpf);
   }
 
   @override
@@ -139,7 +262,7 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Digite os PRIMEIROS 5 NÚMEROS do seu CPF para continuar.',
+                  'Digite seu CPF completo para continuar',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.white70,
@@ -149,23 +272,34 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
                 TextFormField(
                   controller: _cpfController,
                   keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  maxLength: 5,
+                  enabled: !_isBlocked(),
+                  maxLength: 14, // 11 dígitos + 3 caracteres de formatação
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
                   ],
+                  onChanged: (value) {
+                    // Auto-formatar enquanto digita
+                    final formatted = _formatCpfInput(value);
+                    if (formatted != value) {
+                      _cpfController.value = TextEditingValue(
+                        text: formatted,
+                        selection:
+                            TextSelection.collapsed(offset: formatted.length),
+                      );
+                    }
+                  },
                   style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
                     color: Colors.white,
-                    letterSpacing: 8,
+                    letterSpacing: 2,
                   ),
                   decoration: InputDecoration(
-                    hintText: '12345',
+                    hintText: '000.000.000-00',
                     hintStyle: TextStyle(
-                      fontSize: 32,
+                      fontSize: 20,
                       color: Colors.white.withValues(alpha: 0.3),
-                      letterSpacing: 8,
+                      letterSpacing: 2,
                     ),
                     counterText: '',
                     filled: true,
@@ -174,17 +308,36 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
                     ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.2)),
+                    ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
+                      borderSide:
+                          const BorderSide(color: Color(0xFF22C55E), width: 2),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.red, width: 2),
+                    ),
+                    disabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.1)),
                     ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Digite os 5 números';
+                      return 'Digite seu CPF';
                     }
-                    if (value.length != 5) {
-                      return 'São necessários 5 números';
+                    final cleanCpf = value.replaceAll(RegExp(r'[^0-9]'), '');
+                    if (cleanCpf.length != 11) {
+                      return 'CPF deve ter 11 dígitos';
+                    }
+                    if (!_isValidCpf(cleanCpf)) {
+                      return 'CPF inválido';
                     }
                     return null;
                   },
@@ -200,12 +353,14 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                        const Icon(Icons.error_outline,
+                            color: Colors.red, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _errorMessage!,
-                            style: const TextStyle(color: Colors.red, fontSize: 14),
+                            style: const TextStyle(
+                                color: Colors.red, fontSize: 14),
                           ),
                         ),
                       ],
@@ -232,7 +387,8 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
                             width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF122118)),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF122118)),
                             ),
                           )
                         : const Text(
