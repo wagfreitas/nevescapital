@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:neves_capital/features/auth/presentation/screens/unified_cpf_screen.dart';
+import 'package:neves_capital/features/auth/presentation/screens/phone_login_screen.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/features/auth/data/services/registration_service.dart';
 import 'package:neves_capital/features/auth/data/services/local_registration_storage.dart';
@@ -174,7 +174,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => UnifiedCpfScreen(
+                              builder: (context) => PhoneLoginScreen(
                                 authController: widget.authController,
                                 themeController: widget.themeController,
                               ),
@@ -211,7 +211,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => UnifiedCpfScreen(
+                              builder: (context) => PhoneLoginScreen(
                                 authController: widget.authController,
                                 themeController: widget.themeController,
                               ),

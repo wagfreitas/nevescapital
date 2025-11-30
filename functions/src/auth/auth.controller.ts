@@ -2,6 +2,7 @@ import { Controller, Post, Body, UseGuards, BadRequestException, NotFoundExcepti
 import { ApiTags, ApiOperation, ApiSecurity, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ApiKeyGuard } from '../common/guards/api-key.guard';
+import * as admin from 'firebase-admin';
 import { EmailSenderService } from './email-sender.service';
 import { ResetPasswordDto, ResetPasswordByCpfDto } from './dto/reset-password.dto';
 import { RequestPasswordResetOtpDto, VerifyPasswordResetOtpDto, ChangePasswordWithOtpDto } from './dto/otp.dto';
@@ -24,11 +25,11 @@ export class AuthController {
     private readonly smsService: SmsService,
     private readonly ycloudService: YcloudService,
     private readonly encryptionService: EncryptionService,
-  ) {}
+  ) { }
 
   @Post('reset-password')
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests por minuto
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Enviar email de redefinição de senha (customizado)',
     description: 'Envia email customizado com template personalizado usando Firebase Admin SDK para gerar o link'
   })
@@ -38,7 +39,7 @@ export class AuthController {
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     try {
       await this.emailSenderService.sendPasswordResetEmail(resetPasswordDto.email);
-      
+
       return {
         success: true,
         message: 'Email de redefinição de senha enviado com sucesso',
@@ -50,7 +51,7 @@ export class AuthController {
 
   @Post('reset-password/cpf')
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests por minuto
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Enviar email de redefinição de senha por CPF (customizado)',
     description: 'Busca email por CPF no PostgreSQL e envia email customizado de reset'
   })
@@ -60,14 +61,14 @@ export class AuthController {
     try {
       // 1. Buscar usuário por CPF
       const userData = await this.usersService.findByCpf(resetPasswordByCpfDto.cpf);
-      
+
       if (!userData || !userData.email) {
         throw new Error('CPF não encontrado');
       }
 
       // 2. Enviar email customizado
       await this.emailSenderService.sendPasswordResetEmail(userData.email);
-      
+
       return {
         success: true,
         message: 'Email de redefinição de senha enviado com sucesso',
@@ -79,7 +80,7 @@ export class AuthController {
 
   @Post('request-password-reset-otp')
   @Throttle({ default: { limit: 3, ttl: 120000 } }) // 3 requests por 2 minutos (rate limiting mais restritivo)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Solicitar código OTP para recuperação de senha via SMS/WhatsApp',
     description: 'Gera código OTP e envia para o telefone cadastrado do usuário'
   })
@@ -90,7 +91,7 @@ export class AuthController {
     try {
       // 1. Buscar usuário por CPF
       const userData = await this.usersService.findByCpf(dto.cpf);
-      
+
       if (!userData || !userData.id) {
         throw new NotFoundException('CPF não encontrado');
       }
@@ -128,7 +129,7 @@ export class AuthController {
 
   @Post('verify-password-reset-otp')
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests por minuto
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Verificar código OTP e obter token temporário',
     description: 'Valida código OTP e retorna token temporário para mudança de senha'
   })
@@ -139,7 +140,7 @@ export class AuthController {
     try {
       // 1. Buscar usuário por CPF
       const userData = await this.usersService.findByCpf(dto.cpf);
-      
+
       if (!userData || !userData.id) {
         throw new NotFoundException('CPF não encontrado');
       }
@@ -160,7 +161,7 @@ export class AuthController {
 
   @Post('change-password-with-otp')
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests por minuto
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Alterar senha usando token OTP',
     description: 'Altera senha do usuário após verificação do OTP. Requer senha antiga e nova senha.'
   })
@@ -170,7 +171,7 @@ export class AuthController {
     try {
       // 1. Validar token temporário
       const tokenValidation = await this.otpService.validateTempToken(dto.token);
-      
+
       if (!tokenValidation.valid) {
         throw new UnauthorizedException('Token inválido ou expirado');
       }
@@ -187,7 +188,7 @@ export class AuthController {
       // Nota: A validação da senha antiga será feita no frontend usando Firebase Auth
       // Por enquanto, apenas verificamos se o token OTP é válido (que já validou a identidade)
       const isOldPasswordValid = await this.usersService.verifyPasswordInternal(userId, dto.old_password);
-      
+
       if (!isOldPasswordValid) {
         throw new UnauthorizedException('Senha atual incorreta');
       }
@@ -209,7 +210,7 @@ export class AuthController {
 
   @Post('check-cpf')
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests por minuto
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Verificar se CPF já está cadastrado',
     description: 'Verifica se um CPF já existe no sistema. Retorna true se existe, false se não existe.'
   })
@@ -218,7 +219,7 @@ export class AuthController {
   async checkCpf(@Body() dto: CheckCpfDto) {
     try {
       const userData = await this.usersService.findByCpf(dto.cpf);
-      
+
       return {
         success: true,
         exists: !!userData,
@@ -239,7 +240,7 @@ export class AuthController {
 
   @Post('request-registration-otp')
   @Throttle({ default: { limit: 3, ttl: 120000 } }) // 3 requests por 2 minutos
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Solicitar código OTP para cadastro via WhatsApp',
     description: 'Gera código OTP e envia via WhatsApp usando Ycloud para usuários em processo de cadastro'
   })
@@ -260,26 +261,13 @@ export class AuthController {
         }
       }
 
-      // 2. Gerar código OTP
-      const { otpCode, expiresAt } = await this.otpService.createRegistrationOtp(dto.cpf, dto.phone);
-
-      // 3. Enviar via Ycloud WhatsApp
-      if (!this.ycloudService.isConfigured()) {
-        throw new BadRequestException('Serviço de WhatsApp não configurado. Contate o suporte.');
-      }
-
-      const sendResult = await this.ycloudService.sendOtp(dto.phone, otpCode);
-
-      if (!sendResult.success) {
-        throw new BadRequestException(`Erro ao enviar código: ${sendResult.error}`);
-      }
+      // 2. Gerar e enviar código OTP via YCloud Verify API
+      const { expiresAt } = await this.otpService.createRegistrationOtp(dto.cpf, dto.phone);
 
       return {
         success: true,
         message: 'Código enviado com sucesso via WhatsApp',
         expires_at: expiresAt.toISOString(),
-        // Não retornar o código em produção
-        // otp_code: otpCode, // REMOVER EM PRODUÇÃO
       };
     } catch (error) {
       throw error;
@@ -288,7 +276,7 @@ export class AuthController {
 
   @Post('verify-registration-otp')
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests por minuto
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Verificar código OTP de cadastro',
     description: 'Valida código OTP enviado via WhatsApp durante o processo de cadastro'
   })
@@ -307,5 +295,106 @@ export class AuthController {
       throw error;
     }
   }
-}
 
+  @Post('check-user-status')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({
+    summary: 'Verificar status do usuário após login Firebase',
+    description: 'Recebe token do Firebase, verifica se usuário existe e retorna próximo passo.'
+  })
+  @ApiResponse({ status: 200, description: 'Status retornado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Token inválido' })
+  async checkUserStatus(@Body() body: { token: string }) {
+    try {
+      // 1. Verificar Token do Firebase
+      const decodedToken = await admin.auth().verifyIdToken(body.token);
+      const phone = decodedToken.phone_number;
+
+      if (!phone) {
+        throw new BadRequestException('Token não contém número de telefone');
+      }
+
+      // 2. Verificar se usuário existe no banco
+      const user = await this.usersService.findByPhone(phone);
+
+      if (user) {
+        // Usuário existe -> Exigir verificação de CPF (primeiros 5 dígitos)
+        return {
+          success: true,
+          status: 'REQUIRE_CPF_CHECK',
+          message: 'Usuário encontrado. Confirme seu CPF.',
+          phone: phone,
+        };
+      } else {
+        // Usuário não existe -> Fluxo de Cadastro
+        return {
+          success: true,
+          status: 'REGISTER',
+          message: 'Usuário não encontrado. Redirecionando para cadastro.',
+          phone: phone,
+        };
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
+
+
+
+  @Post('login-complete')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiOperation({
+    summary: 'Completar login (Verificar CPF)',
+    description: 'Verifica os primeiros 5 dígitos do CPF e gera o token de acesso customizado (se necessário) ou apenas confirma.'
+  })
+  @ApiResponse({ status: 200, description: 'Login realizado com sucesso' })
+  @ApiResponse({ status: 401, description: 'CPF incorreto ou token inválido' })
+  async loginComplete(@Body() body: { token: string; cpfPrefix: string }) {
+    try {
+      // 1. Verificar Token do Firebase
+      const decodedToken = await admin.auth().verifyIdToken(body.token);
+      const phone = decodedToken.phone_number;
+
+      if (!phone) {
+        throw new BadRequestException('Token não contém número de telefone');
+      }
+
+      // 2. Buscar usuário pelo telefone
+      const user = await this.usersService.findByPhone(phone);
+
+      if (!user) {
+        throw new NotFoundException('Usuário não encontrado');
+      }
+
+      // 3. Verificar CPF (primeiros 5 dígitos)
+      const userCpf = user.cpf.replace(/\D/g, ''); // Remove formatação
+      const inputPrefix = body.cpfPrefix.replace(/\D/g, '');
+
+      if (!userCpf.startsWith(inputPrefix)) {
+        throw new UnauthorizedException('CPF incorreto');
+      }
+
+      // 4. Gerar Custom Token (opcional, mas útil se quisermos adicionar claims específicas ou controlar a sessão)
+      // Se o cliente já tem um ID Token válido, ele já está autenticado no Firebase.
+      // Mas se o nosso sistema depende de claims específicas ou se quisermos renovar a sessão com privilégios de "usuário verificado",
+      // podemos gerar um novo token ou apenas retornar sucesso.
+
+      // Vamos retornar um custom token para garantir que o frontend possa forçar um refresh se necessário,
+      // ou simplesmente retornar os dados do usuário.
+
+      // Para simplificar e manter compatibilidade com o frontend que espera um 'token' (que era custom token antes):
+      const customToken = await admin.auth().createCustomToken(user.id);
+
+      return {
+        success: true,
+        token: customToken,
+        user: {
+          name: user.full_name,
+          email: user.email,
+        }
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+}

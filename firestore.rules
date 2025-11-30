@@ -2,45 +2,39 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user is accessing their own data
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
     // Coleção users
-    // Permite leitura pública para busca por CPF (apenas hash é exposto)
-    // Permite escrita para criar novos usuários (cadastro)
-    // Permite atualização apenas se o documento não existir ou se for o próprio usuário
     match /users/{userId} {
-      // Permitir leitura pública (necessário para busca por CPF antes do login)
-      // Apenas hash é exposto, dados sensíveis estão criptografados
-      allow read: if true;
-      
-      // Permitir criação de novos usuários (cadastro)
-      allow create: if true;
-      
-      // Permitir atualização apenas se o documento não existir ou se for o próprio usuário
-      // (validação feita pelo app - aqui apenas permitimos)
-      allow update: if true;
-      
-      // Não permitir delete (ou permitir apenas com validação adicional)
-      allow delete: if false;
+      // Leitura/Escrita apenas pelo próprio usuário
+      allow read, write: if isOwner(userId);
     }
     
-    // Coleção registration_progress - rastrear cadastros parciais
-    // Permite leitura e escrita pública (dados sensíveis criptografados)
+    // Coleção registration_progress
+    // Permitir apenas se o usuário estiver autenticado (ou implementar lógica específica para anonimo se necessário)
+    // Por enquanto, assumindo que o cadastro cria o auth user primeiro ou usa auth anônimo
     match /registration_progress/{progressId} {
-      allow read: if true; // Permitir leitura para verificar progresso
-      allow create: if true; // Permitir criar novo progresso
-      allow update: if true; // Permitir atualizar progresso existente
-      allow delete: if true; // Permitir deletar após finalizar cadastro
+      allow read, write: if isAuthenticated();
     }
     
-    // Coleção otps - apenas Cloud Functions podem escrever
+    // Coleção otps - Apenas Cloud Functions (Admin SDK)
     match /otps/{otpId} {
-      allow read: if true; // Permitir leitura para verificar OTP
-      allow write: if false; // Apenas Cloud Functions podem escrever
+      allow read, write: if false;
     }
     
-    // Coleção transactions - usuário só acessa suas transações
+    // Coleção transactions
     match /transactions/{transactionId} {
-      allow read: if true; // Permitir leitura (validação feita pelo app)
-      allow write: if false; // Apenas Cloud Functions podem escrever
+      // Usuário só lê se for dono (assumindo campo userId no documento)
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false;
     }
   }
 }

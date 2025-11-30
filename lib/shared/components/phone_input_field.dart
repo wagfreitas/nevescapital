@@ -6,6 +6,7 @@ import '../helpers/phone_helper.dart';
 /// Widget de input com máscara de Telefone
 class PhoneInputField extends StatefulWidget {
   final TextEditingController controller;
+  final FocusNode? focusNode;
   final String? hintText;
   final String? labelText;
   final String? Function(String?)? validator;
@@ -16,6 +17,7 @@ class PhoneInputField extends StatefulWidget {
   const PhoneInputField({
     super.key,
     required this.controller,
+    this.focusNode,
     this.hintText,
     this.labelText,
     this.validator,
@@ -38,16 +40,16 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
   void initState() {
     super.initState();
     _maskedController = TextEditingController();
-    _focusNode = FocusNode();
-    
+    _focusNode = widget.focusNode ?? FocusNode();
+
     // Inicializa com valor formatado se já houver
     if (widget.controller.text.isNotEmpty) {
       _maskedController.text = PhoneHelper.formatPhone(widget.controller.text);
     }
-    
+
     // Listener para sincronizar com o controller externo
     widget.controller.addListener(_syncController);
-    
+
     // Listener para detectar perda de foco
     _focusNode.addListener(_onFocusChanged);
   }
@@ -57,12 +59,16 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
     widget.controller.removeListener(_syncController);
     _focusNode.removeListener(_onFocusChanged);
     _maskedController.dispose();
-    _focusNode.dispose();
+    // Só dispose do focusNode se foi criado internamente
+    if (widget.focusNode == null) {
+      _focusNode.dispose();
+    }
     super.dispose();
   }
 
   void _syncController() {
-    if (widget.controller.text != PhoneHelper.getPhoneNumbers(_maskedController.text)) {
+    if (widget.controller.text !=
+        PhoneHelper.getPhoneNumbers(_maskedController.text)) {
       _maskedController.text = PhoneHelper.formatPhone(widget.controller.text);
     }
   }
@@ -73,12 +79,13 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
       if (!_hasValidated) {
         _hasValidated = true;
       }
-      
+
       widget.onFocusLost?.call();
-      
+
       // Força a validação do campo específico
       if (mounted) {
-        final isValid = PhoneHelper.validatePhone(_maskedController.text) == null;
+        final isValid =
+            PhoneHelper.validatePhone(_maskedController.text) == null;
         if (isValid) {
           // Se válido, limpa o erro
           _fieldKey.currentState?.validate();
@@ -96,15 +103,14 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
   void _onTextChanged(String value) {
     // Remove caracteres não numéricos
     final cleanValue = PhoneHelper.cleanPhone(value);
-    
+
     // Limita a 11 dígitos
-    final limitedValue = cleanValue.length > 11 
-        ? cleanValue.substring(0, 11) 
-        : cleanValue;
-    
+    final limitedValue =
+        cleanValue.length > 11 ? cleanValue.substring(0, 11) : cleanValue;
+
     // Formata o telefone
     final formattedValue = PhoneHelper.formatPhone(limitedValue);
-    
+
     // Atualiza o controller mascarado
     if (_maskedController.text != formattedValue) {
       _maskedController.text = formattedValue;
@@ -112,10 +118,10 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
         offset: formattedValue.length,
       );
     }
-    
+
     // Atualiza o controller externo com apenas os números
     widget.controller.text = limitedValue;
-    
+
     // Chama callback se fornecido
     widget.onChanged?.call();
   }
@@ -125,12 +131,12 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
     if (!_hasValidated) {
       return null;
     }
-    
+
     // Usa o validador personalizado se fornecido, senão usa o padrão
     if (widget.validator != null) {
       return widget.validator!(value);
     }
-    
+
     return PhoneHelper.validatePhone(value);
   }
 
@@ -143,9 +149,9 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
           Text(
             widget.labelText!,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.w600,
-            ),
+                  color: AppTheme.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
           ),
           const SizedBox(height: 8),
         ],
@@ -161,7 +167,8 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
             keyboardType: TextInputType.phone,
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(15), // (xx)xxxxx-xxxx = 15 caracteres
+              LengthLimitingTextInputFormatter(
+                  15), // (xx)xxxxx-xxxx = 15 caracteres
             ],
             style: const TextStyle(
               color: AppTheme.textPrimary,

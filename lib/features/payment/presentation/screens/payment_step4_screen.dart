@@ -56,12 +56,13 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
   void _detectCardBrand() {
     final cardNumber = _numeroCartaoController.text.replaceAll(' ', '');
     final detectedBrand = CardBrandDetector.detectBrand(cardNumber);
-    
+
     if (detectedBrand != _detectedBrand) {
       setState(() {
         _detectedBrand = detectedBrand;
       });
-      AppLogger.debug('Bandeira detectada: ${CardBrandDetector.getBrandName(detectedBrand)}');
+      AppLogger.debug(
+          'Bandeira detectada: ${CardBrandDetector.getBrandName(detectedBrand)}');
     }
   }
 
@@ -83,35 +84,6 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
     }
   }
   */
-
-  String _formatCardNumber(String cardNumber) {
-    // Remove espaços e formata: XXXX XXXX XXXX XXXX
-    final digits = cardNumber.replaceAll(RegExp(r'\D'), '');
-    final buffer = StringBuffer();
-    
-    for (int i = 0; i < digits.length && i < 16; i++) {
-      if (i > 0 && i % 4 == 0) {
-        buffer.write(' ');
-      }
-      buffer.write(digits[i]);
-    }
-    
-    return buffer.toString();
-  }
-
-  String _formatExpiryDate(String expiryDate) {
-    // Formatar para MM/AA
-    final cleaned = expiryDate.replaceAll(RegExp(r'\D'), '');
-    
-    if (cleaned.length >= 4) {
-      // Se veio no formato MMYY ou MMYYYY
-      final month = cleaned.substring(0, 2);
-      final year = cleaned.length >= 4 ? cleaned.substring(2, 4) : cleaned.substring(2);
-      return '$month/$year';
-    }
-    
-    return expiryDate;
-  }
 
   void _continuar() {
     if (_formKey.currentState?.validate() ?? false) {
@@ -169,7 +141,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 20),
-                
+
                 // Título
                 const Text(
                   'DADOS DO CARTÃO DO COMPRADOR',
@@ -181,7 +153,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 40),
-                
+
                 // BOTÃO DE SCAN TEMPORARIAMENTE REMOVIDO
                 // Conflito de dependências com Firebase
                 // Será reimplementado com solução compatível
@@ -282,7 +254,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    
+
                     // Data de Vencimento
                     Expanded(
                       flex: 3,
@@ -321,9 +293,9 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                   text: 'Avançar',
                   onPressed: _continuar,
                 ),
-                
+
                 const SizedBox(height: 20),
-                
+
                 // Indicador de progresso
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -339,9 +311,9 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                     _buildProgressDot(false),
                   ],
                 ),
-                
+
                 const SizedBox(height: 20),
-                
+
                 // Aviso de segurança
                 const Row(
                   children: [
@@ -366,7 +338,6 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
     );
   }
 
-
   Widget _buildProgressDot(bool isActive) {
     return Container(
       width: 12,
@@ -385,7 +356,6 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
       color: Colors.grey[300],
     );
   }
-
 }
 
 /// Formatador para número do cartão (adiciona espaços)
@@ -397,14 +367,14 @@ class _CardNumberFormatter extends TextInputFormatter {
   ) {
     final text = newValue.text.replaceAll(' ', '');
     final buffer = StringBuffer();
-    
+
     for (int i = 0; i < text.length; i++) {
       if (i > 0 && i % 4 == 0) {
         buffer.write(' ');
       }
       buffer.write(text[i]);
     }
-    
+
     final formatted = buffer.toString();
     return TextEditingValue(
       text: formatted,
@@ -421,11 +391,11 @@ class _ExpiryDateFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     final text = newValue.text.replaceAll('/', '');
-    
+
     if (text.isEmpty) {
       return newValue.copyWith(text: '');
     }
-    
+
     final buffer = StringBuffer();
     for (int i = 0; i < text.length && i < 4; i++) {
       if (i == 2) {
@@ -433,7 +403,7 @@ class _ExpiryDateFormatter extends TextInputFormatter {
       }
       buffer.write(text[i]);
     }
-    
+
     final formatted = buffer.toString();
     return TextEditingValue(
       text: formatted,
@@ -441,5 +411,3 @@ class _ExpiryDateFormatter extends TextInputFormatter {
     );
   }
 }
-
-

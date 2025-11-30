@@ -44,47 +44,41 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAe07Wz57gux94qiv_BxMExGEhdpGnO_BA',
-    appId: '1:1065108873797:web:eb590616399dd2dc10792c',
-    messagingSenderId: '1065108873797',
-    projectId: 'apppagpag',
-    authDomain: 'apppagpag.firebaseapp.com',
-    storageBucket: 'apppagpag.firebasestorage.app',
-    measurementId: 'G-WRFMJ5262Y',
+    apiKey: 'AIzaSyDGzzXDRzQj7RbiZJQfvwZEpnO0vHzSMsk',
+    appId: '1:124871515546:web:eb590616399dd2dc10792c',
+    messagingSenderId: '124871515546',
+    projectId: 'pagpagapp',
+    authDomain: 'pagpagapp.firebaseapp.com',
+    storageBucket: 'pagpagapp.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyC2NyLDzCjntVz2QOe5SNhG7p9B75MUXrk',
-    appId: '1:1065108873797:android:86824ad9c25563bb10792c',
-    messagingSenderId: '1065108873797',
-    projectId: 'apppagpag',
-    storageBucket: 'apppagpag.firebasestorage.app',
+    apiKey: 'AIzaSyDGzzXDRzQj7RbiZJQfvwZEpnO0vHzSMsk',
+    appId: '1:124871515546:android:0f98d17e8a104e71b1ee23',
+    messagingSenderId: '124871515546',
+    projectId: 'pagpagapp',
+    storageBucket: 'pagpagapp.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyC2NyLDzCjntVz2QOe5SNhG7p9B75MUXrk',
-    appId: '1:1065108873797:ios:a7f889b04f6a459c10792c',
-    messagingSenderId: '1065108873797',
-    projectId: 'apppagpag',
-    authDomain: 'apppagpag.firebaseapp.com',
-    storageBucket: 'apppagpag.firebasestorage.app',
-    iosBundleId: 'com.example.nevesCapital',
+    apiKey: 'AIzaSyCsFaxeejMMNYvjzZVdIXhv8dQJEI3Xq1Y',
+    appId: '1:124871515546:ios:9da6a3d40a751e12b1ee23',
+    messagingSenderId: '124871515546',
+    projectId: 'pagpagapp',
+    storageBucket: 'pagpagapp.firebasestorage.app',
+    iosBundleId: 'com.nevescapital.pagpag',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyC2NyLDzCjntVz2QOe5SNhG7p9B75MUXrk',
-    appId: '1:1065108873797:ios:a7f889b04f6a459c10792c',
-    messagingSenderId: '1065108873797',
-    projectId: 'apppagpag',
-    authDomain: 'apppagpag.firebaseapp.com',
-    storageBucket: 'apppagpag.firebasestorage.app',
-    iosBundleId: 'com.example.nevesCapital',
+    apiKey: 'AIzaSyCsFaxeejMMNYvjzZVdIXhv8dQJEI3Xq1Y',
+    appId: '1:124871515546:ios:9da6a3d40a751e12b1ee23',
+    messagingSenderId: '124871515546',
+    projectId: 'pagpagapp',
+    authDomain: 'pagpagapp.firebaseapp.com',
+    storageBucket: 'pagpagapp.firebasestorage.app',
+    iosBundleId: 'com.nevescapital.pagpag',
   );
 }
 
-// 📝 INSTRUÇÕES PARA CONFIGURAR:
-// 1. Execute: flutterfire configure
-// 2. Ou substitua manualmente os valores acima pelos seus dados reais
-// 3. Os dados reais estão nos arquivos:
-//    - android/app/google-services.json
-//    - ios/Runner/GoogleService-Info.plist
+// ✅ Configurações unificadas para o projeto: pagpagapp
+// Todas as plataformas agora usam o mesmo projeto Firebase

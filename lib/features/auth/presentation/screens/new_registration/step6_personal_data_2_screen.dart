@@ -27,23 +27,40 @@ class Step6PersonalData2Screen extends StatefulWidget {
   });
 
   @override
-  State<Step6PersonalData2Screen> createState() => _Step6PersonalData2ScreenState();
+  State<Step6PersonalData2Screen> createState() =>
+      _Step6PersonalData2ScreenState();
 }
 
 class _Step6PersonalData2ScreenState extends State<Step6PersonalData2Screen> {
-  bool? _isPep; // null = não selecionado, false = Não, true = Sim
+  bool? _isPep = false; // Padrão: false = Não
   String? _occupation;
   String? _incomeRange;
   bool _isLoading = false;
   String? _errorMessage;
 
-  final List<String> _occupations = [
+  static const List<String> _occupations = [
+    'Administrador',
+    'Advogado',
+    'Agricultor',
+    'Analista de Sistemas',
+    'Aposentado',
+    'Arquiteto',
     'Assalariado',
     'Autônomo',
-    'Empresário',
-    'Aposentado',
-    'Estudante',
+    'Comerciante',
+    'Contador',
+    'Dentista',
     'Desempregado',
+    'Empresário',
+    'Enfermeiro',
+    'Engenheiro',
+    'Estudante',
+    'Farmacêutico',
+    'Funcionário Público',
+    'Médico',
+    'Professor',
+    'Servidor Público',
+    'Técnico',
     'Outro',
   ];
 
@@ -120,6 +137,20 @@ class _Step6PersonalData2ScreenState extends State<Step6PersonalData2Screen> {
     }
   }
 
+  Future<void> _showOccupationSearch(BuildContext context) async {
+    final result = await showSearch<String>(
+      context: context,
+      delegate: _OccupationSearchDelegate(_occupations, _occupation),
+    );
+
+    if (result != null) {
+      setState(() {
+        _occupation = result;
+        _errorMessage = null;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -140,11 +171,36 @@ class _Step6PersonalData2ScreenState extends State<Step6PersonalData2Screen> {
             children: [
               const SizedBox(height: 40),
               const Text(
-                'Informações Pessoais 2/2',
+                'Informações Pessoais',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 32,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Color(0xFF22C55E),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 8),
@@ -188,48 +244,36 @@ class _Step6PersonalData2ScreenState extends State<Step6PersonalData2Screen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.2),
+              GestureDetector(
+                onTap: () => _showOccupationSearch(context),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
                   ),
-                ),
-                child: DropdownButtonFormField<String>(
-                  value: _occupation,
-                  decoration: InputDecoration(
-                    hintText: 'Opções',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-                    filled: true,
-                    fillColor: Colors.transparent,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    prefixIcon: const Icon(Icons.work, color: Colors.white70),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.work, color: Colors.white70),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _occupation ?? 'Buscar ocupação',
+                          style: TextStyle(
+                            color: _occupation != null
+                                ? Colors.white
+                                : Colors.white.withValues(alpha: 0.5),
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      const Icon(Icons.search, color: Colors.white70),
+                    ],
                   ),
-                  dropdownColor: const Color(0xFF1a2d24),
-                  style: const TextStyle(color: Colors.white),
-                  icon: const Icon(Icons.arrow_drop_down, color: Colors.white70),
-                  items: _occupations.map((String occupation) {
-                    return DropdownMenuItem<String>(
-                      value: occupation,
-                      child: Text(occupation),
-                    );
-                  }).toList(),
-                  onChanged: (String? value) {
-                    setState(() {
-                      _occupation = value;
-                      _errorMessage = null;
-                    });
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Selecione sua ocupação';
-                    }
-                    return null;
-                  },
                 ),
               ),
               const SizedBox(height: 32),
@@ -245,28 +289,31 @@ class _Step6PersonalData2ScreenState extends State<Step6PersonalData2Screen> {
               const SizedBox(height: 16),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                   ),
                 ),
                 child: DropdownButtonFormField<String>(
                   value: _incomeRange,
                   decoration: InputDecoration(
                     hintText: 'Opções',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                     filled: true,
                     fillColor: Colors.transparent,
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    prefixIcon: const Icon(Icons.attach_money, color: Colors.white70),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 16),
+                    prefixIcon:
+                        const Icon(Icons.attach_money, color: Colors.white70),
                   ),
                   dropdownColor: const Color(0xFF1a2d24),
                   style: const TextStyle(color: Colors.white),
-                  icon: const Icon(Icons.arrow_drop_down, color: Colors.white70),
+                  icon:
+                      const Icon(Icons.arrow_drop_down, color: Colors.white70),
                   items: _incomeRanges.map((String range) {
                     return DropdownMenuItem<String>(
                       value: range,
@@ -292,18 +339,20 @@ class _Step6PersonalData2ScreenState extends State<Step6PersonalData2Screen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.red),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                      const Icon(Icons.error_outline,
+                          color: Colors.red, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: const TextStyle(color: Colors.red, fontSize: 14),
+                          style:
+                              const TextStyle(color: Colors.red, fontSize: 14),
                         ),
                       ),
                     ],
@@ -330,7 +379,8 @@ class _Step6PersonalData2ScreenState extends State<Step6PersonalData2Screen> {
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF122118)),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF122118)),
                           ),
                         )
                       : const Text(
@@ -364,12 +414,12 @@ class _Step6PersonalData2ScreenState extends State<Step6PersonalData2Screen> {
         decoration: BoxDecoration(
           color: isSelected
               ? const Color(0xFF22C55E)
-              : Colors.white.withOpacity(0.1),
+              : Colors.white.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
                 ? const Color(0xFF22C55E)
-                : Colors.white.withOpacity(0.2),
+                : Colors.white.withValues(alpha: 0.2),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -388,3 +438,95 @@ class _Step6PersonalData2ScreenState extends State<Step6PersonalData2Screen> {
   }
 }
 
+class _OccupationSearchDelegate extends SearchDelegate<String> {
+  final List<String> occupations;
+  final String? selectedOccupation;
+
+  _OccupationSearchDelegate(this.occupations, this.selectedOccupation);
+
+  @override
+  String get searchFieldLabel => 'Buscar ocupação';
+
+  @override
+  ThemeData appBarTheme(BuildContext context) {
+    return ThemeData(
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF122118),
+        elevation: 0,
+        iconTheme: IconThemeData(color: Colors.white),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+        border: InputBorder.none,
+      ),
+      textTheme: const TextTheme(
+        titleLarge: TextStyle(color: Colors.white, fontSize: 18),
+      ),
+    );
+  }
+
+  @override
+  List<Widget> buildActions(BuildContext context) {
+    return [
+      if (query.isNotEmpty)
+        IconButton(
+          icon: const Icon(Icons.clear),
+          onPressed: () {
+            query = '';
+          },
+        ),
+    ];
+  }
+
+  @override
+  Widget buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () {
+        close(context, selectedOccupation ?? '');
+      },
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    return buildSuggestions(context);
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    final suggestions = query.isEmpty
+        ? occupations
+        : occupations
+            .where((occupation) =>
+                occupation.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+
+    return Container(
+      color: const Color(0xFF122118),
+      child: ListView.builder(
+        itemCount: suggestions.length,
+        itemBuilder: (context, index) {
+          final occupation = suggestions[index];
+          final isSelected = occupation == selectedOccupation;
+
+          return ListTile(
+            title: Text(
+              occupation,
+              style: TextStyle(
+                color: isSelected ? const Color(0xFF22C55E) : Colors.white,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+            trailing: isSelected
+                ? const Icon(Icons.check, color: Color(0xFF22C55E))
+                : null,
+            onTap: () {
+              close(context, occupation);
+            },
+          );
+        },
+      ),
+    );
+  }
+}

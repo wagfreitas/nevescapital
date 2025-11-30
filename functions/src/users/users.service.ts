@@ -16,7 +16,7 @@ export class UsersService {
     @Inject('DATABASE_POOL') private readonly pool: Pool,
     private readonly encryptionService: EncryptionService,
     private readonly pixValidationService: PixValidationService,
-  ) {}
+  ) { }
 
   /**
    * Criptografar para bytea (PostgreSQL)
@@ -37,7 +37,7 @@ export class UsersService {
     try {
       // Buffer vem do PostgreSQL como bytea, converter para string
       let encrypted: string;
-      
+
       if (Buffer.isBuffer(buffer)) {
         // Se é um buffer, converter para string
         encrypted = buffer.toString('utf8');
@@ -47,14 +47,14 @@ export class UsersService {
       } else {
         throw new Error('Formato de buffer inválido');
       }
-      
+
       console.log(`🔐 Tentando descriptografar: ${encrypted.substring(0, 50)}...`);
-      
+
       const decrypted = this.encryptionService.decrypt(encrypted);
       if (!decrypted) {
         throw new Error('Falha na descriptografia - resultado vazio');
       }
-      
+
       console.log(`✅ Descriptografado com sucesso: ${decrypted}`);
       return decrypted;
     } catch (error) {
@@ -184,11 +184,11 @@ export class UsersService {
           const decryptedCpf = this.decryptFromBytea(user.cpf_encrypted);
           allCpfs.push(decryptedCpf);
           console.log(`🔐 CPF descriptografado: ${decryptedCpf} (buscando: ${cpf})`);
-          
+
           // Normalizar ambos os CPFs para comparação (remover formatação)
           const normalizedDecrypted = decryptedCpf.replace(/\D/g, '');
           const normalizedSearch = cpf.replace(/\D/g, '');
-          
+
           if (normalizedDecrypted === normalizedSearch) {
             console.log(`✅ Usuário encontrado! ID: ${user.id}`);
             foundUser = user;
@@ -199,7 +199,7 @@ export class UsersService {
           continue;
         }
       }
-      
+
       if (allCpfs.length > 0) {
         console.log(`📋 Todos os CPFs encontrados no banco: ${allCpfs.join(', ')}`);
       }
@@ -269,6 +269,105 @@ export class UsersService {
     }
   }
 
+  async findByPhone(phone: string) {
+    try {
+      console.log(`🔍 Buscando usuário por telefone: ${phone}`);
+
+      // Buscar todos os telefones ativos
+      const result = await this.pool.query(
+        `SELECT 
+          up.user_id,
+          up.phone_encrypted
+        FROM user_phones up
+        JOIN users u ON u.id = up.user_id
+        WHERE u.deleted_at IS NULL AND up.is_primary = true`,
+      );
+
+      console.log(`📊 Encontrados ${result.rows.length} telefones para verificar`);
+
+      let foundUserId = null;
+
+      // Normalizar telefone de busca (apenas números)
+      const normalizedSearch = phone.replace(/\D/g, '');
+
+      for (const row of result.rows) {
+        try {
+          const decryptedPhone = this.decryptFromBytea(row.phone_encrypted);
+          const normalizedDecrypted = decryptedPhone.replace(/\D/g, '');
+
+          // Comparar (ignora +55 se um tiver e outro não, ou apenas compara números finais)
+          // Vamos comparar exato após normalização
+          if (normalizedDecrypted === normalizedSearch ||
+            normalizedDecrypted.endsWith(normalizedSearch) ||
+            normalizedSearch.endsWith(normalizedDecrypted)) {
+            console.log(`✅ Telefone encontrado! User ID: ${row.user_id}`);
+            foundUserId = row.user_id;
+            break;
+          }
+        } catch (error) {
+          continue;
+        }
+      }
+
+      if (!foundUserId) {
+        return null;
+      }
+
+      return this.findById(foundUserId);
+    } catch (error) {
+      console.error('Erro ao buscar usuário por telefone:', error);
+      throw error;
+    }
+  }
+
+  async checkByCpf(cpf: string) {
+    try {
+      console.log(`🔍 Verificando existência de CPF: ${cpf}`);
+
+      // Buscar todos os usuários ativos
+      const result = await this.pool.query(
+        `SELECT 
+          u.id,
+          u.cpf_encrypted,
+          u.kyc_status
+        FROM users u
+        WHERE u.deleted_at IS NULL`,
+      );
+
+      // Procurar o usuário com CPF correspondente
+      let foundUser = null;
+      for (const user of result.rows) {
+        try {
+          const decryptedCpf = this.decryptFromBytea(user.cpf_encrypted);
+
+          // Normalizar ambos os CPFs para comparação
+          const normalizedDecrypted = decryptedCpf.replace(/\D/g, '');
+          const normalizedSearch = cpf.replace(/\D/g, '');
+
+          if (normalizedDecrypted === normalizedSearch) {
+            foundUser = user;
+            break;
+          }
+        } catch (error) {
+          continue;
+        }
+      }
+
+      if (!foundUser) {
+        return { exists: false };
+      }
+
+      return {
+        exists: true,
+        kyc_status: foundUser.kyc_status,
+        // Não retornar PII aqui
+      };
+    } catch (error) {
+      console.error('Erro ao verificar CPF:', error);
+      throw error;
+    }
+  }
+
   async findByEmail(email: string) {
     try {
       // Normalizar email: trim, lowercase
@@ -299,7 +398,7 @@ export class UsersService {
           const decryptedEmail = this.decryptFromBytea(user.email_encrypted);
           const normalizedDecryptedEmail = decryptedEmail.trim().toLowerCase();
           console.log(`🔐 Email descriptografado: ${normalizedDecryptedEmail} (original: ${decryptedEmail})`);
-          
+
           // Comparação case-insensitive e sem espaços
           if (normalizedDecryptedEmail === normalizedEmail) {
             console.log(`✅ Usuário encontrado! ID: ${user.id}`);
@@ -391,7 +490,7 @@ export class UsersService {
       // Isso valida a senha
       const auth = admin.auth();
       const user = await auth.getUserByEmail(userData.email);
-      
+
       // Firebase Admin SDK não tem método direto para verificar senha
       // Precisamos usar Firebase Auth REST API ou fazer login via cliente
       // Por enquanto, retornamos true se o usuário existe (validação será feita no cliente)
@@ -540,7 +639,7 @@ export class UsersService {
       // Atualizar telefone se fornecido
       if (updateUserDto.phone) {
         const phoneEncrypted = this.encryptToBytea(updateUserDto.phone);
-        
+
         try {
           // Tentar usar tabela user_phones (estrutura nova)
           const existingPhone = await client.query(
@@ -618,7 +717,7 @@ export class UsersService {
 
         if (updateFields.length > 0) {
           updateFields.push('updated_at = NOW()');
-          
+
           // Verificar se já existe endereço
           const existingAddress = await client.query(
             'SELECT id FROM user_addresses WHERE user_id = $1 AND is_primary = true',
@@ -674,7 +773,7 @@ export class UsersService {
   async syncFirebaseEmail(cpf: string, oldEmail: string) {
     try {
       console.log(`🔄 Sincronizando email do Firebase para CPF: ${cpf}`);
-      
+
       // 1. Buscar usuário no PostgreSQL por CPF para obter o email novo
       const userData = await this.findByCpf(cpf);
       if (!userData || !userData.email) {

@@ -8,7 +8,7 @@ import 'package:neves_capital/features/auth/presentation/controllers/registratio
 import 'package:neves_capital/features/auth/domain/entities/registration_progress.dart';
 import 'step4_email_screen.dart';
 
-/// Tela 3 do Cadastro: Insira o código OTP (4 dígitos)
+/// Tela 3 do Cadastro: Insira o código OTP (6 dígitos)
 class Step3OtpScreen extends StatefulWidget {
   final AuthController? authController;
   final ThemeController? themeController;
@@ -28,11 +28,14 @@ class Step3OtpScreen extends StatefulWidget {
 }
 
 class _Step3OtpScreenState extends State<Step3OtpScreen> {
+  static const int _otpLength = 6;
   final TextEditingController _otpController = TextEditingController();
+  final FocusNode _otpFocusNode = FocusNode();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   String? _errorMessage;
   int _resendCountdown = 0;
+  bool _isOtpComplete = false;
   late RegistrationLifecycleObserver _lifecycleObserver;
 
   @override
@@ -51,12 +54,28 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
     );
 
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
+
+    // Listener para habilitar/desabilitar botão
+    _otpController.addListener(() {
+      final hasFullCode = _otpController.text.trim().length == _otpLength;
+      if (hasFullCode != _isOtpComplete) {
+        setState(() {
+          _isOtpComplete = hasFullCode;
+        });
+      }
+    });
+
+    // Abrir teclado automaticamente
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _otpFocusNode.requestFocus();
+    });
   }
 
   @override
   void dispose() {
     _lifecycleObserver.dispose();
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
+    _otpFocusNode.dispose();
     _otpController.dispose();
     super.dispose();
   }
@@ -136,7 +155,7 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
     // MOCK: Reenviar OTP
     AppLogger.debug(
         'MOCK: Reenviando OTP para telefone: ${widget.phone.substring(0, 2)}***');
-    AppLogger.debug('MOCK: Novo código: 1234');
+    AppLogger.debug('MOCK: Novo código: 123456');
 
     if (mounted) {
       setState(() {
@@ -162,9 +181,9 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
 
   // MOCK: Simula verificação de OTP
   bool _mockVerifyOtp(String otpCode) {
-    // Para teste: aceita qualquer código de 4 dígitos
+    // Para teste: aceita qualquer código de 6 dígitos
     // Em produção, isso virá da API
-    return otpCode.length == 4;
+    return otpCode.length == _otpLength;
   }
 
   @override
@@ -180,171 +199,186 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
         ),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 40),
-                const Text(
-                  'Digite o código',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Informe o código de verificação recebido no número ${PhoneHelper.maskPhoneLast4(widget.phone)}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.white70,
-                  ),
-                ),
-                const SizedBox(height: 40),
-                TextFormField(
-                  controller: _otpController,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  maxLength: 4,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                  ],
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 12,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: '0000',
-                    hintStyle: TextStyle(
-                      fontSize: 32,
-                      color: Colors.white.withOpacity(0.3),
-                      letterSpacing: 12,
-                    ),
-                    counterText: '',
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: Colors.white.withOpacity(0.2)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: Color(0xFF22C55E), width: 2),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.red, width: 2),
-                    ),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Digite o código';
-                    }
-                    if (value.trim().length != 4) {
-                      return 'Código deve ter 4 dígitos';
-                    }
-                    return null;
-                  },
-                ),
-                if (_errorMessage != null) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.red),
-                    ),
-                    child: Row(
+        child: LayoutBuilder(
+          // Evita overflow quando o teclado ocupa parte da tela.
+          builder: (context, constraints) {
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            return SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(24, 0, 24, 24 + bottomInset),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Form(
+                  key: _formKey,
+                  child: IntrinsicHeight(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.error_outline,
-                            color: Colors.red, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _errorMessage!,
-                            style: const TextStyle(
-                                color: Colors.red, fontSize: 14),
+                        const SizedBox(height: 40),
+                        const Text(
+                          'Digite o código',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Informe o código de verificação recebido no número ${PhoneHelper.formatPhone(widget.phone)}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.white70,
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                        TextFormField(
+                          controller: _otpController,
+                          focusNode: _otpFocusNode,
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.center,
+                          maxLength: _otpLength,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          style: const TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 12,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: '000000',
+                            hintStyle: TextStyle(
+                              fontSize: 32,
+                              color: Colors.white.withValues(alpha: 0.3),
+                              letterSpacing: 12,
+                            ),
+                            counterText: '',
+                            filled: true,
+                            fillColor: Colors.white.withValues(alpha: 0.1),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.2)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFF22C55E), width: 2),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  const BorderSide(color: Colors.red, width: 2),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Digite o código';
+                            }
+                            if (value.trim().length != _otpLength) {
+                              return 'Código deve ter $_otpLength dígitos';
+                            }
+                            return null;
+                          },
+                        ),
+                        if (_errorMessage != null) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline,
+                                    color: Colors.red, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _errorMessage!,
+                                    style: const TextStyle(
+                                        color: Colors.red, fontSize: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: (_isLoading || !_isOtpComplete)
+                                ? null
+                                : _handleVerifyOtp,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF22C55E),
+                              foregroundColor: const Color(0xFF122118),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Color(0xFF122118)),
+                                    ),
+                                  )
+                                : const Text(
+                                    'Verificar Código',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        if (_resendCountdown > 0)
+                          Center(
+                            child: Text(
+                              'Reenviar código em ${_resendCountdown}s',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.5),
+                                fontSize: 14,
+                              ),
+                            ),
+                          )
+                        else
+                          Center(
+                            child: TextButton(
+                              onPressed: _isLoading ? null : _handleResendOtp,
+                              child: const Text(
+                                'Reenviar código',
+                                style: TextStyle(
+                                  color: Color(0xFF22C55E),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 40),
                       ],
                     ),
                   ),
-                ],
-                const Spacer(),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _handleVerifyOtp,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF22C55E),
-                      foregroundColor: const Color(0xFF122118),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                  Color(0xFF122118)),
-                            ),
-                          )
-                        : const Text(
-                            'Verificar Código',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                  ),
                 ),
-                const SizedBox(height: 16),
-                if (_resendCountdown > 0)
-                  Center(
-                    child: Text(
-                      'Reenviar código em ${_resendCountdown}s',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
-                        fontSize: 14,
-                      ),
-                    ),
-                  )
-                else
-                  Center(
-                    child: TextButton(
-                      onPressed: _isLoading ? null : _handleResendOtp,
-                      child: const Text(
-                        'Reenviar código',
-                        style: TextStyle(
-                          color: Color(0xFF22C55E),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 40),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );

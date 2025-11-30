@@ -76,6 +76,7 @@ const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
 const swagger_1 = __webpack_require__(/*! @nestjs/swagger */ "@nestjs/swagger");
 const throttler_1 = __webpack_require__(/*! @nestjs/throttler */ "@nestjs/throttler");
 const api_key_guard_1 = __webpack_require__(/*! ../common/guards/api-key.guard */ "./src/common/guards/api-key.guard.ts");
+const admin = __webpack_require__(/*! firebase-admin */ "firebase-admin");
 const email_sender_service_1 = __webpack_require__(/*! ./email-sender.service */ "./src/auth/email-sender.service.ts");
 const reset_password_dto_1 = __webpack_require__(/*! ./dto/reset-password.dto */ "./src/auth/dto/reset-password.dto.ts");
 const otp_dto_1 = __webpack_require__(/*! ./dto/otp.dto */ "./src/auth/dto/otp.dto.ts");
@@ -226,14 +227,7 @@ let AuthController = class AuthController {
                     throw error;
                 }
             }
-            const { otpCode, expiresAt } = await this.otpService.createRegistrationOtp(dto.cpf, dto.phone);
-            if (!this.ycloudService.isConfigured()) {
-                throw new common_1.BadRequestException('Serviço de WhatsApp não configurado. Contate o suporte.');
-            }
-            const sendResult = await this.ycloudService.sendOtp(dto.phone, otpCode);
-            if (!sendResult.success) {
-                throw new common_1.BadRequestException(`Erro ao enviar código: ${sendResult.error}`);
-            }
+            const { expiresAt } = await this.otpService.createRegistrationOtp(dto.cpf, dto.phone);
             return {
                 success: true,
                 message: 'Código enviado com sucesso via WhatsApp',
@@ -250,6 +244,65 @@ let AuthController = class AuthController {
             return {
                 success: true,
                 message: 'Código OTP verificado com sucesso',
+            };
+        }
+        catch (error) {
+            throw error;
+        }
+    }
+    async checkUserStatus(body) {
+        try {
+            const decodedToken = await admin.auth().verifyIdToken(body.token);
+            const phone = decodedToken.phone_number;
+            if (!phone) {
+                throw new common_1.BadRequestException('Token não contém número de telefone');
+            }
+            const user = await this.usersService.findByPhone(phone);
+            if (user) {
+                return {
+                    success: true,
+                    status: 'REQUIRE_CPF_CHECK',
+                    message: 'Usuário encontrado. Confirme seu CPF.',
+                    phone: phone,
+                };
+            }
+            else {
+                return {
+                    success: true,
+                    status: 'REGISTER',
+                    message: 'Usuário não encontrado. Redirecionando para cadastro.',
+                    phone: phone,
+                };
+            }
+        }
+        catch (error) {
+            throw error;
+        }
+    }
+    async loginComplete(body) {
+        try {
+            const decodedToken = await admin.auth().verifyIdToken(body.token);
+            const phone = decodedToken.phone_number;
+            if (!phone) {
+                throw new common_1.BadRequestException('Token não contém número de telefone');
+            }
+            const user = await this.usersService.findByPhone(phone);
+            if (!user) {
+                throw new common_1.NotFoundException('Usuário não encontrado');
+            }
+            const userCpf = user.cpf.replace(/\D/g, '');
+            const inputPrefix = body.cpfPrefix.replace(/\D/g, '');
+            if (!userCpf.startsWith(inputPrefix)) {
+                throw new common_1.UnauthorizedException('CPF incorreto');
+            }
+            const customToken = await admin.auth().createCustomToken(user.id);
+            return {
+                success: true,
+                token: customToken,
+                user: {
+                    name: user.full_name,
+                    email: user.email,
+                }
             };
         }
         catch (error) {
@@ -373,6 +426,34 @@ __decorate([
     __metadata("design:paramtypes", [typeof (_p = typeof registration_otp_dto_1.VerifyRegistrationOtpDto !== "undefined" && registration_otp_dto_1.VerifyRegistrationOtpDto) === "function" ? _p : Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "verifyRegistrationOtp", null);
+__decorate([
+    (0, common_1.Post)('check-user-status'),
+    (0, throttler_1.Throttle)({ default: { limit: 10, ttl: 60000 } }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Verificar status do usuário após login Firebase',
+        description: 'Recebe token do Firebase, verifica se usuário existe e retorna próximo passo.'
+    }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Status retornado com sucesso' }),
+    (0, swagger_1.ApiResponse)({ status: 401, description: 'Token inválido' }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "checkUserStatus", null);
+__decorate([
+    (0, common_1.Post)('login-complete'),
+    (0, throttler_1.Throttle)({ default: { limit: 5, ttl: 60000 } }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Completar login (Verificar CPF)',
+        description: 'Verifica os primeiros 5 dígitos do CPF e gera o token de acesso customizado (se necessário) ou apenas confirma.'
+    }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Login realizado com sucesso' }),
+    (0, swagger_1.ApiResponse)({ status: 401, description: 'CPF incorreto ou token inválido' }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "loginComplete", null);
 exports.AuthController = AuthController = __decorate([
     (0, swagger_1.ApiTags)('Auth'),
     (0, common_1.Controller)('api/auth'),
@@ -972,21 +1053,17 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
-var _a, _b;
+var _a;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.OtpService = void 0;
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
-const pg_1 = __webpack_require__(/*! pg */ "pg");
-const encryption_service_1 = __webpack_require__(/*! ../../common/services/encryption.service */ "./src/common/services/encryption.service.ts");
+const admin = __webpack_require__(/*! firebase-admin */ "firebase-admin");
 const crypto = __webpack_require__(/*! crypto */ "crypto");
+const ycloud_service_1 = __webpack_require__(/*! ./ycloud.service */ "./src/auth/services/ycloud.service.ts");
 let OtpService = class OtpService {
-    constructor(pool, encryptionService) {
-        this.pool = pool;
-        this.encryptionService = encryptionService;
-        this.OTP_EXPIRY_MINUTES = 10;
+    constructor(ycloudService) {
+        this.ycloudService = ycloudService;
+        this.OTP_EXPIRY_MINUTES = 5;
         this.MAX_ATTEMPTS = 3;
         this.OTP_LENGTH = 6;
     }
@@ -998,236 +1075,153 @@ let OtpService = class OtpService {
     hashOtpCode(code) {
         return crypto.createHash('sha256').update(code).digest('hex');
     }
-    encryptPhone(phone) {
-        const encrypted = this.encryptionService.encrypt(phone);
-        if (!encrypted) {
-            throw new Error('Falha ao criptografar telefone');
+    async createLoginOtp(phone) {
+        const verification = await this.ycloudService.startVerification(phone, 'whatsapp');
+        if (!verification.success) {
+            throw new common_1.BadRequestException(verification.error || 'Erro ao enviar OTP via WhatsApp');
         }
-        return encrypted;
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+        const docRef = await admin.firestore().collection('otps').add({
+            phone,
+            verificationId: verification.verificationId,
+            expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+            attempts: 0,
+            verified: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            type: 'LOGIN_PHONE',
+            provider: 'YCLOUD'
+        });
+        console.log(`✅ OTP de Login iniciado via YCloud para telefone ${phone}, Doc ID: ${docRef.id}`);
+        return { tempId: docRef.id, expiresAt };
     }
-    decryptPhone(encryptedPhone) {
-        const decrypted = this.encryptionService.decrypt(encryptedPhone);
-        if (!decrypted) {
-            throw new Error('Falha ao descriptografar telefone');
+    async verifyLoginOtp(tempId, otpCode) {
+        const docRef = admin.firestore().collection('otps').doc(tempId);
+        const doc = await docRef.get();
+        if (!doc.exists) {
+            throw new common_1.NotFoundException('Sessão de login não encontrada');
         }
-        return decrypted;
+        const data = doc.data();
+        if (!data) {
+            throw new common_1.NotFoundException('Dados da sessão inválidos');
+        }
+        const expiresAt = data.expiresAt.toDate();
+        if (new Date() > expiresAt) {
+            throw new common_1.UnauthorizedException('Sessão expirada');
+        }
+        if (data.verified) {
+            return { phone: data.phone };
+        }
+        if (data.attempts >= this.MAX_ATTEMPTS) {
+            await docRef.update({ verified: true });
+            throw new common_1.UnauthorizedException('Máximo de tentativas excedido');
+        }
+        const checkResult = await this.ycloudService.checkVerification(data.phone, otpCode, data.verificationId);
+        if (!checkResult.success || !checkResult.valid) {
+            await docRef.update({ attempts: admin.firestore.FieldValue.increment(1) });
+            throw new common_1.UnauthorizedException('Código inválido');
+        }
+        await docRef.update({ verified: true, verifiedAt: admin.firestore.FieldValue.serverTimestamp() });
+        console.log(`✅ Login verificado com sucesso para telefone ${data.phone}`);
+        return { phone: data.phone };
     }
     async createOtp(userId, phone) {
-        const client = await this.pool.connect();
-        try {
-            const existingOtp = await client.query(`SELECT id, attempts, expires_at 
-         FROM password_reset_otps 
-         WHERE user_id = $1 AND verified = FALSE AND expires_at > NOW()
-         ORDER BY created_at DESC 
-         LIMIT 1`, [userId]);
-            if (existingOtp.rows.length > 0) {
-                const otp = existingOtp.rows[0];
-                const expiresAt = new Date(otp.expires_at);
-                const now = new Date();
-                const minutesRemaining = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60));
-                if (minutesRemaining > 2) {
-                    throw new common_1.BadRequestException(`Aguarde ${minutesRemaining} minutos antes de solicitar um novo código`);
-                }
-                await client.query(`UPDATE password_reset_otps SET verified = TRUE WHERE id = $1`, [otp.id]);
-            }
-            const otpCode = this.generateOtpCode();
-            const otpHash = this.hashOtpCode(otpCode);
-            const expiresAt = new Date();
-            expiresAt.setMinutes(expiresAt.getMinutes() + this.OTP_EXPIRY_MINUTES);
-            const encryptedPhone = this.encryptPhone(phone);
-            await client.query(`INSERT INTO password_reset_otps (
-          user_id, phone, otp_code_hash, otp_code, expires_at, verified, attempts
-        ) VALUES ($1, $2, $3, $4, $5, FALSE, 0)`, [userId, encryptedPhone, otpHash, otpCode, expiresAt]);
-            console.log(`✅ OTP criado para usuário ${userId}, expira em ${expiresAt.toISOString()}`);
-            return {
-                otpCode,
-                expiresAt,
-            };
-        }
-        finally {
-            client.release();
-        }
+        const otpCode = this.generateOtpCode();
+        const otpHash = this.hashOtpCode(otpCode);
+        const expiresAt = new Date();
+        expiresAt.setMinutes(expiresAt.getMinutes() + this.OTP_EXPIRY_MINUTES);
+        await admin.firestore().collection('otps').add({
+            type: 'PASSWORD_RESET',
+            userId,
+            phone,
+            otpHash,
+            expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+            attempts: 0,
+            verified: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return { otpCode, expiresAt };
     }
     async verifyOtp(userId, otpCode) {
-        const client = await this.pool.connect();
-        try {
-            const result = await client.query(`SELECT id, otp_code_hash, otp_code, attempts, expires_at, verified
-         FROM password_reset_otps
-         WHERE user_id = $1 AND verified = FALSE AND expires_at > NOW()
-         ORDER BY created_at DESC
-         LIMIT 1`, [userId]);
-            if (result.rows.length === 0) {
-                throw new common_1.NotFoundException('Código OTP não encontrado ou expirado');
-            }
-            const otp = result.rows[0];
-            if (otp.attempts >= this.MAX_ATTEMPTS) {
-                await client.query(`UPDATE password_reset_otps SET verified = TRUE WHERE id = $1`, [otp.id]);
-                throw new common_1.UnauthorizedException('Máximo de tentativas excedido. Solicite um novo código.');
-            }
-            const otpHash = this.hashOtpCode(otpCode);
-            const isValid = otpHash === otp.otp_code_hash;
-            await client.query(`UPDATE password_reset_otps SET attempts = attempts + 1 WHERE id = $1`, [otp.id]);
-            if (!isValid) {
-                throw new common_1.UnauthorizedException('Código OTP inválido');
-            }
-            const token = this.generateTempToken(userId);
-            const tokenExpiresAt = new Date();
-            tokenExpiresAt.setMinutes(tokenExpiresAt.getMinutes() + 15);
-            await client.query(`UPDATE password_reset_otps 
-         SET verified = TRUE, verified_at = NOW(), otp_code = '', 
-             reset_token = $1, token_expires_at = $2
-         WHERE id = $3`, [token, tokenExpiresAt, otp.id]);
-            console.log(`✅ OTP verificado com sucesso para usuário ${userId}`);
-            return token;
+        const snapshot = await admin.firestore().collection('otps')
+            .where('userId', '==', userId)
+            .where('type', '==', 'PASSWORD_RESET')
+            .where('verified', '==', false)
+            .orderBy('createdAt', 'desc')
+            .limit(1)
+            .get();
+        if (snapshot.empty) {
+            throw new common_1.NotFoundException('Nenhum código ativo encontrado');
         }
-        finally {
-            client.release();
+        const doc = snapshot.docs[0];
+        const data = doc.data();
+        if (new Date() > data.expiresAt.toDate()) {
+            throw new common_1.UnauthorizedException('Código expirado');
         }
-    }
-    generateTempToken(userId) {
-        const payload = {
-            userId,
-            type: 'password_reset',
-            timestamp: Date.now(),
-        };
-        const token = crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
-        return token;
+        if (data.attempts >= this.MAX_ATTEMPTS) {
+            await doc.ref.update({ verified: true });
+            throw new common_1.UnauthorizedException('Máximo de tentativas excedido');
+        }
+        const otpHash = this.hashOtpCode(otpCode);
+        if (otpHash !== data.otpHash) {
+            await doc.ref.update({ attempts: admin.firestore.FieldValue.increment(1) });
+            throw new common_1.UnauthorizedException('Código inválido');
+        }
+        await doc.ref.update({ verified: true, verifiedAt: admin.firestore.FieldValue.serverTimestamp() });
+        return crypto.randomBytes(32).toString('hex');
     }
     async validateTempToken(token) {
-        const client = await this.pool.connect();
-        try {
-            const result = await client.query(`SELECT user_id, token_expires_at
-         FROM password_reset_otps
-         WHERE verified = TRUE 
-           AND reset_token = $1
-           AND token_expires_at > NOW()`, [token]);
-            if (result.rows.length === 0) {
-                return { userId: '', valid: false };
-            }
-            const otp = result.rows[0];
-            return { userId: otp.user_id, valid: true };
-        }
-        finally {
-            client.release();
-        }
+        return { userId: '', valid: false };
     }
-    async invalidateToken(token) {
-        const client = await this.pool.connect();
-        try {
-            await client.query(`UPDATE password_reset_otps 
-         SET reset_token = NULL, token_expires_at = NULL 
-         WHERE reset_token = $1`, [token]);
-        }
-        finally {
-            client.release();
-        }
-    }
-    async cleanupExpiredOtps() {
-        const client = await this.pool.connect();
-        try {
-            await client.query(`DELETE FROM password_reset_otps 
-         WHERE expires_at < NOW() - INTERVAL '1 hour'`);
-            console.log('✅ OTPs expirados removidos');
-        }
-        finally {
-            client.release();
-        }
-    }
-    encryptCpf(cpf) {
-        const encrypted = this.encryptionService.encrypt(cpf);
-        if (!encrypted) {
-            throw new Error('Falha ao criptografar CPF');
-        }
-        return encrypted;
-    }
+    async invalidateToken(token) { }
     async createRegistrationOtp(cpf, phone) {
-        const client = await this.pool.connect();
-        try {
-            const encryptedCpf = this.encryptCpf(cpf);
-            const encryptedPhone = this.encryptPhone(phone);
-            const existingOtp = await client.query(`SELECT id, attempts, expires_at 
-         FROM registration_otps 
-         WHERE cpf = $1 AND phone = $2 AND verified = FALSE AND expires_at > NOW()
-         ORDER BY created_at DESC 
-         LIMIT 1`, [encryptedCpf, encryptedPhone]);
-            if (existingOtp.rows.length > 0) {
-                const otp = existingOtp.rows[0];
-                const expiresAt = new Date(otp.expires_at);
-                const now = new Date();
-                const minutesRemaining = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60));
-                if (minutesRemaining > 2) {
-                    throw new common_1.BadRequestException(`Aguarde ${minutesRemaining} minutos antes de solicitar um novo código`);
-                }
-                await client.query(`UPDATE registration_otps SET verified = TRUE WHERE id = $1`, [otp.id]);
-            }
-            const otpCode = this.generateOtpCode();
-            const otpHash = this.hashOtpCode(otpCode);
-            const expiresAt = new Date();
-            expiresAt.setMinutes(expiresAt.getMinutes() + this.OTP_EXPIRY_MINUTES);
-            await client.query(`INSERT INTO registration_otps (
-          cpf, phone, otp_code_hash, otp_code, expires_at, verified, attempts
-        ) VALUES ($1, $2, $3, $4, $5, FALSE, 0)`, [encryptedCpf, encryptedPhone, otpHash, otpCode, expiresAt]);
-            console.log(`✅ OTP de cadastro criado para CPF ${cpf.substring(0, 3)}***, expira em ${expiresAt.toISOString()}`);
-            return {
-                otpCode,
-                expiresAt,
-            };
+        const verification = await this.ycloudService.startVerification(phone, 'whatsapp');
+        if (!verification.success) {
+            throw new common_1.BadRequestException(verification.error || 'Erro ao enviar OTP via WhatsApp');
         }
-        finally {
-            client.release();
-        }
+        const expiresAt = new Date();
+        expiresAt.setMinutes(expiresAt.getMinutes() + this.OTP_EXPIRY_MINUTES);
+        await admin.firestore().collection('otps').add({
+            type: 'REGISTRATION',
+            cpf,
+            phone,
+            verificationId: verification.verificationId,
+            expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+            attempts: 0,
+            verified: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            provider: 'YCLOUD'
+        });
+        return { expiresAt };
     }
     async verifyRegistrationOtp(cpf, phone, otpCode) {
-        const client = await this.pool.connect();
-        try {
-            const encryptedCpf = this.encryptCpf(cpf);
-            const encryptedPhone = this.encryptPhone(phone);
-            const result = await client.query(`SELECT id, otp_code_hash, otp_code, attempts, expires_at, verified
-         FROM registration_otps
-         WHERE cpf = $1 AND phone = $2 AND verified = FALSE AND expires_at > NOW()
-         ORDER BY created_at DESC
-         LIMIT 1`, [encryptedCpf, encryptedPhone]);
-            if (result.rows.length === 0) {
-                throw new common_1.NotFoundException('Código OTP não encontrado ou expirado');
-            }
-            const otp = result.rows[0];
-            if (otp.attempts >= this.MAX_ATTEMPTS) {
-                await client.query(`UPDATE registration_otps SET verified = TRUE WHERE id = $1`, [otp.id]);
-                throw new common_1.UnauthorizedException('Máximo de tentativas excedido. Solicite um novo código.');
-            }
-            const otpHash = this.hashOtpCode(otpCode);
-            const isValid = otpHash === otp.otp_code_hash;
-            await client.query(`UPDATE registration_otps SET attempts = attempts + 1 WHERE id = $1`, [otp.id]);
-            if (!isValid) {
-                throw new common_1.UnauthorizedException('Código OTP inválido');
-            }
-            await client.query(`UPDATE registration_otps 
-         SET verified = TRUE, verified_at = NOW(), otp_code = ''
-         WHERE id = $1`, [otp.id]);
-            console.log(`✅ OTP de cadastro verificado com sucesso para CPF ${cpf.substring(0, 3)}***`);
-            return true;
+        const snapshot = await admin.firestore().collection('otps')
+            .where('cpf', '==', cpf)
+            .where('type', '==', 'REGISTRATION')
+            .where('verified', '==', false)
+            .orderBy('createdAt', 'desc')
+            .limit(1)
+            .get();
+        if (snapshot.empty) {
+            throw new common_1.NotFoundException('Código não encontrado');
         }
-        finally {
-            client.release();
+        const doc = snapshot.docs[0];
+        const data = doc.data();
+        if (new Date() > data.expiresAt.toDate()) {
+            throw new common_1.UnauthorizedException('Código expirado');
         }
-    }
-    async cleanupExpiredRegistrationOtps() {
-        const client = await this.pool.connect();
-        try {
-            await client.query(`DELETE FROM registration_otps 
-         WHERE expires_at < NOW() - INTERVAL '1 hour'`);
-            console.log('✅ OTPs de cadastro expirados removidos');
+        const checkResult = await this.ycloudService.checkVerification(phone, otpCode, data.verificationId);
+        if (!checkResult.success || !checkResult.valid) {
+            await doc.ref.update({ attempts: admin.firestore.FieldValue.increment(1) });
+            throw new common_1.UnauthorizedException('Código inválido');
         }
-        finally {
-            client.release();
-        }
+        await doc.ref.update({ verified: true });
+        return true;
     }
 };
 exports.OtpService = OtpService;
 exports.OtpService = OtpService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, common_1.Inject)('DATABASE_POOL')),
-    __metadata("design:paramtypes", [typeof (_a = typeof pg_1.Pool !== "undefined" && pg_1.Pool) === "function" ? _a : Object, typeof (_b = typeof encryption_service_1.EncryptionService !== "undefined" && encryption_service_1.EncryptionService) === "function" ? _b : Object])
+    __metadata("design:paramtypes", [typeof (_a = typeof ycloud_service_1.YcloudService !== "undefined" && ycloud_service_1.YcloudService) === "function" ? _a : Object])
 ], OtpService);
 
 
@@ -1359,9 +1353,8 @@ const https = __webpack_require__(/*! https */ "https");
 let YcloudService = class YcloudService {
     constructor(configService) {
         this.configService = configService;
-        this.apiUrl = 'https://api.ycloud.com/v1';
+        this.apiUrl = 'https://api.ycloud.com/v2';
         this.apiKey = this.configService.get('YCLOUD_API_KEY', '');
-        this.whatsappNumber = this.configService.get('YCLOUD_WHATSAPP_NUMBER', '');
         if (!this.apiKey) {
             console.warn('⚠️ Ycloud não configurado. Variável YCLOUD_API_KEY necessária.');
         }
@@ -1376,7 +1369,7 @@ let YcloudService = class YcloudService {
         }
         return '+' + cleaned;
     }
-    async sendOtp(phone, otpCode) {
+    async startVerification(phone, channel = 'whatsapp') {
         if (!this.apiKey) {
             return {
                 success: false,
@@ -1385,62 +1378,65 @@ let YcloudService = class YcloudService {
         }
         const formattedPhone = this.formatPhoneNumber(phone);
         try {
-            const message = `Seu código de verificação é: ${otpCode}\n\nEste código expira em 10 minutos.\n\nNão compartilhe este código com ninguém.`;
-            const response = await this.makeRequest('POST', '/messages', {
+            const response = await this.makeRequest('POST', '/verify/verifications', {
                 to: formattedPhone,
-                type: 'text',
-                text: {
-                    body: message,
-                },
-                from: this.whatsappNumber || 'whatsapp',
+                channel: channel,
             });
             if (response.success) {
-                console.log(`✅ OTP enviado via Ycloud WhatsApp para ${formattedPhone}`);
+                console.log(`✅ Verificação iniciada via Ycloud (${channel}) para ${formattedPhone}, ID: ${response.data?.id}`);
                 return {
                     success: true,
-                    messageId: response.data?.id || response.data?.messageId,
+                    verificationId: response.data?.id,
                 };
             }
             else {
-                throw new Error(response.error || 'Erro ao enviar OTP');
+                throw new Error(response.error || 'Erro ao iniciar verificação');
             }
         }
         catch (error) {
-            console.error(`❌ Erro ao enviar OTP via Ycloud para ${formattedPhone}:`, error.message);
+            console.error(`❌ Erro ao iniciar verificação Ycloud para ${formattedPhone}:`, error.message);
             return {
                 success: false,
-                error: error.message || 'Erro ao enviar mensagem',
+                error: error.message || 'Erro ao iniciar verificação',
             };
         }
     }
-    async verifyOtp(phone, otpCode) {
+    async checkVerification(phone, code, verificationId) {
         if (!this.apiKey) {
             return {
                 success: false,
+                valid: false,
                 error: 'Ycloud não configurado',
             };
         }
         const formattedPhone = this.formatPhoneNumber(phone);
         try {
-            const response = await this.makeRequest('POST', '/verify/check', {
+            const response = await this.makeRequest('POST', '/verify/verifications/check', {
                 to: formattedPhone,
-                code: otpCode,
+                code: code,
             });
-            if (response.success && response.data?.valid === true) {
-                console.log(`✅ OTP verificado com sucesso para ${formattedPhone}`);
-                return { success: true };
+            if (response.success) {
+                const isValid = response.data?.valid === true || response.data?.status === 'approved';
+                if (isValid) {
+                    console.log(`✅ Código verificado com sucesso para ${formattedPhone}`);
+                }
+                else {
+                    console.warn(`⚠️ Código inválido para ${formattedPhone}`);
+                }
+                return {
+                    success: true,
+                    valid: isValid,
+                };
             }
             else {
-                return {
-                    success: false,
-                    error: 'Código OTP inválido',
-                };
+                throw new Error(response.error || 'Erro ao verificar código');
             }
         }
         catch (error) {
-            console.error(`❌ Erro ao verificar OTP via Ycloud:`, error.message);
+            console.error(`❌ Erro ao verificar código Ycloud para ${formattedPhone}:`, error.message);
             return {
                 success: false,
+                valid: false,
                 error: error.message || 'Erro ao verificar código',
             };
         }
@@ -1469,9 +1465,15 @@ let YcloudService = class YcloudService {
                             resolve({ success: true, data: parsed });
                         }
                         else {
+                            let errorMessage = 'Erro na requisição';
+                            if (parsed.message)
+                                errorMessage = typeof parsed.message === 'object' ? JSON.stringify(parsed.message) : parsed.message;
+                            else if (parsed.error)
+                                errorMessage = typeof parsed.error === 'object' ? JSON.stringify(parsed.error) : parsed.error;
+                            console.error(`❌ Erro YCloud (Status ${res.statusCode}):`, JSON.stringify(parsed));
                             resolve({
                                 success: false,
-                                error: parsed.message || parsed.error || 'Erro na requisição',
+                                error: errorMessage,
                             });
                         }
                     }
@@ -2704,6 +2706,9 @@ let UsersController = class UsersController {
     findByCpf(cpf) {
         return this.usersService.findByCpf(cpf);
     }
+    checkByCpf(cpf) {
+        return this.usersService.checkByCpf(cpf);
+    }
     async findByEmail(email) {
         const decodedEmail = decodeURIComponent(email);
         console.log(`📧 Email recebido na URL: ${email}`);
@@ -2761,6 +2766,15 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "findByCpf", null);
+__decorate([
+    (0, common_1.Get)('check-cpf/:cpf'),
+    (0, swagger_1.ApiOperation)({ summary: 'Verificar se CPF existe (sem retornar PII)' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Status do CPF retornado' }),
+    __param(0, (0, common_1.Param)('cpf')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], UsersController.prototype, "checkByCpf", null);
 __decorate([
     (0, common_1.Get)('email/:email'),
     (0, swagger_1.ApiOperation)({ summary: 'Buscar usuário por email' }),
@@ -3132,6 +3146,81 @@ let UsersService = class UsersService {
         }
         catch (error) {
             console.error('Erro ao buscar usuário:', error);
+            throw error;
+        }
+    }
+    async findByPhone(phone) {
+        try {
+            console.log(`🔍 Buscando usuário por telefone: ${phone}`);
+            const result = await this.pool.query(`SELECT 
+          up.user_id,
+          up.phone_encrypted
+        FROM user_phones up
+        JOIN users u ON u.id = up.user_id
+        WHERE u.deleted_at IS NULL AND up.is_primary = true`);
+            console.log(`📊 Encontrados ${result.rows.length} telefones para verificar`);
+            let foundUserId = null;
+            const normalizedSearch = phone.replace(/\D/g, '');
+            for (const row of result.rows) {
+                try {
+                    const decryptedPhone = this.decryptFromBytea(row.phone_encrypted);
+                    const normalizedDecrypted = decryptedPhone.replace(/\D/g, '');
+                    if (normalizedDecrypted === normalizedSearch ||
+                        normalizedDecrypted.endsWith(normalizedSearch) ||
+                        normalizedSearch.endsWith(normalizedDecrypted)) {
+                        console.log(`✅ Telefone encontrado! User ID: ${row.user_id}`);
+                        foundUserId = row.user_id;
+                        break;
+                    }
+                }
+                catch (error) {
+                    continue;
+                }
+            }
+            if (!foundUserId) {
+                return null;
+            }
+            return this.findById(foundUserId);
+        }
+        catch (error) {
+            console.error('Erro ao buscar usuário por telefone:', error);
+            throw error;
+        }
+    }
+    async checkByCpf(cpf) {
+        try {
+            console.log(`🔍 Verificando existência de CPF: ${cpf}`);
+            const result = await this.pool.query(`SELECT 
+          u.id,
+          u.cpf_encrypted,
+          u.kyc_status
+        FROM users u
+        WHERE u.deleted_at IS NULL`);
+            let foundUser = null;
+            for (const user of result.rows) {
+                try {
+                    const decryptedCpf = this.decryptFromBytea(user.cpf_encrypted);
+                    const normalizedDecrypted = decryptedCpf.replace(/\D/g, '');
+                    const normalizedSearch = cpf.replace(/\D/g, '');
+                    if (normalizedDecrypted === normalizedSearch) {
+                        foundUser = user;
+                        break;
+                    }
+                }
+                catch (error) {
+                    continue;
+                }
+            }
+            if (!foundUser) {
+                return { exists: false };
+            }
+            return {
+                exists: true,
+                kyc_status: foundUser.kyc_status,
+            };
+        }
+        catch (error) {
+            console.error('Erro ao verificar CPF:', error);
             throw error;
         }
     }

@@ -166,7 +166,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           backgroundColor: AppTheme.primaryColor,
           foregroundColor: Colors.white,
           elevation: 4,
-          shadowColor: AppTheme.primaryColor.withOpacity(0.3),
+          shadowColor: AppTheme.primaryColor.withValues(alpha: 0.3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -254,7 +254,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? AppTheme.primaryColor.withOpacity(0.1) : Colors.transparent,
+          color: isActive ? AppTheme.primaryColor.withValues(alpha: 0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(

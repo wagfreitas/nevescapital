@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/registration_lifecycle_observer.dart';
@@ -7,7 +7,35 @@ import 'package:neves_capital/features/auth/domain/entities/registration_progres
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'step6_personal_data_2_screen.dart';
 
-/// Tela 5 do Cadastro: Informações Pessoais 1/2
+/// Formatter para data no formato DD/MM/YYYY
+class _DateInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+
+    if (text.length > 10) {
+      return oldValue;
+    }
+
+    String formatted = '';
+    for (int i = 0; i < text.length; i++) {
+      formatted += text[i];
+      if (i == 1 || i == 3) {
+        formatted += '/';
+      }
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+/// Tela 5 do Cadastro: Informações Pessoais
 class Step5PersonalData1Screen extends StatefulWidget {
   final AuthController? authController;
   final ThemeController? themeController;
@@ -33,6 +61,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _birthDateController = TextEditingController();
   final TextEditingController _motherNameController = TextEditingController();
+  final FocusNode _fullNameFocusNode = FocusNode();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   String? _errorMessage;
@@ -62,46 +91,50 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
       shouldSaveProgress: () => ModalRoute.of(context)?.isCurrent ?? false,
     );
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
+
+    // Abrir teclado automaticamente
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fullNameFocusNode.requestFocus();
+    });
   }
 
   @override
   void dispose() {
     _lifecycleObserver.dispose();
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
+    _fullNameFocusNode.dispose();
     _fullNameController.dispose();
     _birthDateController.dispose();
     _motherNameController.dispose();
     super.dispose();
   }
 
-  Future<void> _selectDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now()
-          .subtract(const Duration(days: 365 * 18)), // 18 anos atrás
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF22C55E),
-              onPrimary: Color(0xFF122118),
-              surface: Color(0xFF1a2d24),
-              onSurface: Colors.white,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
+  DateTime? _parseBirthDate(String text) {
+    try {
+      if (text.length != 10) return null;
+      final parts = text.split('/');
+      if (parts.length != 3) return null;
 
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-        _birthDateController.text = DateFormat('dd/MM/yyyy').format(picked);
-      });
+      final day = int.parse(parts[0]);
+      final month = int.parse(parts[1]);
+      final year = int.parse(parts[2]);
+
+      return DateTime(year, month, day);
+    } catch (e) {
+      return null;
     }
+  }
+
+  bool _isValidAge(DateTime birthDate) {
+    final now = DateTime.now();
+    final age = now.year -
+        birthDate.year -
+        (now.month < birthDate.month ||
+                (now.month == birthDate.month && now.day < birthDate.day)
+            ? 1
+            : 0);
+
+    return age >= 18 && age <= 110;
   }
 
   Future<void> _handleNext() async {
@@ -164,7 +197,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
         ),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Form(
             key: _formKey,
@@ -173,11 +206,36 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
               children: [
                 const SizedBox(height: 40),
                 const Text(
-                  'Informações Pessoais 1/2',
+                  'Informações Pessoais',
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Color(0xFF22C55E),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 32,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -192,14 +250,13 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                 // Nome Completo
                 TextFormField(
                   controller: _fullNameController,
+                  focusNode: _fullNameFocusNode,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: 'Nome Completo',
                     labelStyle: const TextStyle(color: Colors.white70),
-                    hintText: 'Digite seu nome completo',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
+                    fillColor: Colors.white.withValues(alpha: 0.1),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -207,7 +264,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide:
-                          BorderSide(color: Colors.white.withOpacity(0.2)),
+                          BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -230,20 +287,21 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 // Data de Nascimento
                 TextFormField(
                   controller: _birthDateController,
-                  readOnly: true,
-                  onTap: _selectDate,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    _DateInputFormatter(),
+                  ],
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: 'Data de Nascimento',
                     labelStyle: const TextStyle(color: Colors.white70),
-                    hintText: 'DD/MM/AAAA',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
+                    fillColor: Colors.white.withValues(alpha: 0.1),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -251,7 +309,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide:
-                          BorderSide(color: Colors.white.withOpacity(0.2)),
+                          BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -267,8 +325,30 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Selecione sua data de nascimento';
+                      return 'Digite sua data de nascimento';
                     }
+                    if (value.length != 10) {
+                      return 'Data incompleta';
+                    }
+
+                    final birthDate = _parseBirthDate(value);
+                    if (birthDate == null) {
+                      return 'Data inválida';
+                    }
+
+                    if (!_isValidAge(birthDate)) {
+                      final now = DateTime.now();
+                      final age = now.year - birthDate.year;
+                      if (age < 18) {
+                        return 'Você deve ter no mínimo 18 anos';
+                      }
+                      return 'Data de nascimento inválida';
+                    }
+
+                    setState(() {
+                      _selectedDate = birthDate;
+                    });
+
                     return null;
                   },
                 ),
@@ -280,10 +360,8 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                   decoration: InputDecoration(
                     labelText: 'Nome da Mãe',
                     labelStyle: const TextStyle(color: Colors.white70),
-                    hintText: 'Digite o nome completo da sua mãe',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
+                    fillColor: Colors.white.withValues(alpha: 0.1),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -291,7 +369,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide:
-                          BorderSide(color: Colors.white.withOpacity(0.2)),
+                          BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -320,7 +398,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.red),
                     ),
@@ -340,7 +418,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                     ),
                   ),
                 ],
-                const Spacer(),
+                const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,
                   height: 56,

@@ -171,7 +171,7 @@ class CarouselBannerItem extends StatelessWidget {
               end: Alignment.bottomCenter,
               colors: [
                 Colors.transparent,
-                (overlayColor ?? Colors.black).withOpacity(0.7),
+                (overlayColor ?? Colors.black).withValues(alpha: 0.7),
               ],
             ),
           ),

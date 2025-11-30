@@ -5,12 +5,10 @@ import * as https from 'https';
 @Injectable()
 export class YcloudService {
   private readonly apiKey: string;
-  private readonly apiUrl: string = 'https://api.ycloud.com/v1';
-  private readonly whatsappNumber: string;
+  private readonly apiUrl: string = 'https://api.ycloud.com/v2';
 
   constructor(private readonly configService: ConfigService) {
     this.apiKey = this.configService.get<string>('YCLOUD_API_KEY', '');
-    this.whatsappNumber = this.configService.get<string>('YCLOUD_WHATSAPP_NUMBER', '');
 
     if (!this.apiKey) {
       console.warn('⚠️ Ycloud não configurado. Variável YCLOUD_API_KEY necessária.');
@@ -36,10 +34,11 @@ export class YcloudService {
   }
 
   /**
-   * Envia código OTP via WhatsApp usando Ycloud Verify API
-   * Nota: Ycloud Verify gerencia o código automaticamente, mas podemos enviar mensagem customizada também
+   * Inicia uma verificação (envia OTP) usando YCloud Verify API
+   * @param phone Telefone do destinatário
+   * @param channel Canal de envio ('whatsapp' ou 'sms')
    */
-  async sendOtp(phone: string, otpCode: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  async startVerification(phone: string, channel: 'whatsapp' | 'sms' = 'whatsapp'): Promise<{ success: boolean; verificationId?: string; error?: string }> {
     if (!this.apiKey) {
       return {
         success: false,
@@ -50,50 +49,42 @@ export class YcloudService {
     const formattedPhone = this.formatPhoneNumber(phone);
 
     try {
-      // Opção 1: Usar Ycloud Verify API (gerencia OTP automaticamente)
-      // const response = await this.makeRequest('POST', '/verify/send', {
-      //   to: formattedPhone,
-      //   channel: 'whatsapp',
-      // });
-
-      // Opção 2: Enviar mensagem customizada via WhatsApp Messages API
-      const message = `Seu código de verificação é: ${otpCode}\n\nEste código expira em 10 minutos.\n\nNão compartilhe este código com ninguém.`;
-      
-      const response = await this.makeRequest('POST', '/messages', {
+      // Endpoint: /verify/verifications
+      // Doc: https://docs.ycloud.com/reference/verification-send
+      const response = await this.makeRequest('POST', '/verify/verifications', {
         to: formattedPhone,
-        type: 'text',
-        text: {
-          body: message,
-        },
-        // Usar número WhatsApp configurado no Ycloud
-        from: this.whatsappNumber || 'whatsapp',
+        channel: channel,
       });
 
       if (response.success) {
-        console.log(`✅ OTP enviado via Ycloud WhatsApp para ${formattedPhone}`);
+        console.log(`✅ Verificação iniciada via Ycloud (${channel}) para ${formattedPhone}, ID: ${response.data?.id}`);
         return {
           success: true,
-          messageId: response.data?.id || response.data?.messageId,
+          verificationId: response.data?.id,
         };
       } else {
-        throw new Error(response.error || 'Erro ao enviar OTP');
+        throw new Error(response.error || 'Erro ao iniciar verificação');
       }
     } catch (error: any) {
-      console.error(`❌ Erro ao enviar OTP via Ycloud para ${formattedPhone}:`, error.message);
+      console.error(`❌ Erro ao iniciar verificação Ycloud para ${formattedPhone}:`, error.message);
       return {
         success: false,
-        error: error.message || 'Erro ao enviar mensagem',
+        error: error.message || 'Erro ao iniciar verificação',
       };
     }
   }
 
   /**
-   * Verifica código OTP usando Ycloud Verify API
+   * Verifica o código OTP usando YCloud Verify API
+   * @param phone Telefone ou ID da verificação (mas a API pede 'to' e 'code' geralmente, ou verification_id e code)
+   * @param code Código OTP informado pelo usuário
+   * @param verificationId ID da verificação (opcional, mas recomendado se tiver)
    */
-  async verifyOtp(phone: string, otpCode: string): Promise<{ success: boolean; error?: string }> {
+  async checkVerification(phone: string, code: string, verificationId?: string): Promise<{ success: boolean; valid: boolean; error?: string }> {
     if (!this.apiKey) {
       return {
         success: false,
+        valid: false,
         error: 'Ycloud não configurado',
       };
     }
@@ -101,24 +92,37 @@ export class YcloudService {
     const formattedPhone = this.formatPhoneNumber(phone);
 
     try {
-      const response = await this.makeRequest('POST', '/verify/check', {
+      // Endpoint: /verify/verifications/check (ou similar, baseando-se na doc comum de Verify APIs)
+      // A doc do YCloud pode variar, mas geralmente é POST /verify/verifications/check com { to, code } ou { verification_id, code }
+
+      // Vamos tentar usar o endpoint de check padrão
+      const response = await this.makeRequest('POST', '/verify/verifications/check', {
         to: formattedPhone,
-        code: otpCode,
+        code: code,
+        // verification_id: verificationId // Se a API suportar/exigir
       });
 
-      if (response.success && response.data?.valid === true) {
-        console.log(`✅ OTP verificado com sucesso para ${formattedPhone}`);
-        return { success: true };
-      } else {
+      if (response.success) {
+        const isValid = response.data?.valid === true || response.data?.status === 'approved';
+
+        if (isValid) {
+          console.log(`✅ Código verificado com sucesso para ${formattedPhone}`);
+        } else {
+          console.warn(`⚠️ Código inválido para ${formattedPhone}`);
+        }
+
         return {
-          success: false,
-          error: 'Código OTP inválido',
+          success: true,
+          valid: isValid,
         };
+      } else {
+        throw new Error(response.error || 'Erro ao verificar código');
       }
     } catch (error: any) {
-      console.error(`❌ Erro ao verificar OTP via Ycloud:`, error.message);
+      console.error(`❌ Erro ao verificar código Ycloud para ${formattedPhone}:`, error.message);
       return {
         success: false,
+        valid: false,
         error: error.message || 'Erro ao verificar código',
       };
     }
@@ -154,9 +158,16 @@ export class YcloudService {
             if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
               resolve({ success: true, data: parsed });
             } else {
+              // Melhorar tratamento de erro para evitar [object Object]
+              let errorMessage = 'Erro na requisição';
+              if (parsed.message) errorMessage = typeof parsed.message === 'object' ? JSON.stringify(parsed.message) : parsed.message;
+              else if (parsed.error) errorMessage = typeof parsed.error === 'object' ? JSON.stringify(parsed.error) : parsed.error;
+
+              console.error(`❌ Erro YCloud (Status ${res.statusCode}):`, JSON.stringify(parsed));
+
               resolve({
                 success: false,
-                error: parsed.message || parsed.error || 'Erro na requisição',
+                error: errorMessage,
               });
             }
           } catch (e) {

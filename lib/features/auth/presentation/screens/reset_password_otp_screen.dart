@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:neves_capital/shared/components/cpf_input_field.dart';
-import 'package:neves_capital/shared/helpers/cpf_helper.dart';
 import 'package:neves_capital/shared/services/database_service.dart';
 import 'package:neves_capital/features/auth/presentation/screens/change_password_screen.dart';
 
@@ -23,7 +21,6 @@ class _ResetPasswordOtpScreenState extends State<ResetPasswordOtpScreen> {
   bool _codeSent = false;
   bool _codeVerified = false;
   String? _resetToken;
-  DateTime? _expiresAt;
   int _resendCountdown = 0;
   String? _errorMessage;
 
@@ -46,15 +43,14 @@ class _ResetPasswordOtpScreenState extends State<ResetPasswordOtpScreen> {
     });
 
     try {
-      final result = await DatabaseService.requestPasswordResetOtp(widget.cpf);
-      
+      await DatabaseService.requestPasswordResetOtp(widget.cpf);
+
       if (!mounted) return;
 
       setState(() {
         _codeSent = true;
         _isLoading = false;
         _resendCountdown = 120; // 2 minutos
-        _expiresAt = DateTime.parse(result['expires_at']);
       });
 
       // Iniciar contador regressivo
@@ -91,8 +87,9 @@ class _ResetPasswordOtpScreenState extends State<ResetPasswordOtpScreen> {
 
     try {
       final otpCode = _otpController.text.trim();
-      final result = await DatabaseService.verifyPasswordResetOtp(widget.cpf, otpCode);
-      
+      final result =
+          await DatabaseService.verifyPasswordResetOtp(widget.cpf, otpCode);
+
       if (!mounted) return;
 
       setState(() {
@@ -166,11 +163,13 @@ class _ResetPasswordOtpScreenState extends State<ResetPasswordOtpScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(25),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 32),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 14, horizontal: 32),
                       ),
                       child: const Text(
                         'Enviar Código',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600),
                       ),
                     ),
                 ],
@@ -218,7 +217,7 @@ class _ResetPasswordOtpScreenState extends State<ResetPasswordOtpScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
+        color: Colors.red.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.red, width: 1),
       ),
@@ -234,7 +233,7 @@ class _ResetPasswordOtpScreenState extends State<ResetPasswordOtpScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF22C55E).withOpacity(0.1),
+        color: const Color(0xFF22C55E).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: const Color(0xFF22C55E), width: 1),
       ),
@@ -283,23 +282,24 @@ class _ResetPasswordOtpScreenState extends State<ResetPasswordOtpScreen> {
               hintText: '000000',
               hintStyle: TextStyle(
                 fontSize: 32,
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
                 letterSpacing: 8,
               ),
               counterText: '',
               filled: true,
-              fillColor: Colors.white.withOpacity(0.1),
+              fillColor: Colors.white.withValues(alpha: 0.1),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
+                borderSide:
+                    const BorderSide(color: Color(0xFF22C55E), width: 2),
               ),
             ),
             validator: (value) {
@@ -331,12 +331,14 @@ class _ResetPasswordOtpScreenState extends State<ResetPasswordOtpScreen> {
                       width: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF122118)),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Color(0xFF122118)),
                       ),
                     )
                   : const Text(
                       'Verificar Código',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      style:
+                          TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
             ),
           ),
@@ -345,7 +347,7 @@ class _ResetPasswordOtpScreenState extends State<ResetPasswordOtpScreen> {
             Text(
               'Reenviar código em ${_resendCountdown}s',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 fontSize: 12,
               ),
             )
@@ -366,4 +368,3 @@ class _ResetPasswordOtpScreenState extends State<ResetPasswordOtpScreen> {
     );
   }
 }
-

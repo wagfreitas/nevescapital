@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/shared/components/cpf_input_field.dart';
 import 'package:neves_capital/shared/helpers/cpf_helper.dart';
-import 'package:neves_capital/shared/services/firestore_service.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
-import 'package:neves_capital/features/auth/presentation/screens/login_otp/login_step3_otp_screen.dart';
 import 'package:neves_capital/features/auth/presentation/screens/new_registration/step2_phone_screen.dart';
 import 'package:neves_capital/features/auth/data/services/registration_service.dart';
-import 'package:neves_capital/features/auth/data/services/local_registration_storage.dart';
 import 'package:neves_capital/features/auth/presentation/helpers/registration_navigator.dart';
+import 'package:neves_capital/features/auth/data/services/auth_api_service.dart';
 
 /// Tela Unificada: Insira seu CPF
 /// Verifica se o CPF existe e direciona automaticamente para:
@@ -36,13 +34,39 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
   String? _errorMessage;
 
   @override
+  void initState() {
+    super.initState();
+    // Limpar mensagem de erro quando o usuário começar a digitar
+    _cpfController.addListener(() {
+      if (_errorMessage != null) {
+        setState(() {
+          _errorMessage = null;
+        });
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _cpfController.dispose();
     super.dispose();
   }
 
   Future<void> _handleNext() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Validar o formulário
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    // Validação adicional do CPF antes de prosseguir
+    final cpf = CpfHelper.getCpfNumbers(_cpfController.text);
+
+    if (!CpfHelper.isValidCpf(cpf)) {
+      setState(() {
+        _errorMessage = 'CPF inválido. Por favor, verifique o número digitado.';
+      });
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -50,107 +74,45 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
     });
 
     try {
-      final cpf = CpfHelper.getCpfNumbers(_cpfController.text);
+      // Verificar se CPF existe no banco
+      AppLogger.info('🚀 Verificando CPF: ${cpf.substring(0, 3)}***');
 
-      // Verificar se CPF já está cadastrado no Firestore
-      AppLogger.info('🔍 Verificando existência do CPF no Firebase...');
-      AppLogger.debug('CPF (primeiros 3 dígitos): ${cpf.substring(0, 3)}***');
-
-      final result = await FirestoreService.checkCpf(cpf);
+      final result = await AuthApiService.checkCpf(cpf);
 
       if (!mounted) return;
 
-      // Verificar se a resposta tem sucesso
       final success = result['success'] as bool? ?? false;
-      final message = result['message'] as String? ?? '';
-
-      AppLogger.info(
-          '📊 Resultado da verificação: success=$success, message=$message');
-
-      if (!success) {
-        // Se não teve sucesso na verificação, mostrar mensagem de erro
-        setState(() {
-          _errorMessage =
-              message.isNotEmpty ? message : 'Erro ao verificar CPF';
-        });
-        return;
-      }
-
       final exists = result['exists'] as bool? ?? false;
-      AppLogger.info(
-          '✅ CPF ${exists ? "ENCONTRADO" : "NÃO ENCONTRADO"} no Firebase');
 
-      if (exists) {
+      if (success && exists) {
         // ============================================
-        // FLUXO DE LOGIN - CPF já cadastrado
+        // CPF EXISTE: Fluxo de Login (Phone Auth)
         // ============================================
-        AppLogger.debug('CPF cadastrado - iniciando fluxo de LOGIN');
+        AppLogger.info(
+            '✅ CPF encontrado - Redirecionando para login via telefone');
 
-        // Buscar dados do usuário (incluindo telefone)
-        final userData = await FirestoreService.getUserByCpf(cpf);
-
-        if (!mounted) return;
-
-        if (userData == null) {
-          setState(() {
-            _errorMessage = 'Erro ao buscar dados do usuário. Tente novamente.';
-          });
-          return;
-        }
-
-        final phone = userData['phone'] as String?;
-
-        if (phone == null || phone.isEmpty) {
+        // TODO: Implementar navegação para tela de Phone Login
+        // Por enquanto, mostrar mensagem
+        if (mounted) {
           setState(() {
             _errorMessage =
-                'Telefone não cadastrado. Entre em contato com o suporte.';
+                'Login via telefone ainda não implementado. Em breve!';
           });
-          return;
         }
-
-        AppLogger.sensitive('Telefone encontrado para login', phone);
-
-        // MOCK: Simular envio de OTP
-        // TODO: Em produção, chamar backend para enviar OTP real
-        AppLogger.debug('MOCK: OTP enviado para telefone cadastrado');
-
-        // Navegar para tela de OTP (login)
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => LoginStep3OtpScreen(
-                authController: widget.authController,
-                themeController: widget.themeController,
-              ),
-              settings: RouteSettings(
-                arguments: {
-                  'cpf': cpf,
-                  'phone': phone,
-                },
-              ),
-            ),
-          );
-        }
-      } else {
+      } else if (success && !exists) {
         // ============================================
-        // FLUXO DE CADASTRO - CPF NÃO cadastrado
+        // CPF NÃO EXISTE: Fluxo de Cadastro
         // ============================================
-        AppLogger.debug('CPF não cadastrado - verificando cadastro parcial');
+        AppLogger.info('👤 CPF não encontrado - Redirecionando para cadastro');
 
-        // Verificar se há cadastro abandonado anteriormente
+        // Verificar se há cadastro abandonado
         final registrationProgress = await RegistrationService.getProgress(cpf);
 
         if (registrationProgress != null &&
             !registrationProgress.isComplete &&
             !registrationProgress.isStale) {
-          // Cadastro anteriormente abandonado
-          AppLogger.info(
-              'Cadastro abandonado encontrado - step: ${registrationProgress.currentStep}');
-
           if (!mounted) return;
 
-          // Perguntar se quer retomar
           final shouldResume = await RegistrationNavigator.showResumeDialog(
             context,
             registrationProgress.currentStep,
@@ -159,7 +121,6 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
           if (!mounted) return;
 
           if (shouldResume) {
-            // Retomar cadastro de onde parou
             RegistrationNavigator.navigateToStep(
               context: context,
               progress: registrationProgress,
@@ -168,14 +129,11 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
             );
             return;
           } else {
-            // Recomeçar do zero - marcar como abandonado e deletar
             await RegistrationService.deleteProgress(cpf);
           }
         }
 
-        // Iniciar novo cadastro
-        AppLogger.debug('Iniciando novo cadastro');
-
+        // Novo cadastro
         if (mounted) {
           Navigator.push(
             context,
@@ -188,14 +146,18 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
             ),
           );
         }
+      } else {
+        // Erro ao verificar CPF
+        setState(() {
+          _errorMessage = 'Erro ao verificar CPF. Tente novamente.';
+        });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage =
-              'Erro ao verificar CPF. Verifique sua conexão e tente novamente.';
+          _errorMessage = 'Erro de conexão. Verifique sua internet.';
         });
-        AppLogger.error('Erro ao verificar CPF: $e');
+        AppLogger.error('Erro no _handleNext: $e');
       }
     } finally {
       if (mounted) {
@@ -283,7 +245,7 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
+        color: Colors.red.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.red, width: 1),
       ),
@@ -316,9 +278,17 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
               if (value == null || value.isEmpty) {
                 return 'Por favor, digite seu CPF';
               }
-              if (!CpfHelper.isValidCpf(value)) {
-                return 'CPF inválido';
+
+              final cpfNumbers = CpfHelper.getCpfNumbers(value);
+
+              if (cpfNumbers.length != 11) {
+                return 'CPF deve ter 11 dígitos';
               }
+
+              if (!CpfHelper.isValidCpf(value)) {
+                return 'CPF inválido. Verifique os dígitos.';
+              }
+
               return null;
             },
           ),
@@ -351,42 +321,6 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          _buildInfoText(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoText() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF28CC28).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: const Color(0xFF28CC28).withOpacity(0.3),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.info_outline,
-            color: const Color(0xFF28CC28).withOpacity(0.8),
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Se já tiver cadastro, você será direcionado para login. Caso contrário, faremos seu cadastro.',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
-                fontSize: 13,
-                height: 1.4,
-              ),
             ),
           ),
         ],

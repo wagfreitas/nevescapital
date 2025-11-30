@@ -28,6 +28,7 @@ class Step4EmailScreen extends StatefulWidget {
 
 class _Step4EmailScreenState extends State<Step4EmailScreen> {
   final TextEditingController _emailController = TextEditingController();
+  final FocusNode _emailFocusNode = FocusNode();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   String? _errorMessage;
@@ -51,12 +52,18 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
       shouldSaveProgress: () => ModalRoute.of(context)?.isCurrent ?? false,
     );
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
+
+    // Abrir teclado automaticamente
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _emailFocusNode.requestFocus();
+    });
   }
 
   @override
   void dispose() {
     _lifecycleObserver.dispose();
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
+    _emailFocusNode.dispose();
     _emailController.dispose();
     super.dispose();
   }
@@ -165,13 +172,14 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
                 const SizedBox(height: 40),
                 TextFormField(
                   controller: _emailController,
+                  focusNode: _emailFocusNode,
                   keyboardType: TextInputType.emailAddress,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: 'seu@email.com',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
+                    fillColor: Colors.white.withValues(alpha: 0.1),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -179,7 +187,7 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide:
-                          BorderSide(color: Colors.white.withOpacity(0.2)),
+                          BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -207,7 +215,7 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.red),
                     ),

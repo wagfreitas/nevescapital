@@ -290,6 +290,9 @@ class FirestoreService {
     String? state,
     String? number,
     String? complement,
+    String? selfieUrl,
+    String? frontDocumentUrl,
+    String? backDocumentUrl,
   }) async {
     try {
       AppLogger.debug('Iniciando atualização do usuário no Firestore');
@@ -352,6 +355,17 @@ class FirestoreService {
           'city': city,
           'state': state,
         };
+      }
+
+      // Atualizar URLs dos documentos KYC se fornecidas
+      if (selfieUrl != null && selfieUrl.isNotEmpty) {
+        updates['kycDocuments.selfieUrl'] = selfieUrl;
+      }
+      if (frontDocumentUrl != null && frontDocumentUrl.isNotEmpty) {
+        updates['kycDocuments.frontDocumentUrl'] = frontDocumentUrl;
+      }
+      if (backDocumentUrl != null && backDocumentUrl.isNotEmpty) {
+        updates['kycDocuments.backDocumentUrl'] = backDocumentUrl;
       }
 
       AppLogger.debug(

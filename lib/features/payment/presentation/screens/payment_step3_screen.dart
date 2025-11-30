@@ -176,7 +176,7 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(12),
-          color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.1) : Colors.transparent,
+          color: isSelected ? Theme.of(context).primaryColor.withValues(alpha: 0.1) : Colors.transparent,
         ),
         child: Row(
           children: [

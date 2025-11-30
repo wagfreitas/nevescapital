@@ -401,6 +401,43 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  /// Login com Firebase Custom Token (Novo Fluxo CPF-First)
+  Future<bool> loginWithCustomToken(String token) async {
+    _setLoading(true);
+    _clearError();
+    _setLoginProgress(LoginProgress.authenticating);
+
+    try {
+      AppLogger.info('🔑 Iniciando login com Custom Token...');
+      
+      // 1. Fazer login no Firebase com o token customizado
+      final credential = await firebase_auth.FirebaseAuth.instance.signInWithCustomToken(token);
+      
+      if (credential.user == null) {
+        throw Exception('Falha ao autenticar com token customizado');
+      }
+
+      _currentUser = credential.user;
+      
+      // 2. Salvar estado de login
+      await UserCacheService.saveLastLogin();
+      
+      _setLoginProgress(LoginProgress.success);
+      
+      AppLogger.info('✅ Login com Custom Token realizado com sucesso!');
+      notifyListeners();
+      
+      return true;
+    } catch (e) {
+      AppLogger.error('❌ Erro no login com Custom Token', e);
+      _setLoginProgress(LoginProgress.error);
+      _setError('Erro ao autenticar. Tente novamente.');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   /// Logout
   Future<void> logout() async {
     AppLogger.debug('Iniciando logout...');

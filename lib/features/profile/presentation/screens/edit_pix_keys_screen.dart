@@ -271,12 +271,12 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
                             child: Container(
                               padding: const EdgeInsets.all(16.0),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.1),
+                                color: Colors.white.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: isPrimary 
                                       ? const Color(0xFF22C55E) 
-                                      : Colors.white.withOpacity(0.2),
+                                      : Colors.white.withValues(alpha: 0.2),
                                   width: isPrimary ? 2 : 1,
                                 ),
                               ),
@@ -289,7 +289,7 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
                                         Text(
                                           'Chave PIX ${index + 1}',
                                           style: TextStyle(
-                                            color: Colors.white.withOpacity(0.7),
+                                            color: Colors.white.withValues(alpha: 0.7),
                                             fontSize: 12,
                                           ),
                                         ),
@@ -310,7 +310,7 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
                                               vertical: 2,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: const Color(0xFF22C55E).withOpacity(0.2),
+                                              color: const Color(0xFF22C55E).withValues(alpha: 0.2),
                                               borderRadius: BorderRadius.circular(4),
                                             ),
                                             child: const Text(
@@ -328,7 +328,7 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
                                   ),
                                   Icon(
                                     Icons.chevron_right,
-                                    color: Colors.white.withOpacity(0.5),
+                                    color: Colors.white.withValues(alpha: 0.5),
                                   ),
                                 ],
                               ),
@@ -346,16 +346,16 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
                           hintText: 'Digite a nova chave PIX',
-                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                           filled: true,
-                          fillColor: Colors.white.withOpacity(0.1),
+                          fillColor: Colors.white.withValues(alpha: 0.1),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide.none,
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -421,7 +421,7 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
                       Text(
                         'Limite máximo de 5 chaves PIX atingido',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
+                          color: Colors.white.withValues(alpha: 0.5),
                           fontSize: 12,
                         ),
                       ),
@@ -496,7 +496,7 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
             Text(
               'Tipo: ${_getKeyTypeLabel(key['key_type'])}',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
                 fontSize: 12,
               ),
             ),

@@ -63,7 +63,7 @@ class LoginProgressWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.red[900]?.withOpacity(0.2),
+        color: Colors.red[900]?.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.red[300]!),
       ),

@@ -158,55 +158,69 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 40),
-              // Preview da Selfie
-              Container(
-                height: 200,
-                width: 200,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: _selfieFile != null
-                        ? const Color(0xFF22C55E)
-                        : Colors.white.withOpacity(0.3),
-                    width: 2.0,
-                  ),
-                ),
-                child: _selfieFile != null
-                    ? ClipOval(
-                        child: Image.file(
-                          _selfieFile!,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: double.infinity,
+              // Preview da Selfie com Oval
+              SizedBox(
+                height: 400,
+                width: double.infinity,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Fundo escurecido
+                    Container(
+                      color: Colors.black.withValues(alpha: 0.3),
+                    ),
+                    // Oval Guide
+                    CustomPaint(
+                      size: const Size(280, 360),
+                      painter: _selfieFile != null ? null : _OvalGuidePainter(),
+                    ),
+                    // Preview da foto ou placeholder
+                    if (_selfieFile != null)
+                      ClipPath(
+                        clipper: _OvalClipper(),
+                        child: SizedBox(
+                          width: 280,
+                          height: 360,
+                          child: Image.file(
+                            _selfieFile!,
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       )
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.person,
-                            size: 80,
-                            color: Colors.white.withOpacity(0.5),
-                          ),
-                          const SizedBox(height: 8.0),
-                          Text(
-                            'Selfie',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                    else
+                      SizedBox(
+                        width: 280,
+                        height: 360,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.person_outline,
+                              size: 120,
+                              color: Colors.white.withValues(alpha: 0.5),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 16),
+                            Text(
+                              'Posicione seu rosto\nno centro do oval',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
               // Instruções
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -228,7 +242,7 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              // Botão Tirar Foto
+              // Botão Tirar Foto / Alterar Foto
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -241,14 +255,17 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.camera_alt, color: Color(0xFF22C55E)),
-                      SizedBox(width: 8),
+                      Icon(
+                        _selfieFile == null ? Icons.camera_alt : Icons.refresh,
+                        color: const Color(0xFF22C55E),
+                      ),
+                      const SizedBox(width: 8),
                       Text(
-                        'Tirar Foto',
-                        style: TextStyle(
+                        _selfieFile == null ? 'Tirar Foto' : 'Alterar Foto',
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
                         ),
@@ -262,18 +279,20 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.red),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                      const Icon(Icons.error_outline,
+                          color: Colors.red, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: const TextStyle(color: Colors.red, fontSize: 14),
+                          style:
+                              const TextStyle(color: Colors.red, fontSize: 14),
                         ),
                       ),
                     ],
@@ -286,7 +305,8 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _isLoading || _selfieFile == null ? null : _handleNext,
+                  onPressed:
+                      _isLoading || _selfieFile == null ? null : _handleNext,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF22C55E),
                     foregroundColor: const Color(0xFF122118),
@@ -301,7 +321,8 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF122118)),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF122118)),
                           ),
                         )
                       : const Text(
@@ -335,3 +356,63 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
   }
 }
 
+/// Custom Painter para desenhar o guia oval
+class _OvalGuidePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF22C55E)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0;
+
+    // Desenhar oval
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final rrect = RRect.fromRectAndRadius(
+      rect,
+      Radius.circular(size.width / 2),
+    );
+
+    canvas.drawRRect(rrect, paint);
+
+    // Desenhar linhas de guia (opcional)
+    final dashPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    // Linha horizontal central
+    canvas.drawLine(
+      Offset(size.width * 0.2, size.height / 2),
+      Offset(size.width * 0.8, size.height / 2),
+      dashPaint,
+    );
+
+    // Linha vertical central
+    canvas.drawLine(
+      Offset(size.width / 2, size.height * 0.2),
+      Offset(size.width / 2, size.height * 0.8),
+      dashPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Custom Clipper para recortar a imagem em formato oval
+class _OvalClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final rrect = RRect.fromRectAndRadius(
+      rect,
+      Radius.circular(size.width / 2),
+    );
+    path.addRRect(rrect);
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}

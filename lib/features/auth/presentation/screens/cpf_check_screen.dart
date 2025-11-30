@@ -1,43 +1,44 @@
 import 'package:flutter/material.dart';
-import 'package:neves_capital/shared/components/cpf_input_field.dart';
-import 'package:neves_capital/shared/helpers/cpf_helper.dart';
-import 'package:neves_capital/shared/services/firestore_service.dart';
+import 'package:flutter/services.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
-import 'step2_phone_screen.dart';
+import 'package:neves_capital/features/auth/data/services/auth_api_service.dart';
 
-/// Tela 1: Insira seu CPF
-class Step1CpfScreen extends StatefulWidget {
+/// Tela de Verificação de CPF (Segundo Fator)
+/// Pede os primeiros 5 dígitos do CPF para confirmar identidade
+class CpfCheckScreen extends StatefulWidget {
   final AuthController? authController;
   final ThemeController? themeController;
 
-  const Step1CpfScreen({
+  const CpfCheckScreen({
     super.key,
     this.authController,
     this.themeController,
   });
 
   @override
-  State<Step1CpfScreen> createState() => _Step1CpfScreenState();
+  State<CpfCheckScreen> createState() => _CpfCheckScreenState();
 }
 
-class _Step1CpfScreenState extends State<Step1CpfScreen> {
+class _CpfCheckScreenState extends State<CpfCheckScreen> {
   final TextEditingController _cpfController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   String? _errorMessage;
+  String? _token;
 
   @override
   void initState() {
     super.initState();
-    // Receber CPF da tela anterior (se vier da tela inicial)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-      final cpf = args?['cpf'] as String?;
-      if (cpf != null && cpf.isNotEmpty) {
-        // Pré-preencher CPF se vier da tela inicial
-        _cpfController.text = CpfHelper.formatCpf(cpf);
+      _token = args?['token'] as String?;
+      
+      if (_token == null) {
+        setState(() {
+          _errorMessage = 'Sessão inválida. Reinicie o login.';
+        });
       }
     });
   }
@@ -48,8 +49,9 @@ class _Step1CpfScreenState extends State<Step1CpfScreen> {
     super.dispose();
   }
 
-  Future<void> _handleNext() async {
+  Future<void> _handleCompleteLogin() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_token == null) return;
 
     setState(() {
       _isLoading = true;
@@ -57,46 +59,45 @@ class _Step1CpfScreenState extends State<Step1CpfScreen> {
     });
 
     try {
-      final cpf = CpfHelper.getCpfNumbers(_cpfController.text);
+      final cpfPrefix = _cpfController.text.trim();
       
-      // Verificar se CPF já está cadastrado no Firestore (verificação de segurança)
-      final result = await FirestoreService.checkCpf(cpf);
+      AppLogger.info('🔐 Verificando prefixo do CPF...');
       
+      final result = await AuthApiService.loginComplete(_token!, cpfPrefix);
+
       if (!mounted) return;
 
-      final exists = result['exists'] as bool? ?? false;
+      final success = result['success'] as bool? ?? false;
 
-      if (exists) {
-        // CPF já cadastrado - redirecionar para login
-        setState(() {
-          _errorMessage = 'CPF já cadastrado. Use a opção de login.';
-        });
-        // Opcional: Navegar para tela de login após 2 segundos
-        await Future.delayed(const Duration(seconds: 2));
-        if (mounted) {
-          Navigator.popUntil(context, (route) => route.isFirst);
+      if (success) {
+        final token = result['token'] as String;
+        AppLogger.info('✅ CPF confirmado! Token recebido.');
+
+        // Login no Firebase
+        if (widget.authController != null) {
+          final loginSuccess = await widget.authController!.loginWithCustomToken(token);
+          
+          if (!mounted) return;
+
+          if (loginSuccess) {
+            // Login completo!
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          } else {
+            setState(() {
+              _errorMessage = widget.authController!.errorMessage ?? 'Erro ao autenticar';
+            });
+          }
         }
       } else {
-        // CPF não existe - continuar para próxima tela do cadastro (telefone)
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => Step2PhoneScreen(
-                authController: widget.authController,
-                themeController: widget.themeController,
-                cpf: cpf,
-              ),
-            ),
-          );
-        }
+        setState(() {
+          _errorMessage = result['message'] as String? ?? 'CPF incorreto';
+        });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Erro ao verificar CPF. Verifique sua conexão e tente novamente.';
+          _errorMessage = 'Erro de conexão. Tente novamente.';
         });
-        AppLogger.error('Erro ao verificar CPF: $e');
       }
     } finally {
       if (mounted) {
@@ -129,32 +130,71 @@ class _Step1CpfScreenState extends State<Step1CpfScreen> {
               children: [
                 const SizedBox(height: 40),
                 const Text(
-                  'Insira seu CPF',
+                  'Confirme sua identidade',
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Precisamos do seu CPF para verificar se você já é nosso cliente',
+                  'Digite os PRIMEIROS 5 NÚMEROS do seu CPF para continuar.',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.white70,
                   ),
                 ),
                 const SizedBox(height: 40),
-                CpfInputField(
+                TextFormField(
                   controller: _cpfController,
-                  hintText: 'XXX.XXX.XXX-XX',
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  maxLength: 5,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 8,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: '12345',
+                    hintStyle: TextStyle(
+                      fontSize: 32,
+                      color: Colors.white.withValues(alpha: 0.3),
+                      letterSpacing: 8,
+                    ),
+                    counterText: '',
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.1),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Digite os 5 números';
+                    }
+                    if (value.length != 5) {
+                      return 'São necessários 5 números';
+                    }
+                    return null;
+                  },
                 ),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.red),
                     ),
@@ -177,7 +217,7 @@ class _Step1CpfScreenState extends State<Step1CpfScreen> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _handleNext,
+                    onPressed: _isLoading ? null : _handleCompleteLogin,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF22C55E),
                       foregroundColor: const Color(0xFF122118),
@@ -196,7 +236,7 @@ class _Step1CpfScreenState extends State<Step1CpfScreen> {
                             ),
                           )
                         : const Text(
-                            'Avançar',
+                            'Confirmar',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
@@ -213,7 +253,3 @@ class _Step1CpfScreenState extends State<Step1CpfScreen> {
     );
   }
 }
-
-
-
-

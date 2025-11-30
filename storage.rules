@@ -1,0 +1,28 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper function
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Permite upload de documentos KYC
+    match /users/{userId}/kyc/{document} {
+      // Leitura apenas para usuário autenticado dono dos documentos
+      allow read: if isOwner(userId);
+      
+      // Escrita apenas para usuário autenticado dono dos documentos
+      allow write: if isOwner(userId)
+                   && request.resource.size < 5 * 1024 * 1024  // Max 5MB
+                   && request.resource.contentType.matches('image/.*');
+      
+      // Exclusão apenas para usuário autenticado
+      allow delete: if isOwner(userId);
+    }
+    
+    // Bloquear todo o resto
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -23,7 +23,7 @@ import { ApiKeyGuard } from '../common/guards/api-key.guard';
 @UseGuards(ApiKeyGuard)
 @ApiSecurity('api-key')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   @Post('register')
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 registros por minuto
@@ -41,6 +41,13 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
   findByCpf(@Param('cpf') cpf: string) {
     return this.usersService.findByCpf(cpf);
+  }
+
+  @Get('check-cpf/:cpf')
+  @ApiOperation({ summary: 'Verificar se CPF existe (sem retornar PII)' })
+  @ApiResponse({ status: 200, description: 'Status do CPF retornado' })
+  checkByCpf(@Param('cpf') cpf: string) {
+    return this.usersService.checkByCpf(cpf);
   }
 
   @Get('email/:email')

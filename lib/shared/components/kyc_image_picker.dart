@@ -44,7 +44,7 @@ class _KycImagePickerState extends State<KycImagePicker> {
         borderRadius: BorderRadius.circular(12.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -104,7 +104,7 @@ class _KycImagePickerState extends State<KycImagePicker> {
     return Container(
       height: 200,
       decoration: BoxDecoration(
-        color: AppTheme.lightTheme.colorScheme.primary.withOpacity(0.1),
+        color: AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8.0),
         border: Border.all(
           color: AppTheme.lightTheme.colorScheme.primary,
@@ -117,7 +117,7 @@ class _KycImagePickerState extends State<KycImagePicker> {
           Icon(
             Icons.camera_alt,
             size: 60,
-            color: AppTheme.lightTheme.colorScheme.primary.withOpacity(0.6),
+            color: AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.6),
           ),
           const SizedBox(height: 8.0),
           Text(

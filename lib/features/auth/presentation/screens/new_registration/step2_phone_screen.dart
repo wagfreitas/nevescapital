@@ -27,6 +27,7 @@ class Step2PhoneScreen extends StatefulWidget {
 
 class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
   final TextEditingController _phoneController = TextEditingController();
+  final FocusNode _phoneFocusNode = FocusNode();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   String? _errorMessage;
@@ -42,6 +43,11 @@ class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
       shouldSaveProgress: () => ModalRoute.of(context)?.isCurrent ?? false,
     );
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
+
+    // Abrir teclado automaticamente
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _phoneFocusNode.requestFocus();
+    });
   }
 
   RegistrationProgress _buildCurrentProgress() {
@@ -70,6 +76,7 @@ class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
   void dispose() {
     _lifecycleObserver.dispose();
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
+    _phoneFocusNode.dispose();
     _phoneController.dispose();
     super.dispose();
   }
@@ -149,7 +156,7 @@ class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
               children: [
                 const SizedBox(height: 40),
                 const Text(
-                  'Insira seu telefone',
+                  'Insira seu Celular',
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
@@ -167,6 +174,7 @@ class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
                 const SizedBox(height: 40),
                 PhoneInputField(
                   controller: _phoneController,
+                  focusNode: _phoneFocusNode,
                   hintText: '(XX) XXXXX-XXXX',
                 ),
                 if (_errorMessage != null) ...[
@@ -174,7 +182,7 @@ class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.red),
                     ),

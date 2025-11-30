@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
+import 'package:neves_capital/shared/services/firebase_storage_service.dart';
 import 'package:neves_capital/features/auth/data/services/local_registration_storage.dart';
 import 'package:neves_capital/features/auth/data/services/registration_service.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
@@ -108,41 +109,17 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
       // Primeiro, verificar se o usuário já existe (criado na tela de email)
       final existingUser = await FirestoreService.getUserByCpf(widget.cpf);
 
+      String userId;
       if (existingUser != null) {
         AppLogger.info(
-            'Step8DocumentScreen: Usuário encontrado, atualizando dados...');
-        AppLogger.debug('UserId: ${existingUser['id']}');
-
-        // Atualizar usuário com dados completos
-        final success = await FirestoreService.updateUser(
-          userId: existingUser['id'] as String,
-          email: widget.email,
-          fullName: widget.fullName,
-          cpf: widget.cpf,
-          phone: widget.phone,
-          birthDate: widget.birthDate,
-          motherName: widget.motherName,
-          isPep: widget.isPep,
-          occupation: widget.occupation,
-          incomeRange: widget.incomeRange,
-          // TODO: Upload selfie e documentos para Firebase Storage
-          // selfiePath: widget.selfiePath,
-          // frontDocumentPath: _frontDocumentFile!.path,
-          // backDocumentPath: _backDocumentFile!.path,
-        );
-
-        if (success) {
-          AppLogger.info(
-              'Step8DocumentScreen: Usuário atualizado com sucesso!');
-        } else {
-          AppLogger.error('Step8DocumentScreen: Falha ao atualizar usuário');
-          throw Exception('Falha ao atualizar dados do usuário');
-        }
+            'Step8DocumentScreen: Usuário encontrado, preparando upload...');
+        userId = existingUser['id'] as String;
+        AppLogger.debug('UserId: $userId');
       } else {
         AppLogger.warning(
-            'Step8DocumentScreen: Usuário não encontrado, criando novo...');
-        // Criar usuário completo (fallback)
-        await FirestoreService.createUser(
+            'Step8DocumentScreen: Usuário não encontrado, criando temporariamente...');
+        // Criar usuário base para obter userId
+        userId = await FirestoreService.createUser(
           email: widget.email,
           fullName: widget.fullName,
           cpf: widget.cpf,
@@ -153,8 +130,58 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
           occupation: widget.occupation,
           incomeRange: widget.incomeRange,
         );
-        AppLogger.info('Step8DocumentScreen: Usuário criado com sucesso!');
+        AppLogger.info('Step8DocumentScreen: Usuário base criado: $userId');
       }
+
+      // Upload dos documentos para Firebase Storage
+      AppLogger.info('Step8DocumentScreen: Iniciando upload de documentos...');
+      final uploadResults = await FirebaseStorageService.uploadKycDocuments(
+        userId: userId,
+        selfiePath: widget.selfiePath,
+        frontDocumentPath: _frontDocumentFile!.path,
+        backDocumentPath: _backDocumentFile!.path,
+      );
+
+      final selfieUrl = uploadResults['selfieUrl'];
+      final frontDocumentUrl = uploadResults['frontDocumentUrl'];
+      final backDocumentUrl = uploadResults['backDocumentUrl'];
+
+      AppLogger.info('Step8DocumentScreen: Upload concluído');
+      AppLogger.debug('Selfie URL: $selfieUrl');
+      AppLogger.debug('Front Document URL: $frontDocumentUrl');
+      AppLogger.debug('Back Document URL: $backDocumentUrl');
+
+      // Validar se todos os uploads foram bem-sucedidos
+      if (selfieUrl == null ||
+          frontDocumentUrl == null ||
+          backDocumentUrl == null) {
+        throw Exception('Falha ao fazer upload de um ou mais documentos');
+      }
+
+      // Atualizar usuário com URLs dos documentos
+      AppLogger.info('Step8DocumentScreen: Atualizando usuário com URLs...');
+      final success = await FirestoreService.updateUser(
+        userId: userId,
+        email: widget.email,
+        fullName: widget.fullName,
+        cpf: widget.cpf,
+        phone: widget.phone,
+        birthDate: widget.birthDate,
+        motherName: widget.motherName,
+        isPep: widget.isPep,
+        occupation: widget.occupation,
+        incomeRange: widget.incomeRange,
+        selfieUrl: selfieUrl,
+        frontDocumentUrl: frontDocumentUrl,
+        backDocumentUrl: backDocumentUrl,
+      );
+
+      if (!success) {
+        AppLogger.error('Step8DocumentScreen: Falha ao atualizar usuário');
+        throw Exception('Falha ao atualizar dados do usuário');
+      }
+
+      AppLogger.info('Step8DocumentScreen: Usuário atualizado com sucesso!');
 
       AppLogger.info('Step8DocumentScreen: Cadastro finalizado no Firestore!');
 
@@ -256,7 +283,7 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.red),
                   ),
@@ -317,7 +344,7 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
                   'Ao Finalizar o Cadastro você Concorda com os\nTermos de Uso e com a Política de Privacidade',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -341,13 +368,13 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
         height: 120,
         decoration: BoxDecoration(
           color: file != null
-              ? const Color(0xFF22C55E).withOpacity(0.1)
-              : Colors.white.withOpacity(0.1),
+              ? const Color(0xFF22C55E).withValues(alpha: 0.1)
+              : Colors.white.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: file != null
                 ? const Color(0xFF22C55E)
-                : Colors.white.withOpacity(0.2),
+                : Colors.white.withValues(alpha: 0.2),
             width: file != null ? 2 : 1,
           ),
         ),
@@ -365,7 +392,7 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
                   ),
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.3),
+                      color: Colors.black.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(

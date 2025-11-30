@@ -1,16 +1,15 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:neves_capital/core/config/env_service.dart';
-import 'package:neves_capital/core/utils/app_logger.dart';
 
 /// Service para integração com a API do Pagar.me
-/// 
+///
 /// SEGURANÇA: API Key carregada de variáveis de ambiente (.env)
 class PagarmeService {
   // Chave de API e URL carregadas de variáveis de ambiente
   static String get _apiKey => EnvService.pagarmeApiKey;
   static String get _baseUrl => EnvService.pagarmeBaseUrl;
-  
+
   /// Processa um pagamento com cartão de crédito
   Future<Map<String, dynamic>> processarPagamentoCartao({
     required String nomeEstabelecimento,
@@ -25,14 +24,15 @@ class PagarmeService {
       final vencimentoParts = vencimento.split('/');
       final expMonth = vencimentoParts[0];
       final expYear = '20${vencimentoParts[1]}';
-      
+
       // Construir payload da requisição
       final payload = {
         'amount': valorCentavos, // API V5 espera valor em centavos
         'description': 'Venda - $nomeEstabelecimento',
         'items': [
           {
-            'code': 'VENDA_${DateTime.now().millisecondsSinceEpoch}', // Código único obrigatório
+            'code':
+                'VENDA_${DateTime.now().millisecondsSinceEpoch}', // Código único obrigatório
             'amount': valorCentavos, // Valor em centavos
             'description': 'Venda - $nomeEstabelecimento',
             'quantity': 1,
@@ -44,7 +44,11 @@ class PagarmeService {
             'credit_card': {
               'recurrence_cycle': 'first',
               'installments': 1,
-              'statement_descriptor': nomeEstabelecimento.substring(0, nomeEstabelecimento.length > 13 ? 13 : nomeEstabelecimento.length),
+              'statement_descriptor': nomeEstabelecimento.substring(
+                  0,
+                  nomeEstabelecimento.length > 13
+                      ? 13
+                      : nomeEstabelecimento.length),
               'card': {
                 'number': numeroCartao.replaceAll(' ', ''),
                 'holder_name': nomeTitular,
@@ -95,11 +99,11 @@ class PagarmeService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         // Pagamento criado com sucesso
         final charges = responseData['charges'] as List?;
-        
+
         if (charges != null && charges.isNotEmpty) {
           final charge = charges[0];
           final status = charge['status'];
-          
+
           if (status == 'paid') {
             return {
               'success': true,
@@ -114,14 +118,16 @@ class PagarmeService {
               'transactionId': charge['id'],
             };
           } else {
-            final errorMessage = charge['last_transaction']?['acquirer_message'] ?? 'Erro desconhecido';
+            final errorMessage = charge['last_transaction']
+                    ?['acquirer_message'] ??
+                'Erro desconhecido';
             return {
               'success': false,
               'message': 'Pagamento recusado: $errorMessage',
             };
           }
         }
-        
+
         return {
           'success': false,
           'message': 'Erro ao processar pagamento',
@@ -130,13 +136,13 @@ class PagarmeService {
         // Erro na requisição
         final errors = responseData['errors'] as Map<String, dynamic>?;
         String errorMessage = 'Erro ao processar pagamento';
-        
+
         if (errors != null) {
           errorMessage = errors.values.first.toString();
         } else if (responseData['message'] != null) {
           errorMessage = responseData['message'];
         }
-        
+
         return {
           'success': false,
           'message': errorMessage,
@@ -161,7 +167,7 @@ class PagarmeService {
       final vencimentoParts = vencimento.split('/');
       final expMonth = vencimentoParts[0];
       final expYear = '20${vencimentoParts[1]}';
-      
+
       final payload = {
         'type': 'card',
         'card': {
@@ -174,7 +180,8 @@ class PagarmeService {
       };
 
       final response = await http.post(
-        Uri.parse('$_baseUrl/tokens?appId=pk_test_SUACHAVEAQUI'), // Usar chave pública
+        Uri.parse(
+            '$_baseUrl/tokens?appId=pk_test_SUACHAVEAQUI'), // Usar chave pública
         headers: {
           'Content-Type': 'application/json',
         },
@@ -231,5 +238,3 @@ class PagarmeService {
     }
   }
 }
-
-

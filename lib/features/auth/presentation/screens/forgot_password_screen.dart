@@ -107,7 +107,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF22C55E).withOpacity(0.1),
+        color: const Color(0xFF22C55E).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: const Color(0xFF22C55E),
@@ -191,23 +191,26 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _isLoading ? null : () {
-                final cpf = CpfHelper.getCpfNumbers(_cpfController.text);
-                if (cpf.length == 11) {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => ResetPasswordOtpScreen(cpf: cpf),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Digite um CPF válido primeiro'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              },
+              onPressed: _isLoading
+                  ? null
+                  : () {
+                      final cpf = CpfHelper.getCpfNumbers(_cpfController.text);
+                      if (cpf.length == 11) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                ResetPasswordOtpScreen(cpf: cpf),
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Digite um CPF válido primeiro'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
               icon: const Icon(Icons.phone_android, size: 20),
               label: const Text('WhatsApp/SMS'),
               style: ElevatedButton.styleFrom(
@@ -243,40 +246,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  Widget _buildSubmitButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : _handleResetPassword,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF22C55E), // bg-[var(--primary-500)]
-          foregroundColor: const Color(0xFF122118), // text-[#122118]
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(25), // rounded-full
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 14), // py-3.5
-          elevation: 0,
-        ),
-        child: _isLoading
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF122118)),
-                ),
-              )
-            : const Text(
-                'Enviar Email',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-      ),
-    );
-  }
-
   Future<void> _handleResetPassword() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -296,7 +265,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           _isLoading = false;
         });
       } else {
-        final errorMessage = widget.authController.errorMessage ?? 'Erro ao enviar email';
+        final errorMessage =
+            widget.authController.errorMessage ?? 'Erro ao enviar email';
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -324,6 +294,3 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
   }
 }
-
-
-
