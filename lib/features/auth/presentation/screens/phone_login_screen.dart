@@ -274,7 +274,21 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                   },
                 ),
               ),
-              const SizedBox(height: 32),
+              // 🎯 BOTÃO DE AUTO-FILL (MODO DEBUG)
+              if (_useFakeOtp) ...[
+                TextButton.icon(
+                  onPressed: () {
+                    _phoneController.text = '11989630454';
+                  },
+                  icon: const Icon(Icons.flash_on, color: Colors.orange),
+                  label: const Text(
+                    'Auto-preencher teste',
+                    style: TextStyle(color: Colors.orange),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 height: 56,

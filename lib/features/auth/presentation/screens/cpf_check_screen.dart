@@ -231,6 +231,21 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
     return CpfHelper.isValidCpf(cpf);
   }
 
+  Widget _buildTestButton(String label, String cpf, Color color) {
+    return ElevatedButton(
+      onPressed: () {
+        _cpfController.text = cpf;
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color.withValues(alpha: 0.2),
+        foregroundColor: color,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        textStyle: const TextStyle(fontSize: 12),
+      ),
+      child: Text(label),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -269,6 +284,18 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
                   ),
                 ),
                 const SizedBox(height: 40),
+                // 🎯 BOTÕES DE TESTE RÁPIDO (MODO DEBUG)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildTestButton('A: Login OK', '123.456.789-01', Colors.green),
+                    _buildTestButton('B: Troca Tel', '987.654.321-00', Colors.orange),
+                    _buildTestButton('C: Pré-Cadastro', '111.222.333-44', Colors.blue),
+                    _buildTestButton('D: Novo User', '555.666.777-88', Colors.purple),
+                  ],
+                ),
+                const SizedBox(height: 24),
                 TextFormField(
                   controller: _cpfController,
                   keyboardType: TextInputType.number,

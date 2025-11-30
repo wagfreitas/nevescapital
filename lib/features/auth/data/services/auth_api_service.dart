@@ -12,6 +12,35 @@ class AuthApiService {
         'x-api-key': _apiKey,
       };
 
+  // 🎭 MODO MOCK PARA TESTES
+  static const bool _useMockData = true;
+
+  // 🎯 DADOS DE TESTE - CPFs para cada cenário
+  static const Map<String, Map<String, dynamic>> _mockUsers = {
+    '12345678901': {
+      // Cenário A: LOGIN_SUCCESS
+      'status': 'LOGIN_SUCCESS',
+      'phone': '+5511989630454',
+      'token': 'mock-token-user-1',
+    },
+    '98765432100': {
+      // Cenário B: PHONE_CHANGE_DETECTED
+      'status': 'PHONE_CHANGE_DETECTED',
+      'phone': '+5511989630454', // Telefone NOVO (atual)
+      'oldPhone': '+5511999999999', // Telefone ANTIGO
+    },
+    '11122233344': {
+      // Cenário C: PRE_REGISTRATION_FOUND
+      'status': 'PRE_REGISTRATION_FOUND',
+      'currentStep': 'email',
+      'phone': '+5511989630454',
+    },
+    '55566677788': {
+      // Cenário D: NEW_USER
+      'status': 'NEW_USER',
+    },
+  };
+
   /// Verifica o status do usuário após login no Firebase
   static Future<Map<String, dynamic>> checkUserStatus(String token) async {
     final url = Uri.parse('$_baseUrl/api/auth/check-user-status');
@@ -133,11 +162,35 @@ class AuthApiService {
   /// Retorna o status do usuário e determina o fluxo (login, cadastro, etc)
   static Future<Map<String, dynamic>> checkUserByCpf(
       String token, String cpf) async {
+    AppLogger.info('🚀 [API] Verificando usuário pelo CPF completo...');
+
+    // 🎭 MODO MOCK: Retornar dados fake
+    if (_useMockData) {
+      await Future.delayed(const Duration(milliseconds: 800)); // Simular latência
+
+      final cleanCpf = cpf.replaceAll(RegExp(r'[^0-9]'), '');
+      final mockUser = _mockUsers[cleanCpf];
+
+      if (mockUser != null) {
+        AppLogger.info('✅ [MOCK] CPF encontrado: ${mockUser['status']}');
+        return {
+          'success': true,
+          ...mockUser,
+        };
+      } else {
+        // CPF não encontrado nos mocks - considerar novo usuário
+        AppLogger.info('✅ [MOCK] CPF não encontrado - NEW_USER');
+        return {
+          'success': true,
+          'status': 'NEW_USER',
+        };
+      }
+    }
+
+    // MODO REAL: Chamar API
     final url = Uri.parse('$_baseUrl/api/auth/check-user-by-cpf');
 
     try {
-      AppLogger.info('🚀 [API] Verificando usuário pelo CPF completo...');
-
       final response = await http.post(
         url,
         headers: _headers,
@@ -154,21 +207,13 @@ class AuthApiService {
       if (response.statusCode == 200) {
         final status = data['status'] as String;
 
-        // Status possíveis:
-        // - LOGIN_SUCCESS: CPF encontrado + telefone correspondente
-        // - PHONE_CHANGE_DETECTED: CPF encontrado + telefone diferente
-        // - PRE_REGISTRATION_FOUND: Pré-cadastro encontrado
-        // - NEW_USER: CPF não encontrado
-
         return {
           'success': true,
           'status': status,
-          'token': data['token'], // Presente em LOGIN_SUCCESS
-          'phone': data['phone'], // Telefone cadastrado (se houver)
-          'oldPhone':
-              data['oldPhone'], // Telefone anterior (se PHONE_CHANGE_DETECTED)
-          'currentStep':
-              data['currentStep'], // Etapa atual (se PRE_REGISTRATION_FOUND)
+          'token': data['token'],
+          'phone': data['phone'],
+          'oldPhone': data['oldPhone'],
+          'currentStep': data['currentStep'],
           'message': data['message'] ?? '',
         };
       } else {
