@@ -26,6 +26,7 @@ class CustomTextField extends StatelessWidget {
   final bool autofocus;
   final TextInputAction? textInputAction;
   final void Function()? onSubmitted;
+  final bool readOnly;
   
   const CustomTextField({
     super.key,
@@ -52,6 +53,7 @@ class CustomTextField extends StatelessWidget {
     this.autofocus = false,
     this.textInputAction,
     this.onSubmitted,
+    this.readOnly = false,
   });
   
   @override
@@ -85,6 +87,7 @@ class CustomTextField extends StatelessWidget {
           maxLines: maxLines,
           maxLength: maxLength,
           enabled: enabled,
+          readOnly: readOnly,
           onChanged: onChanged,
           onTap: onTap,
           focusNode: focusNode,

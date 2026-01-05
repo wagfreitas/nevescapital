@@ -449,7 +449,7 @@ class AuthController extends ChangeNotifier {
 
   /// Logout
   Future<void> logout() async {
-    AppLogger.debug('Iniciando logout...');
+    AppLogger.debug('Iniciando logout agora...');
     _setLoading(true);
     
     try {
@@ -701,6 +701,7 @@ class AuthController extends ChangeNotifier {
   /// Limpar estado
   void clearState() {
     _currentUser = null;
+    _isLoggedInOtp = false; // Limpar também o estado OTP
     _isLoading = false;
     _errorMessage = null;
     _loginProgress = LoginProgress.idle;

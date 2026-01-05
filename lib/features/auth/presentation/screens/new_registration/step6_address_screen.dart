@@ -552,12 +552,12 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                             controller: _streetController,
                             keyboardType: TextInputType.streetAddress,
                             readOnly: true,
-                            style: const TextStyle(color: Colors.white),
+                            style: const TextStyle(color: Colors.white60),
                             decoration: InputDecoration(
                               labelText: 'Logradouro',
-                              labelStyle: const TextStyle(color: Colors.white70),
+                              labelStyle: const TextStyle(color: Colors.white60),
                               filled: true,
-                              fillColor: Colors.white.withValues(alpha: 0.1),
+                              fillColor: Colors.white.withValues(alpha: 0.05),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide.none,
@@ -565,7 +565,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
-                                    color: Colors.white.withValues(alpha: 0.2)),
+                                    color: Colors.white.withValues(alpha: 0.1)),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -576,7 +576,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: const BorderSide(color: Colors.red, width: 2),
                               ),
-                              prefixIcon: const Icon(Icons.home, color: Colors.white70),
+                              prefixIcon: const Icon(Icons.home, color: Colors.white60),
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
@@ -677,12 +677,12 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                             controller: _neighborhoodController,
                             keyboardType: TextInputType.text,
                             readOnly: true,
-                            style: const TextStyle(color: Colors.white),
+                            style: const TextStyle(color: Colors.white60),
                             decoration: InputDecoration(
                               labelText: 'Bairro',
-                              labelStyle: const TextStyle(color: Colors.white70),
+                              labelStyle: const TextStyle(color: Colors.white60),
                               filled: true,
-                              fillColor: Colors.white.withValues(alpha: 0.1),
+                              fillColor: Colors.white.withValues(alpha: 0.05),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide.none,
@@ -690,7 +690,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
-                                    color: Colors.white.withValues(alpha: 0.2)),
+                                    color: Colors.white.withValues(alpha: 0.1)),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -701,7 +701,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: const BorderSide(color: Colors.red, width: 2),
                               ),
-                              prefixIcon: const Icon(Icons.location_city, color: Colors.white70),
+                              prefixIcon: const Icon(Icons.location_city, color: Colors.white60),
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
@@ -721,12 +721,12 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                   textCapitalization: TextCapitalization.characters,
                                   maxLength: 2,
                                   readOnly: true,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: const TextStyle(color: Colors.white60),
                                   decoration: InputDecoration(
                                     labelText: 'UF',
-                                    labelStyle: const TextStyle(color: Colors.white70),
+                                    labelStyle: const TextStyle(color: Colors.white60),
                                     filled: true,
-                                    fillColor: Colors.white.withValues(alpha: 0.1),
+                                    fillColor: Colors.white.withValues(alpha: 0.05),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide.none,
@@ -734,7 +734,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                     enabledBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(
-                                          color: Colors.white.withValues(alpha: 0.2)),
+                                          color: Colors.white.withValues(alpha: 0.1)),
                                     ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -745,7 +745,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: const BorderSide(color: Colors.red, width: 2),
                                     ),
-                                    prefixIcon: const Icon(Icons.map, color: Colors.white70),
+                                    prefixIcon: const Icon(Icons.map, color: Colors.white60),
                                     counterText: '',
                                   ),
                                   validator: (value) {
@@ -766,12 +766,12 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                   controller: _cityController,
                                   keyboardType: TextInputType.text,
                                   readOnly: true,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: const TextStyle(color: Colors.white60),
                                   decoration: InputDecoration(
                                     labelText: 'Cidade',
-                                    labelStyle: const TextStyle(color: Colors.white70),
+                                    labelStyle: const TextStyle(color: Colors.white60),
                                     filled: true,
-                                    fillColor: Colors.white.withValues(alpha: 0.1),
+                                    fillColor: Colors.white.withValues(alpha: 0.05),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide.none,
@@ -779,7 +779,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                     enabledBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(
-                                          color: Colors.white.withValues(alpha: 0.2)),
+                                          color: Colors.white.withValues(alpha: 0.1)),
                                     ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -790,7 +790,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: const BorderSide(color: Colors.red, width: 2),
                                     ),
-                                    prefixIcon: const Icon(Icons.location_city, color: Colors.white70),
+                                    prefixIcon: const Icon(Icons.location_city, color: Colors.white60),
                                   ),
                                   validator: (value) {
                                     if (value == null || value.trim().isEmpty) {

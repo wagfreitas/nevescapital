@@ -1,8 +1,25 @@
 import 'package:flutter/material.dart';
+import '../../core/design_system/design_system.dart';
 
-/// Botão customizado da aplicação
+/// Botão customizado da aplicação seguindo o Design System
+/// 
+/// **Padrão de texto:**
+/// - Texto capitalizado (primeira letra de cada palavra maiúscula)
+/// - Sempre no infinitivo (verbo no infinitivo)
+/// 
+/// **Exemplos corretos:**
+/// - "Salvar Alterações"
+/// - "Confirmar"
+/// - "Retornar"
+/// - "Alterar"
+/// - "Finalizar Cadastro"
+/// 
+/// **Exemplos incorretos:**
+/// - "Salvando" (não infinitivo)
+/// - "CONFIRMAR" (tudo maiúsculo)
+/// - "confirmar" (tudo minúsculo)
 class CustomButton extends StatelessWidget {
-  final String text;
+  final String text; // Texto do botão (deve estar no infinitivo)
   final VoidCallback? onPressed;
   final bool isLoading;
   final bool isOutlined;
@@ -11,6 +28,7 @@ class CustomButton extends StatelessWidget {
   final IconData? icon;
   final double? width;
   final double? height;
+  final bool capitalizeText; // Se true, capitaliza primeira letra de cada palavra (padrão)
   
   const CustomButton({
     super.key,
@@ -23,66 +41,87 @@ class CustomButton extends StatelessWidget {
     this.icon,
     this.width,
     this.height,
+    this.capitalizeText = true, // Padrão: capitaliza primeira letra
   });
   
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    // Texto já deve vir no infinitivo e capitalizado (ex: "Salvar Alterações")
+    // Apenas garantimos que está capitalizado se necessário
+    final effectiveText = capitalizeText ? DesignSystem.formatButtonText(text) : text;
+    final effectiveHeight = height ?? DesignSystem.buttonHeight;
     
     return SizedBox(
-      width: width,
-      height: height ?? 48,
+      width: width ?? double.infinity,
+      height: effectiveHeight,
       child: isOutlined
           ? OutlinedButton(
               onPressed: isLoading ? null : onPressed,
               style: OutlinedButton.styleFrom(
-                foregroundColor: textColor ?? theme.colorScheme.primary,
+                foregroundColor: textColor ?? DesignSystem.buttonSecondaryForeground,
                 side: BorderSide(
-                  color: backgroundColor ?? theme.colorScheme.primary,
+                  color: backgroundColor ?? DesignSystem.buttonSecondaryBorder,
                 ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(DesignSystem.buttonBorderRadius),
                 ),
+                padding: DesignSystem.buttonPadding,
+                elevation: 0,
               ),
-              child: _buildButtonContent(theme),
+              child: _buildButtonContent(effectiveText, effectiveHeight),
             )
           : ElevatedButton(
               onPressed: isLoading ? null : onPressed,
               style: ElevatedButton.styleFrom(
-                backgroundColor: backgroundColor ?? theme.colorScheme.primary,
-                foregroundColor: textColor ?? Colors.white,
+                backgroundColor: backgroundColor ?? DesignSystem.buttonPrimaryBackground,
+                foregroundColor: textColor ?? DesignSystem.buttonPrimaryForeground,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(DesignSystem.buttonBorderRadius),
                 ),
+                padding: DesignSystem.buttonPadding,
+                elevation: 0,
               ),
-              child: _buildButtonContent(theme),
+              child: _buildButtonContent(effectiveText, effectiveHeight),
             ),
     );
   }
   
-  Widget _buildButtonContent(ThemeData theme) {
+  Widget _buildButtonContent(String displayText, double buttonHeight) {
     if (isLoading) {
-      return const SizedBox(
+      return SizedBox(
         width: 20,
         height: 20,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          valueColor: AlwaysStoppedAnimation<Color>(
+            textColor ?? DesignSystem.buttonPrimaryForeground,
+          ),
         ),
       );
     }
     
+    final textStyle = buttonHeight <= DesignSystem.buttonHeightSmall
+        ? DesignSystem.buttonTextStyleSmall
+        : DesignSystem.buttonTextStyle;
+    
     if (icon != null) {
       return Row(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 18),
+          Icon(icon, size: 20),
           const SizedBox(width: 8),
-          Text(text),
+          Text(
+            displayText,
+            style: textStyle,
+          ),
         ],
       );
     }
     
-    return Text(text);
+    return Text(
+      displayText,
+      style: textStyle,
+    );
   }
 }

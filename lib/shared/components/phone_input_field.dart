@@ -12,6 +12,7 @@ class PhoneInputField extends StatefulWidget {
   final String? Function(String?)? validator;
   final bool enabled;
   final bool autofocus;
+  final bool readOnly;
   final VoidCallback? onChanged;
   final VoidCallback? onFocusLost;
 
@@ -24,6 +25,7 @@ class PhoneInputField extends StatefulWidget {
     this.validator,
     this.enabled = true,
     this.autofocus = false,
+    this.readOnly = false,
     this.onChanged,
     this.onFocusLost,
   });
@@ -176,6 +178,7 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
             focusNode: _focusNode,
             autofocus: widget.autofocus,
             enabled: widget.enabled,
+            readOnly: widget.readOnly,
             keyboardType: TextInputType.phone,
             textInputAction: TextInputAction.done,
             onFieldSubmitted: (_) {

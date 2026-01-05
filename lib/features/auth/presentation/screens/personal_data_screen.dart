@@ -7,6 +7,7 @@ import 'package:neves_capital/shared/services/firestore_service.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'package:neves_capital/shared/components/number_keyboard_toolbar.dart';
+import 'package:neves_capital/shared/components/custom_button.dart';
 
 class PersonalDataScreen extends StatefulWidget {
   final Map<String, String> loginData;
@@ -322,12 +323,12 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                             controller: _streetController,
                             keyboardType: TextInputType.streetAddress,
                             readOnly: true,
-                            style: const TextStyle(color: Colors.white),
+                            style: const TextStyle(color: Colors.white60),
                             decoration: InputDecoration(
                               labelText: 'Logradouro',
-                              labelStyle: const TextStyle(color: Colors.white70),
+                              labelStyle: const TextStyle(color: Colors.white60),
                               filled: true,
-                              fillColor: Colors.white.withValues(alpha: 0.1),
+                              fillColor: Colors.white.withValues(alpha: 0.05),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide.none,
@@ -335,7 +336,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
-                                    color: Colors.white.withValues(alpha: 0.2)),
+                                    color: Colors.white.withValues(alpha: 0.1)),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -346,7 +347,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: const BorderSide(color: Colors.red, width: 2),
                               ),
-                              prefixIcon: const Icon(Icons.home, color: Colors.white70),
+                              prefixIcon: const Icon(Icons.home, color: Colors.white60),
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
@@ -416,6 +417,8 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                                   decoration: InputDecoration(
                                     labelText: 'Complemento',
                                     labelStyle: const TextStyle(color: Colors.white70),
+                                    hintText: 'Complemento',
+                                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                                     filled: true,
                                     fillColor: Colors.white.withValues(alpha: 0.1),
                                     border: OutlineInputBorder(
@@ -448,12 +451,12 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                             controller: _neighborhoodController,
                             keyboardType: TextInputType.text,
                             readOnly: true,
-                            style: const TextStyle(color: Colors.white),
+                            style: const TextStyle(color: Colors.white60),
                             decoration: InputDecoration(
                               labelText: 'Bairro',
-                              labelStyle: const TextStyle(color: Colors.white70),
+                              labelStyle: const TextStyle(color: Colors.white60),
                               filled: true,
-                              fillColor: Colors.white.withValues(alpha: 0.1),
+                              fillColor: Colors.white.withValues(alpha: 0.05),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide.none,
@@ -461,7 +464,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
-                                    color: Colors.white.withValues(alpha: 0.2)),
+                                    color: Colors.white.withValues(alpha: 0.1)),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -472,7 +475,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: const BorderSide(color: Colors.red, width: 2),
                               ),
-                              prefixIcon: const Icon(Icons.location_city, color: Colors.white70),
+                              prefixIcon: const Icon(Icons.location_city, color: Colors.white60),
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
@@ -492,12 +495,12 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                                   textCapitalization: TextCapitalization.characters,
                                   maxLength: 2,
                                   readOnly: true,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: const TextStyle(color: Colors.white60),
                                   decoration: InputDecoration(
                                     labelText: 'UF',
-                                    labelStyle: const TextStyle(color: Colors.white70),
+                                    labelStyle: const TextStyle(color: Colors.white60),
                                     filled: true,
-                                    fillColor: Colors.white.withValues(alpha: 0.1),
+                                    fillColor: Colors.white.withValues(alpha: 0.05),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide.none,
@@ -505,7 +508,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                                     enabledBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(
-                                          color: Colors.white.withValues(alpha: 0.2)),
+                                          color: Colors.white.withValues(alpha: 0.1)),
                                     ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -516,7 +519,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: const BorderSide(color: Colors.red, width: 2),
                                     ),
-                                    prefixIcon: const Icon(Icons.map, color: Colors.white70),
+                                    prefixIcon: const Icon(Icons.map, color: Colors.white60),
                                     counterText: '',
                                   ),
                                   validator: (value) {
@@ -537,12 +540,12 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                                   controller: _cityController,
                                   keyboardType: TextInputType.text,
                                   readOnly: true,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: const TextStyle(color: Colors.white60),
                                   decoration: InputDecoration(
                                     labelText: 'Cidade',
-                                    labelStyle: const TextStyle(color: Colors.white70),
+                                    labelStyle: const TextStyle(color: Colors.white60),
                                     filled: true,
-                                    fillColor: Colors.white.withValues(alpha: 0.1),
+                                    fillColor: Colors.white.withValues(alpha: 0.05),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide.none,
@@ -550,7 +553,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                                     enabledBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(
-                                          color: Colors.white.withValues(alpha: 0.2)),
+                                          color: Colors.white.withValues(alpha: 0.1)),
                                     ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -561,7 +564,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: const BorderSide(color: Colors.red, width: 2),
                                     ),
-                                    prefixIcon: const Icon(Icons.location_city, color: Colors.white70),
+                                    prefixIcon: const Icon(Icons.location_city, color: Colors.white60),
                                   ),
                                   validator: (value) {
                                     if (value == null || value.trim().isEmpty) {
@@ -599,37 +602,10 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                             ),
                           ],
                           const SizedBox(height: 32),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _handleContinue,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF22C55E),
-                                foregroundColor: const Color(0xFF122118),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 0,
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                            Color(0xFF122118)),
-                                      ),
-                                    )
-                                  : Text(
-                                      widget.isEditMode ? 'Salvar Alterações' : 'Finalizar Cadastro',
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                            ),
+                          CustomButton(
+                            text: widget.isEditMode ? 'Salvar Alterações' : 'Finalizar Cadastro',
+                            onPressed: _isLoading ? null : _handleContinue,
+                            isLoading: _isLoading,
                           ),
                           const SizedBox(height: 40),
                         ],

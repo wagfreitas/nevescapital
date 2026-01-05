@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/shared/components/custom_text_field.dart';
 import 'package:neves_capital/shared/components/phone_input_field.dart';
+import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
 import 'package:neves_capital/shared/services/auth_service.dart';
@@ -28,6 +29,8 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emailFocusNode = FocusNode();
+  final _phoneFocusNode = FocusNode();
   
   bool _isLoading = false;
   bool _isLoadingData = true;
@@ -44,6 +47,8 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
   void dispose() {
     _emailController.dispose();
     _phoneController.dispose();
+    _emailFocusNode.dispose();
+    _phoneFocusNode.dispose();
     super.dispose();
   }
 
@@ -420,7 +425,8 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
                               controller: _emailController,
                               hintText: 'Email',
                               labelText: 'Email',
-                              autofocus: true, // Focar automaticamente ao entrar na tela
+                              autofocus: false,
+                              focusNode: _emailFocusNode,
                               keyboardType: TextInputType.emailAddress,
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
@@ -438,7 +444,9 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
                             // Campo Telefone
                             PhoneInputField(
                               controller: _phoneController,
+                              focusNode: _phoneFocusNode,
                               hintText: 'Digite seu telefone',
+                              autofocus: false,
                               validator: PhoneHelper.validatePhone,
                             ),
                             
@@ -508,38 +516,10 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
                             const SizedBox(height: 40),
                             
                             // Botão Confirmar
-                            SizedBox(
-                              width: double.infinity,
-                              height: 56,
-                              child: ElevatedButton(
-                                onPressed: _isLoading ? null : _handleConfirm,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF22C55E),
-                                  foregroundColor: const Color(0xFF122118),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  elevation: 0,
-                                ),
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(
-                                            Color(0xFF122118),
-                                          ),
-                                        ),
-                                      )
-                                    : const Text(
-                                        'CONFIRMAR',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                              ),
+                            CustomButton(
+                              text: 'Confirmar',
+                              onPressed: _isLoading ? null : _handleConfirm,
+                              isLoading: _isLoading,
                             ),
                           ],
                         ),

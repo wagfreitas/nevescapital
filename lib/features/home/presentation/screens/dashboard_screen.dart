@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../../shared/services/firestore_service.dart';
 import '../../../../shared/services/secure_storage_service.dart';
+import '../../../auth/presentation/screens/onboarding_screen.dart';
 
 /// Tela principal do dashboard moderna baseada no React
 class DashboardScreen extends StatefulWidget {
@@ -39,18 +40,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Buscar CPF do SecureStorage
       final cpf = await SecureStorageService.getLastCpf();
       if (cpf == null || cpf.isEmpty) {
-        AppLogger.warning('CPF não encontrado para buscar nome do usuário');
-        setState(() {
-          _userDisplayName = null;
-          _isLoadingName = false;
-        });
+        AppLogger.warning('CPF não encontrado - fazendo logout e redirecionando');
+        await _handleUserNotFound();
         return;
       }
 
       // Buscar dados do usuário no Firestore
       final userData = await FirestoreService.getUserByCpf(cpf);
       
-      if (userData != null && userData['displayName'] != null) {
+      if (userData == null) {
+        AppLogger.warning('Usuário não encontrado no Firestore - fazendo logout e redirecionando');
+        await _handleUserNotFound();
+        return;
+      }
+      
+      if (userData['displayName'] != null) {
         final displayName = userData['displayName'] as String;
         // Pegar os dois primeiros nomes
         final nameParts = displayName.trim().split(' ');
@@ -72,32 +76,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     } catch (e) {
       AppLogger.error('Erro ao carregar nome do usuário', e);
-      setState(() {
-        _userDisplayName = null;
-        _isLoadingName = false;
-      });
+      // Se houver erro crítico, fazer logout
+      await _handleUserNotFound();
+    }
+  }
+
+  /// Lidar com usuário não encontrado - fazer logout e redirecionar
+  Future<void> _handleUserNotFound() async {
+    if (!mounted) return;
+    
+    AppLogger.info('DashboardScreen: Usuário não encontrado - fazendo logout e redirecionando');
+    
+    try {
+      // Fazer logout
+      if (!widget.authController.isDisposed) {
+        await widget.authController.logout();
+      }
+    } catch (e) {
+      AppLogger.error('Erro ao fazer logout', e);
+    }
+    
+    // Aguardar um pouco
+    await Future.delayed(const Duration(milliseconds: 300));
+    
+    // Redirecionar para OnboardingScreen
+    if (mounted) {
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => OnboardingScreen(
+            authController: widget.authController,
+            themeController: widget.themeController,
+          ),
+        ),
+        (route) => false,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Mensagem de boas-vindas
-              _buildWelcomeMessage(context),
-              
-              const SizedBox(height: 60),
-              
-              // Botões principais
-              _buildMainButtons(context),
-            ],
-          ),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Mensagem de boas-vindas
+            _buildWelcomeMessage(context),
+            
+            const SizedBox(height: 60),
+            
+            // Botões principais
+            _buildMainButtons(context),
+          ],
         ),
       ),
     );

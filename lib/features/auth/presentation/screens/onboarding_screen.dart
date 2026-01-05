@@ -29,6 +29,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _hasCheckedBiometric = false;
   bool _isCheckingBiometric = false;
   bool _resumedRegistration = false;
+  bool _isProcessingBiometric = false; // Flag para evitar múltiplas chamadas simultâneas
 
   @override
   void initState() {
@@ -41,6 +42,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   /// Verifica biometria se usuário está logado, depois verifica cadastro pendente
   Future<void> _checkBiometricAndPendingRegistration() async {
+    // Proteção contra múltiplas chamadas simultâneas
+    if (_isProcessingBiometric) {
+      AppLogger.warning('Verificação de biometria já em andamento - ignorando chamada duplicada');
+      return;
+    }
+    
     // Aguardar um pouco para garantir que o AuthController foi totalmente inicializado
     await Future.delayed(const Duration(milliseconds: 150));
     
@@ -80,7 +87,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (isLoggedIn) {
       final isBiometricAvailable = await BiometricService.isAvailable();
       
-      if (isBiometricAvailable && !_hasCheckedBiometric) {
+      if (isBiometricAvailable && !_hasCheckedBiometric && !_isProcessingBiometric) {
+        _isProcessingBiometric = true;
         _hasCheckedBiometric = true;
         _isCheckingBiometric = true;
         
@@ -95,46 +103,69 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         // capturar um frame "em branco" como snapshot do app.
         await WidgetsBinding.instance.endOfFrame;
         
-        // Solicitar biometria (com fallback para senha do dispositivo)
-        // O iOS mostrará opção de usar senha se biometria falhar
-        final authenticated = await BiometricService.authenticate(
-          reason: 'Use sua biometria para acessar o app',
-        );
-        
-        // Manter tela verde escuro até processar resultado
-        if (mounted) {
-          setState(() {
-            _isCheckingBiometric = false;
-          });
-        }
-        
-        // Verificar novamente se ainda está logado após biometria
-        // (pode ter sido feito logout durante a biometria)
-        if (!mounted || !widget.authController.isLoggedIn) {
-          AppLogger.info('Estado de login mudou durante biometria - cancelando redirecionamento');
-          return;
-        }
-        
-        if (authenticated) {
-          AppLogger.info('✅ Biometria ou senha validada - redirecionando para Dashboard');
-          // Autenticação validada (biometria ou senha) - redirecionar para Dashboard
+        try {
+          // Solicitar biometria (com fallback para senha do dispositivo)
+          // O iOS mostrará opção de usar senha se biometria falhar
+          final authenticated = await BiometricService.authenticate(
+            reason: 'Use sua biometria para acessar o app',
+          );
+          
+          // Manter tela verde escuro até processar resultado
           if (mounted) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) => MainTabScreen(
-                  authController: widget.authController,
-                  themeController: widget.themeController ?? ThemeController(),
-                ),
-              ),
-            );
+            setState(() {
+              _isCheckingBiometric = false;
+            });
           }
-          return; // Não verificar cadastro pendente se autenticação foi validada
-        } else {
-          AppLogger.warning('❌ Biometria e senha falharam ou foram canceladas - redirecionando para login (sem fazer logout)');
-          // Se biometria E senha falharam ou foram canceladas, redirecionar para login
-          // NÃO fazer logout - o status de logged in deve ser mantido
-          // O usuário precisará fazer login novamente (telefone + OTP + CPF) para acessar
+          
+          // Verificar novamente se ainda está logado após biometria
+          // (pode ter sido feito logout durante a biometria)
+          if (!mounted || !widget.authController.isLoggedIn) {
+            AppLogger.info('Estado de login mudou durante biometria - cancelando redirecionamento');
+            _isProcessingBiometric = false;
+            return;
+          }
+          
+          if (authenticated) {
+            AppLogger.info('✅ Biometria ou senha validada - redirecionando para Dashboard');
+            // Autenticação validada (biometria ou senha) - redirecionar para Dashboard
+            if (mounted) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => MainTabScreen(
+                    authController: widget.authController,
+                    themeController: widget.themeController ?? ThemeController(),
+                  ),
+                ),
+              );
+            }
+            _isProcessingBiometric = false;
+            return; // Não verificar cadastro pendente se autenticação foi validada
+          } else {
+            AppLogger.warning('❌ Biometria e senha falharam ou foram canceladas - fazendo logout e redirecionando para login');
+            // Se biometria E senha falharam ou foram canceladas, fazer logout para evitar loop
+            // e redirecionar para login
+            if (mounted) {
+              await widget.authController.logout();
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => PhoneLoginScreen(
+                    authController: widget.authController,
+                    themeController: widget.themeController,
+                  ),
+                ),
+              );
+            }
+            _isProcessingBiometric = false;
+            return; // Não verificar cadastro pendente se autenticação falhou
+          }
+        } catch (e) {
+          AppLogger.error('Erro durante autenticação biométrica', e);
           if (mounted) {
+            setState(() {
+              _isCheckingBiometric = false;
+            });
+            // Em caso de erro, fazer logout para evitar loop
+            await widget.authController.logout();
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
                 builder: (context) => PhoneLoginScreen(
@@ -144,7 +175,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             );
           }
-          return; // Não verificar cadastro pendente se autenticação falhou
+          _isProcessingBiometric = false;
+          return;
         }
       } else if (!isBiometricAvailable && isLoggedIn) {
         // Biometria não disponível mas usuário está logado - ir direto para dashboard

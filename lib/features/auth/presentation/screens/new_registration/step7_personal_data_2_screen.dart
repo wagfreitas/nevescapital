@@ -5,6 +5,12 @@ import 'package:neves_capital/features/auth/presentation/controllers/registratio
 import 'package:neves_capital/features/auth/domain/entities/registration_progress.dart';
 import 'package:neves_capital/features/auth/presentation/helpers/registration_navigation_helper.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
+import 'package:neves_capital/core/config/feature_flags.dart';
+import 'package:neves_capital/shared/services/firestore_service.dart';
+import 'package:neves_capital/features/auth/data/services/registration_service.dart';
+import 'package:neves_capital/features/auth/data/services/local_registration_storage.dart';
+import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/features/home/presentation/screens/main_tab_screen.dart';
 import 'step6_address_screen.dart';
 import 'step7_selfie_screen.dart';
 
@@ -255,7 +261,127 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
 
       if (!mounted) return;
 
-      // Navegar para próxima tela (selfie)
+      // Verificar feature flag para pular foto e documentos
+      if (FeatureFlags.skipPhotoAndDocuments) {
+        AppLogger.info('🚩 Feature flag ativa: pulando telas de foto e documentos');
+        
+        // Verificar se o usuário já existe no Firestore (criado na tela de email)
+        final existingUser = await FirestoreService.getUserByCpf(widget.cpf);
+        
+        String userId;
+        if (existingUser != null) {
+          AppLogger.info('Usuário encontrado no Firestore, atualizando dados...');
+          userId = existingUser['id'] as String;
+          
+          // Atualizar usuário com todos os dados coletados
+          final success = await FirestoreService.updateUser(
+            userId: userId,
+            email: widget.email,
+            fullName: widget.fullName,
+            cpf: widget.cpf,
+            phone: widget.phone,
+            birthDate: widget.birthDate,
+            motherName: widget.motherName,
+            isPep: _isPep,
+            occupation: _occupation,
+            incomeRange: _incomeRange,
+            cep: widget.cep,
+            address: widget.street,
+            number: widget.number,
+            complement: widget.complement,
+            neighborhood: widget.neighborhood,
+            city: widget.city,
+            state: widget.state,
+            // Foto e documentos ficam null por enquanto
+            selfieUrl: null,
+            frontDocumentUrl: null,
+            backDocumentUrl: null,
+            documentType: null,
+          );
+          
+          if (!success) {
+            throw Exception('Falha ao atualizar dados do usuário no Firestore');
+          }
+          
+          AppLogger.info('✅ Usuário atualizado com sucesso no Firestore');
+        } else {
+          AppLogger.info('Usuário não encontrado, criando novo usuário no Firestore...');
+          
+          // Criar novo usuário com todos os dados
+          userId = await FirestoreService.createUser(
+            email: widget.email,
+            fullName: widget.fullName,
+            cpf: widget.cpf,
+            phone: widget.phone,
+            birthDate: widget.birthDate,
+            motherName: widget.motherName,
+            isPep: _isPep,
+            occupation: _occupation,
+            incomeRange: _incomeRange,
+            cep: widget.cep,
+            address: widget.street,
+            number: widget.number,
+            complement: widget.complement,
+            neighborhood: widget.neighborhood,
+            city: widget.city,
+            state: widget.state,
+          );
+          
+          AppLogger.info('✅ Usuário criado com sucesso no Firestore');
+        }
+        
+        // Limpar progresso local e do Firestore (cadastro completo!)
+        try {
+          AppLogger.debug('Limpando progresso de cadastro (local + Firestore)...');
+          await LocalRegistrationStorage.clearLocal();
+          await RegistrationService.deleteProgress(widget.cpf);
+          AppLogger.info('✅ Progresso de cadastro limpo com sucesso');
+        } catch (cleanupError) {
+          AppLogger.warning('⚠️ Erro ao limpar progresso (não crítico): $cleanupError');
+        }
+        
+        if (!mounted) return;
+        
+        // Marcar como logado
+        try {
+          if (widget.authController != null) {
+            await widget.authController!.loginWithOtpMock(widget.cpf);
+            AppLogger.info('✅ Login automático realizado com sucesso');
+          }
+        } catch (loginError) {
+          AppLogger.warning('⚠️ Erro ao fazer login automático (não crítico): $loginError');
+        }
+        
+        // Mostrar mensagem de sucesso
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cadastro realizado com sucesso!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        
+        // Redirecionar para Dashboard após cadastro completo
+        await Future.delayed(const Duration(seconds: 1));
+        
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => MainTabScreen(
+                authController: widget.authController ?? AuthController(),
+                themeController: widget.themeController ?? ThemeController(),
+              ),
+            ),
+            (route) => false, // Remove todas as rotas anteriores
+          );
+        }
+        
+        return; // Sair do método após navegar para dashboard
+      }
+
+      // Fluxo normal: navegar para próxima tela (selfie)
       // Usar dados do progresso completo para restaurar tudo que já foi preenchido
       Navigator.push(
         context,
@@ -298,9 +424,14 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
   }
 
   Future<void> _showOccupationSearch(BuildContext context) async {
-    final result = await showSearch<String>(
-      context: context,
-      delegate: _OccupationSearchDelegate(_occupations, _occupation),
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _OccupationSearchScreen(
+          occupations: _occupations,
+          selectedOccupation: _occupation,
+        ),
+      ),
     );
 
     if (result != null) {
@@ -659,95 +790,124 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
   }
 }
 
-// Classe auxiliar para busca de ocupação
-class _OccupationSearchDelegate extends SearchDelegate<String> {
+// Tela customizada de busca de ocupação (substitui SearchDelegate para ter controle total do teclado)
+class _OccupationSearchScreen extends StatefulWidget {
   final List<String> occupations;
   final String? selectedOccupation;
 
-  _OccupationSearchDelegate(this.occupations, this.selectedOccupation);
+  const _OccupationSearchScreen({
+    required this.occupations,
+    this.selectedOccupation,
+  });
 
   @override
-  String get searchFieldLabel => 'Buscar ocupação';
+  State<_OccupationSearchScreen> createState() => _OccupationSearchScreenState();
+}
+
+class _OccupationSearchScreenState extends State<_OccupationSearchScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  List<String> _filteredOccupations = [];
 
   @override
-  ThemeData appBarTheme(BuildContext context) {
-    return ThemeData(
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF122118),
-        elevation: 0,
-        iconTheme: IconThemeData(color: Colors.white),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-        border: InputBorder.none,
-      ),
-      textTheme: const TextTheme(
-        titleLarge: TextStyle(color: Colors.white, fontSize: 18),
-      ),
-    );
+  void initState() {
+    super.initState();
+    _filteredOccupations = widget.occupations;
+    _searchController.addListener(_filterOccupations);
+    // Focar no campo de busca automaticamente
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _searchFocusNode.requestFocus();
+    });
   }
 
   @override
-  List<Widget> buildActions(BuildContext context) {
-    return [
-      if (query.isNotEmpty)
-        IconButton(
-          icon: const Icon(Icons.clear),
+  void dispose() {
+    _searchController.removeListener(_filterOccupations);
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _filterOccupations() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredOccupations = widget.occupations;
+      } else {
+        _filteredOccupations = widget.occupations
+            .where((occupation) =>
+                occupation.toLowerCase().contains(query))
+            .toList();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF122118),
+      resizeToAvoidBottomInset: true,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF122118),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
-            query = '';
+            Navigator.pop(context, widget.selectedOccupation);
           },
         ),
-    ];
-  }
-
-  @override
-  Widget buildLeading(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.arrow_back),
-      onPressed: () {
-        close(context, selectedOccupation ?? '');
-      },
-    );
-  }
-
-  @override
-  Widget buildResults(BuildContext context) {
-    return buildSuggestions(context);
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    final suggestions = query.isEmpty
-        ? occupations
-        : occupations
-            .where((occupation) =>
-                occupation.toLowerCase().contains(query.toLowerCase()))
-            .toList();
-
-    return Container(
-      color: const Color(0xFF122118),
-      child: ListView.builder(
-        itemCount: suggestions.length,
-        itemBuilder: (context, index) {
-          final occupation = suggestions[index];
-          final isSelected = occupation == selectedOccupation;
-
-          return ListTile(
-            title: Text(
-              occupation,
-              style: TextStyle(
-                color: isSelected ? const Color(0xFF22C55E) : Colors.white,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-            trailing: isSelected
-                ? const Icon(Icons.check, color: Color(0xFF22C55E))
+        title: TextField(
+          controller: _searchController,
+          focusNode: _searchFocusNode,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          keyboardType: TextInputType.text,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) {
+            // Fechar teclado quando pressionar "Done" (checkmark)
+            _searchFocusNode.unfocus();
+          },
+          decoration: InputDecoration(
+            hintText: 'Buscar ocupação',
+            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+            border: InputBorder.none,
+            prefixIcon: const Icon(Icons.search, color: Colors.white70),
+            suffixIcon: _searchController.text.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear, color: Colors.white70),
+                    onPressed: () {
+                      _searchController.clear();
+                    },
+                  )
                 : null,
-            onTap: () {
-              close(context, occupation);
-            },
-          );
-        },
+          ),
+        ),
+      ),
+      body: Container(
+        color: const Color(0xFF122118),
+        child: ListView.builder(
+          itemCount: _filteredOccupations.length,
+          itemBuilder: (context, index) {
+            final occupation = _filteredOccupations[index];
+            final isSelected = occupation == widget.selectedOccupation;
+
+            return ListTile(
+              title: Text(
+                occupation,
+                style: TextStyle(
+                  color: isSelected ? const Color(0xFF22C55E) : Colors.white,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+              trailing: isSelected
+                  ? const Icon(Icons.check, color: Color(0xFF22C55E))
+                  : null,
+              onTap: () {
+                Navigator.pop(context, occupation);
+              },
+            );
+          },
+        ),
       ),
     );
   }

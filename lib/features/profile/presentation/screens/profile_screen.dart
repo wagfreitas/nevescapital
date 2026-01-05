@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import 'edit_personal_data_screen.dart';
 import 'edit_store_data_screen.dart';
@@ -29,37 +30,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     // Tentar acessar o controller apenas quando necessário
     // Se houver erro, mostrar mensagem de erro mas não redirecionar automaticamente
-    return Scaffold(
-      appBar: widget.showAppBar
-          ? AppBar(
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-              title: const Text('Conta'),
-              centerTitle: true,
-            )
-          : null,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Título "Conta" quando AppBar não está visível
-              if (!widget.showAppBar) ...[
-                const SizedBox(height: 20),
-                const Text(
-                  'Conta',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Título "Conta" quando AppBar não está visível
+            if (!widget.showAppBar) ...[
+              const SizedBox(height: 20),
+              const Text(
+                'Conta',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 20),
-              ] else
-                const SizedBox(height: 40),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+            ] else
+              const SizedBox(height: 40),
               
               // Pergunta
               const Text(
@@ -153,8 +143,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
   
   void _showLogoutDialog(BuildContext context) {
@@ -170,85 +159,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           TextButton(
             onPressed: () async {
-              Navigator.of(context).pop(); // Fechar dialog
+              // Fechar dialog primeiro
+              Navigator.of(context).pop();
               
+              // Aguardar um frame para garantir que o dialog foi fechado
+              await Future.delayed(const Duration(milliseconds: 100));
+              
+              if (!context.mounted) return;
+              
+              AppLogger.info('ProfileScreen: Iniciando logout...');
+              
+              // Forçar logout de forma mais direta
               try {
-                // Fazer logout
+                // 1. Limpar SharedPreferences diretamente
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove('is_logged_in_otp');
+                await prefs.clear();
+                AppLogger.info('SharedPreferences limpo');
+                
+                // 2. Fazer logout no controller
                 if (!widget.authController.isDisposed) {
-                  AppLogger.debug('ProfileScreen: Iniciando logout...');
-                  await widget.authController.logout();
-                  
-                  // Aguardar um pouco para garantir que o estado foi completamente limpo
-                  await Future.delayed(const Duration(milliseconds: 200));
-                  
-                  AppLogger.debug('ProfileScreen: Logout concluído');
-                  AppLogger.debug('ProfileScreen: isLoggedIn = ${widget.authController.isLoggedIn}');
-                  
-                  // Verificar novamente se o logout foi bem-sucedido
-                  if (widget.authController.isLoggedIn) {
-                    AppLogger.warning('ProfileScreen: isLoggedIn ainda é true após logout - forçando limpeza');
-                    // Forçar limpeza adicional
-                    await widget.authController.logout();
-                    await Future.delayed(const Duration(milliseconds: 100));
-                  }
+                  await widget.authController.logout().timeout(
+                    const Duration(seconds: 5),
+                    onTimeout: () {
+                      AppLogger.warning('Logout timeout - continuando mesmo assim');
+                    },
+                  );
                 }
                 
-                // Após logout, navegar diretamente para a tela de onboarding
-                // O OnboardingScreen não solicitará biometria pois isLoggedIn será false
-                if (context.mounted) {
-                  AppLogger.debug('Navegando diretamente para OnboardingScreen após logout');
-                  
-                  // Criar um novo AuthController para a tela de onboarding
-                  final newAuthController = AuthController();
-                  await newAuthController.initialize();
-                  
-                  // Verificar se o novo controller está realmente deslogado
-                  if (newAuthController.isLoggedIn) {
-                    AppLogger.warning('Novo AuthController ainda está logado - forçando logout');
-                    await newAuthController.logout();
-                    await Future.delayed(const Duration(milliseconds: 100));
-                  }
-                  
-                  // Remover todas as rotas e navegar para OnboardingScreen
-                  Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-                    MaterialPageRoute(
-                      builder: (context) => OnboardingScreen(
-                        authController: newAuthController,
-                        themeController: ThemeController(),
-                      ),
+                // 3. Forçar limpeza do estado
+                widget.authController.clearState();
+                
+              } catch (e) {
+                AppLogger.error('Erro no logout', e);
+                // Continuar mesmo com erro
+              }
+              
+              // Aguardar um pouco para garantir que tudo foi processado
+              await Future.delayed(const Duration(milliseconds: 500));
+              
+              // Navegar SEMPRE para OnboardingScreen
+              if (context.mounted) {
+                AppLogger.info('ProfileScreen: Navegando para OnboardingScreen');
+                
+                // Criar novo controller para garantir estado limpo
+                final newAuthController = AuthController();
+                await newAuthController.initialize();
+                
+                // Se ainda estiver logado, forçar logout
+                if (newAuthController.isLoggedIn) {
+                  await newAuthController.logout();
+                  await Future.delayed(const Duration(milliseconds: 200));
+                }
+                
+                // Navegar usando rootNavigator para garantir que remove todas as rotas
+                Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => OnboardingScreen(
+                      authController: newAuthController,
+                      themeController: ThemeController(),
                     ),
-                    (route) => false, // Remove todas as rotas anteriores
-                  );
-                  
-                  AppLogger.debug('Navegação para onboarding concluída');
-                }
-              } catch (e, stackTrace) {
-                AppLogger.error('Erro no logout', e, stackTrace);
-                // Em caso de erro, tentar navegar mesmo assim
-                if (context.mounted) {
-                  try {
-                    final newAuthController = AuthController();
-                    await newAuthController.initialize();
-                    
-                    // Forçar logout no novo controller também
-                    if (newAuthController.isLoggedIn) {
-                      await newAuthController.logout();
-                      await Future.delayed(const Duration(milliseconds: 100));
-                    }
-                    
-                    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder: (context) => OnboardingScreen(
-                          authController: newAuthController,
-                          themeController: ThemeController(),
-                        ),
-                      ),
-                      (route) => false,
-                    );
-                  } catch (navError) {
-                    AppLogger.error('Erro ao navegar após logout', navError);
-                  }
-                }
+                  ),
+                  (route) => false,
+                );
               }
             },
             child: const Text('Sair'),
