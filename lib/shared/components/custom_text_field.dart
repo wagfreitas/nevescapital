@@ -23,6 +23,9 @@ class CustomTextField extends StatelessWidget {
   final TextCapitalization textCapitalization;
   final TextAlign textAlign;
   final TextStyle? style;
+  final bool autofocus;
+  final TextInputAction? textInputAction;
+  final void Function()? onSubmitted;
   
   const CustomTextField({
     super.key,
@@ -46,6 +49,9 @@ class CustomTextField extends StatelessWidget {
     this.textCapitalization = TextCapitalization.none,
     this.textAlign = TextAlign.start,
     this.style,
+    this.autofocus = false,
+    this.textInputAction,
+    this.onSubmitted,
   });
   
   @override
@@ -86,6 +92,16 @@ class CustomTextField extends StatelessWidget {
           textCapitalization: textCapitalization,
           textAlign: textAlign,
           style: style,
+          autofocus: autofocus,
+          textInputAction: textInputAction ?? (maxLines == 1 ? TextInputAction.done : TextInputAction.newline),
+          onFieldSubmitted: onSubmitted != null 
+              ? (_) => onSubmitted!() 
+              : (maxLines == 1 
+                  ? (_) {
+                      // Fechar teclado quando usuário pressionar "OK" ou "Done"
+                      FocusScope.of(context).unfocus();
+                    }
+                  : null),
           decoration: InputDecoration(
             hintText: effectiveHint,
             prefixIcon: prefixIcon,

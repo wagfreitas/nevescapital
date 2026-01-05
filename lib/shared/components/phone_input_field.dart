@@ -11,6 +11,7 @@ class PhoneInputField extends StatefulWidget {
   final String? labelText;
   final String? Function(String?)? validator;
   final bool enabled;
+  final bool autofocus;
   final VoidCallback? onChanged;
   final VoidCallback? onFocusLost;
 
@@ -22,6 +23,7 @@ class PhoneInputField extends StatefulWidget {
     this.labelText,
     this.validator,
     this.enabled = true,
+    this.autofocus = false,
     this.onChanged,
     this.onFocusLost,
   });
@@ -52,6 +54,15 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
 
     // Listener para detectar perda de foco
     _focusNode.addListener(_onFocusChanged);
+    
+    // Solicitar foco após o primeiro frame se autofocus estiver ativado
+    if (widget.autofocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_focusNode.hasFocus) {
+          _focusNode.requestFocus();
+        }
+      });
+    }
   }
 
   @override
@@ -163,8 +174,14 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
             key: _fieldKey,
             controller: _maskedController,
             focusNode: _focusNode,
+            autofocus: widget.autofocus,
             enabled: widget.enabled,
             keyboardType: TextInputType.phone,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) {
+              // Fechar teclado quando usuário pressionar "OK" ou "Done"
+              _focusNode.unfocus();
+            },
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(

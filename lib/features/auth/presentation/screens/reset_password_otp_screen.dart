@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/shared/services/database_service.dart';
 import 'package:neves_capital/features/auth/presentation/screens/change_password_screen.dart';
+import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
 class ResetPasswordOtpScreen extends StatefulWidget {
   final String cpf;
@@ -120,6 +121,7 @@ class _ResetPasswordOtpScreenState extends State<ResetPasswordOtpScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF122118),
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -129,53 +131,68 @@ class _ResetPasswordOtpScreenState extends State<ResetPasswordOtpScreen> {
         ),
       ),
       body: SafeArea(
-        child: Container(
-          width: double.infinity,
-          height: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildLogo(),
-                const SizedBox(height: 40.0),
-                _buildTitle(),
-                const SizedBox(height: 24.0),
-                if (_errorMessage != null) ...[
-                  _buildErrorMessage(),
-                  const SizedBox(height: 16.0),
-                ],
-                if (_codeSent && !_codeVerified) ...[
-                  _buildSuccessMessage(),
-                  const SizedBox(height: 24.0),
-                  _buildOtpForm(),
-                ] else if (!_codeSent) ...[
-                  _buildDescription(),
-                  const SizedBox(height: 24.0),
-                  if (_isLoading)
-                    const CircularProgressIndicator(color: Color(0xFF22C55E))
-                  else
-                    ElevatedButton(
-                      onPressed: _requestOtp,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF22C55E),
-                        foregroundColor: const Color(0xFF122118),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 14, horizontal: 32),
-                      ),
-                      child: const Text(
-                        'Enviar Código',
-                        style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                ],
-              ],
-            ),
-          ),
+        child: KeyboardDismissWrapper(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            return SingleChildScrollView(
+              reverse: true,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.only(
+                left: 16.0,
+                right: 16.0,
+                top: 16.0,
+                bottom: bottomInset + 32.0,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildLogo(),
+                      const SizedBox(height: 40.0),
+                      _buildTitle(),
+                      const SizedBox(height: 24.0),
+                      if (_errorMessage != null) ...[
+                        _buildErrorMessage(),
+                        const SizedBox(height: 16.0),
+                      ],
+                      if (_codeSent && !_codeVerified) ...[
+                        _buildSuccessMessage(),
+                        const SizedBox(height: 24.0),
+                        _buildOtpForm(),
+                      ] else if (!_codeSent) ...[
+                        _buildDescription(),
+                        const SizedBox(height: 24.0),
+                        if (_isLoading)
+                          const CircularProgressIndicator(color: Color(0xFF22C55E))
+                        else
+                          ElevatedButton(
+                            onPressed: _requestOtp,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF22C55E),
+                              foregroundColor: const Color(0xFF122118),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(25),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 14, horizontal: 32),
+                            ),
+                            child: const Text(
+                              'Enviar Código',
+                              style: TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
         ),
       ),
     );
@@ -183,9 +200,9 @@ class _ResetPasswordOtpScreenState extends State<ResetPasswordOtpScreen> {
 
   Widget _buildLogo() {
     return Image.asset(
-      'assets/icons/logo_ios_filled.png',
-      width: 80,
-      height: 80,
+      'assets/icons/PagPag_icon.png',
+      width: 120,
+      height: 120,
       fit: BoxFit.contain,
     );
   }
@@ -269,6 +286,7 @@ class _ResetPasswordOtpScreenState extends State<ResetPasswordOtpScreen> {
         children: [
           TextFormField(
             controller: _otpController,
+            autofocus: true,
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
             maxLength: 6,

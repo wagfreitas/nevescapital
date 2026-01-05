@@ -7,10 +7,10 @@ class LoginProgressWidget extends StatelessWidget {
   final String? errorMessage;
 
   const LoginProgressWidget({
-    Key? key,
+    super.key,
     required this.progress,
     this.errorMessage,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -5,9 +5,22 @@ class PhoneHelper {
     return phone.replaceAll(RegExp(r'[^0-9]'), '');
   }
 
-  /// Formata telefone no padrão (xx)xxxxx-xxxx
-  static String formatPhone(String phone) {
+  /// Remove o código do país (55) se presente
+  static String removeCountryCode(String phone) {
     final cleanPhoneValue = cleanPhone(phone);
+    
+    // Se começar com 55 e tiver mais de 11 dígitos, remove o 55
+    if (cleanPhoneValue.length > 11 && cleanPhoneValue.startsWith('55')) {
+      return cleanPhoneValue.substring(2);
+    }
+    
+    return cleanPhoneValue;
+  }
+
+  /// Formata telefone no padrão (xx)xxxxx-xxxx
+  /// Remove automaticamente o código do país (55) se presente
+  static String formatPhone(String phone) {
+    final cleanPhoneValue = removeCountryCode(phone);
     
     if (cleanPhoneValue.isEmpty) {
       return '';

@@ -1,31 +1,30 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/registration_lifecycle_observer.dart';
 import 'package:neves_capital/features/auth/domain/entities/registration_progress.dart';
-import 'package:neves_capital/core/utils/app_logger.dart';
-import 'step6_personal_data_2_screen.dart';
+import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
+import 'package:neves_capital/features/auth/presentation/helpers/registration_navigation_helper.dart';
+import 'step4_email_screen.dart';
+import 'step6_address_screen.dart';
 
-/// Formatter para data no formato DD/MM/YYYY
+/// Formatter para data no formato DD/MM/AAAA
 class _DateInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    final text = newValue.text;
+    final digitsOnly = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
 
-    if (text.length > 10) {
-      return oldValue;
-    }
-
-    String formatted = '';
-    for (int i = 0; i < text.length; i++) {
-      formatted += text[i];
-      if (i == 1 || i == 3) {
+    var formatted = '';
+    for (var i = 0; i < digitsOnly.length && i < 8; i++) {
+      if (i == 2 || i == 4) {
         formatted += '/';
       }
+      formatted += digitsOnly[i];
     }
 
     return TextEditingValue(
@@ -42,6 +41,9 @@ class Step5PersonalData1Screen extends StatefulWidget {
   final String cpf;
   final String phone;
   final String email;
+  final String? initialFullName;
+  final DateTime? initialBirthDate;
+  final String? initialMotherName;
 
   const Step5PersonalData1Screen({
     super.key,
@@ -50,6 +52,9 @@ class Step5PersonalData1Screen extends StatefulWidget {
     required this.cpf,
     required this.phone,
     required this.email,
+    this.initialFullName,
+    this.initialBirthDate,
+    this.initialMotherName,
   });
 
   @override
@@ -67,10 +72,29 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
   String? _errorMessage;
   DateTime? _selectedDate;
   late RegistrationLifecycleObserver _lifecycleObserver;
+  Timer? _saveDebounceTimer;
 
   @override
   void initState() {
     super.initState();
+
+    // Restaurar valores salvos se existirem
+    if (widget.initialFullName != null && widget.initialFullName!.isNotEmpty) {
+      _fullNameController.text = widget.initialFullName!;
+    }
+    
+    if (widget.initialBirthDate != null) {
+      _selectedDate = widget.initialBirthDate;
+      // Formatar data para DD/MM/AAAA
+      final day = widget.initialBirthDate!.day.toString().padLeft(2, '0');
+      final month = widget.initialBirthDate!.month.toString().padLeft(2, '0');
+      final year = widget.initialBirthDate!.year.toString();
+      _birthDateController.text = '$day/$month/$year';
+    }
+    
+    if (widget.initialMotherName != null && widget.initialMotherName!.isNotEmpty) {
+      _motherNameController.text = widget.initialMotherName!;
+    }
 
     _lifecycleObserver = RegistrationLifecycleObserver(
       getCurrentProgress: () => RegistrationProgress(
@@ -92,14 +116,44 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
     );
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
 
-    // Abrir teclado automaticamente
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fullNameFocusNode.requestFocus();
+    // Salvar progresso imediatamente se houver valores restaurados
+    if (widget.initialFullName != null || widget.initialBirthDate != null || widget.initialMotherName != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _lifecycleObserver.saveNow(localOnly: false);
+      });
+    }
+
+    // Adicionar listeners para salvar automaticamente quando o usuário digitar
+    _fullNameController.addListener(_onFieldChanged);
+    _birthDateController.addListener(_onFieldChanged);
+    _motherNameController.addListener(_onFieldChanged);
+
+    // Abrir teclado automaticamente apenas se não houver valores restaurados
+    if (widget.initialFullName == null || widget.initialFullName!.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _fullNameFocusNode.requestFocus();
+      });
+    }
+  }
+
+  void _onFieldChanged() {
+    // Cancelar timer anterior se existir
+    _saveDebounceTimer?.cancel();
+    
+    // Agendar salvamento após 2 segundos de inatividade (debounce)
+    _saveDebounceTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) {
+        _lifecycleObserver.saveNow(localOnly: true);
+      }
     });
   }
 
   @override
   void dispose() {
+    _saveDebounceTimer?.cancel();
+    _fullNameController.removeListener(_onFieldChanged);
+    _birthDateController.removeListener(_onFieldChanged);
+    _motherNameController.removeListener(_onFieldChanged);
     _lifecycleObserver.dispose();
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     _fullNameFocusNode.dispose();
@@ -119,8 +173,13 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
       final month = int.parse(parts[1]);
       final year = int.parse(parts[2]);
 
-      return DateTime(year, month, day);
-    } catch (e) {
+      final date = DateTime(year, month, day);
+      if (date.year != year || date.month != month || date.day != day) {
+        return null;
+      }
+
+      return date;
+    } catch (_) {
       return null;
     }
   }
@@ -148,24 +207,51 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
     try {
       if (!mounted) return;
 
-      // Salvar progresso LOCALMENTE antes de navegar
-      AppLogger.debug(
-          'Salvando progresso antes de navegar para Dados Pessoais 2');
-      await _lifecycleObserver.saveNow(localOnly: true);
+      // Criar progresso atual com dados preenchidos
+      final currentProgress = RegistrationProgress(
+        cpf: widget.cpf,
+        currentStep: 'address',
+        status: RegistrationStatus.inProgress,
+        lastUpdated: DateTime.now(),
+        phone: widget.phone,
+        email: widget.email,
+        fullName: _fullNameController.text.trim().isNotEmpty
+            ? _fullNameController.text.trim()
+            : null,
+        birthDate: _selectedDate,
+        motherName: _motherNameController.text.trim().isNotEmpty
+            ? _motherNameController.text.trim()
+            : null,
+      );
 
-      // Navegar para próxima tela
+      // Salvar e buscar progresso completo (garante que dados de outras telas sejam preservados)
+      final completeProgress = await RegistrationNavigationHelper.saveAndGetCompleteProgress(
+        currentProgress: currentProgress,
+      );
+
+      if (!mounted) return;
+
+      // Navegar para próxima tela (Endereço)
+      // Usar dados do progresso completo para restaurar tudo que já foi preenchido
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => Step6PersonalData2Screen(
+          builder: (context) => Step6AddressScreen(
             authController: widget.authController,
             themeController: widget.themeController,
             cpf: widget.cpf,
             phone: widget.phone,
             email: widget.email,
-            fullName: _fullNameController.text.trim(),
-            birthDate: _selectedDate!,
-            motherName: _motherNameController.text.trim(),
+            fullName: completeProgress?.fullName ?? _fullNameController.text.trim(),
+            birthDate: completeProgress?.birthDate ?? _selectedDate!,
+            motherName: completeProgress?.motherName ?? _motherNameController.text.trim(),
+            initialCep: completeProgress?.cep,
+            initialStreet: completeProgress?.street,
+            initialNumber: completeProgress?.number,
+            initialComplement: completeProgress?.complement,
+            initialNeighborhood: completeProgress?.neighborhood,
+            initialCity: completeProgress?.city,
+            initialState: completeProgress?.state,
           ),
         ),
       );
@@ -188,273 +274,335 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF122118),
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            // Tentar fazer pop primeiro (se houver tela anterior na pilha)
+            // Se não houver, navegar explicitamente para a tela de email
+            // Isso garante que funciona tanto no fluxo normal quanto no "Recomeçar"
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              // Não há tela anterior na pilha (vem do fluxo de "Recomeçar")
+              // Navegar explicitamente para a tela de email
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => Step4EmailScreen(
+                    authController: widget.authController,
+                    themeController: widget.themeController,
+                    cpf: widget.cpf,
+                    phone: widget.phone,
+                    initialEmail: widget.email,
+                  ),
+                ),
+              );
+            }
+          },
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 40),
-                const Text(
-                  'Informações Pessoais',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Color(0xFF22C55E),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 32,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Precisamos de algumas informações para completar seu cadastro',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white70,
-                  ),
-                ),
-                const SizedBox(height: 40),
-                // Nome Completo
-                TextFormField(
-                  controller: _fullNameController,
-                  focusNode: _fullNameFocusNode,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Nome Completo',
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.1),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: Color(0xFF22C55E), width: 2),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.red, width: 2),
-                    ),
-                    prefixIcon: const Icon(Icons.person, color: Colors.white70),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Digite seu nome completo';
-                    }
-                    if (value.trim().split(' ').length < 2) {
-                      return 'Digite nome e sobrenome';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-                // Data de Nascimento
-                TextFormField(
-                  controller: _birthDateController,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    _DateInputFormatter(),
-                  ],
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Data de Nascimento',
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.1),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: Color(0xFF22C55E), width: 2),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.red, width: 2),
-                    ),
-                    prefixIcon:
-                        const Icon(Icons.calendar_today, color: Colors.white70),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Digite sua data de nascimento';
-                    }
-                    if (value.length != 10) {
-                      return 'Data incompleta';
-                    }
-
-                    final birthDate = _parseBirthDate(value);
-                    if (birthDate == null) {
-                      return 'Data inválida';
-                    }
-
-                    if (!_isValidAge(birthDate)) {
-                      final now = DateTime.now();
-                      final age = now.year - birthDate.year;
-                      if (age < 18) {
-                        return 'Você deve ter no mínimo 18 anos';
-                      }
-                      return 'Data de nascimento inválida';
-                    }
-
-                    setState(() {
-                      _selectedDate = birthDate;
-                    });
-
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
-                // Nome da Mãe
-                TextFormField(
-                  controller: _motherNameController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Nome da Mãe',
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.1),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: Color(0xFF22C55E), width: 2),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.red, width: 2),
-                    ),
-                    prefixIcon: const Icon(Icons.family_restroom,
-                        color: Colors.white70),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Digite o nome da sua mãe';
-                    }
-                    if (value.trim().split(' ').length < 2) {
-                      return 'Digite nome e sobrenome';
-                    }
-                    return null;
-                  },
-                ),
-                if (_errorMessage != null) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.red),
-                    ),
-                    child: Row(
+        child: KeyboardDismissWrapper(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            return SingleChildScrollView(
+              reverse: true,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.only(
+                left: 24.0,
+                right: 24.0,
+                bottom: bottomInset + 32.0,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Form(
+                  key: _formKey,
+                  child: IntrinsicHeight(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.error_outline,
-                            color: Colors.red, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _errorMessage!,
-                            style: const TextStyle(
-                                color: Colors.red, fontSize: 14),
+                        const SizedBox(height: 40),
+                        const Text(
+                          'Informações Pessoais',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
+                        const SizedBox(height: 12),
+                        Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Primeiro traço (ativo) - primeira de 3
+                              Container(
+                                width: 32,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: Color(0xFF22C55E),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Segundo traço (inativo)
+                              Container(
+                                width: 32,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Terceiro traço (inativo)
+                              Container(
+                                width: 32,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Precisamos de algumas informações para completar seu cadastro',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.white70,
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                        // Nome Completo
+                        TextFormField(
+                          controller: _fullNameController,
+                          focusNode: _fullNameFocusNode,
+                          autofocus: true,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: 'Nome Completo',
+                            labelStyle: const TextStyle(color: Colors.white70),
+                            filled: true,
+                            fillColor: Colors.white.withValues(alpha: 0.1),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.2)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  const BorderSide(color: Color(0xFF22C55E), width: 2),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Colors.red, width: 2),
+                            ),
+                            prefixIcon: const Icon(Icons.person, color: Colors.white70),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Digite seu nome completo';
+                            }
+                            if (value.trim().split(' ').length < 2) {
+                              return 'Digite nome e sobrenome';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        // Data de Nascimento
+                        TextFormField(
+                          controller: _birthDateController,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            _DateInputFormatter(),
+                          ],
+                          maxLength: 10,
+                          style: const TextStyle(color: Colors.white),
+                          onChanged: (value) {
+                            // Atualizar _selectedDate quando o usuário digita
+                            if (value.length == 10) {
+                              final parsed = _parseBirthDate(value);
+                              if (parsed != null && _isValidAge(parsed)) {
+                                setState(() {
+                                  _selectedDate = parsed;
+                                });
+                              }
+                            }
+                          },
+                          decoration: InputDecoration(
+                            labelText: 'Data de Nascimento',
+                            hintText: 'Ex: 25/12/1990',
+                            labelStyle: const TextStyle(color: Colors.white70),
+                            hintStyle:
+                                TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                            filled: true,
+                            fillColor: Colors.white.withValues(alpha: 0.1),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.2)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  const BorderSide(color: Color(0xFF22C55E), width: 2),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Colors.red, width: 2),
+                            ),
+                            prefixIcon:
+                                const Icon(Icons.calendar_today, color: Colors.white70),
+                            counterText: '', // Ocultar contador
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Digite sua data de nascimento';
+                            }
+                            if (value.length != 10) {
+                              return 'Use o formato DD/MM/AAAA';
+                            }
+
+                            final birthDate = _parseBirthDate(value);
+                            if (birthDate == null) {
+                              return 'Data inválida';
+                            }
+
+                            if (!_isValidAge(birthDate)) {
+                              return 'Data de nascimento inválida para maiores de 18 anos';
+                            }
+
+                            _selectedDate = birthDate;
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        // Nome da Mãe
+                        TextFormField(
+                          controller: _motherNameController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: 'Nome da Mãe',
+                            labelStyle: const TextStyle(color: Colors.white70),
+                            filled: true,
+                            fillColor: Colors.white.withValues(alpha: 0.1),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.2)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  const BorderSide(color: Color(0xFF22C55E), width: 2),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Colors.red, width: 2),
+                            ),
+                            prefixIcon: const Icon(Icons.family_restroom,
+                                color: Colors.white70),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Digite o nome da sua mãe';
+                            }
+                            if (value.trim().split(' ').length < 2) {
+                              return 'Digite nome e sobrenome';
+                            }
+                            return null;
+                          },
+                        ),
+                        if (_errorMessage != null) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline,
+                                    color: Colors.red, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _errorMessage!,
+                                    style: const TextStyle(
+                                        color: Colors.red, fontSize: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 32),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _handleNext,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF22C55E),
+                              foregroundColor: const Color(0xFF122118),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Color(0xFF122118)),
+                                    ),
+                                  )
+                                : const Text(
+                                    'Avançar',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 40),
                       ],
                     ),
                   ),
-                ],
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _handleNext,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF22C55E),
-                      foregroundColor: const Color(0xFF122118),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                  Color(0xFF122118)),
-                            ),
-                          )
-                        : const Text(
-                            'Avançar',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                  ),
                 ),
-                const SizedBox(height: 40),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
+        ),
         ),
       ),
     );

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/components/custom_text_field.dart';
 import 'package:neves_capital/shared/helpers/format_helpers.dart';
+import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'payment_step3_screen.dart';
 
 /// Tela 2: Inserir valor da venda
@@ -11,10 +12,10 @@ class PaymentStep2Screen extends StatefulWidget {
   final String ramoAtuacao;
 
   const PaymentStep2Screen({
-    Key? key,
+    super.key,
     required this.nomeEstabelecimento,
     required this.ramoAtuacao,
-  }) : super(key: key);
+  });
 
   @override
   State<PaymentStep2Screen> createState() => _PaymentStep2ScreenState();
@@ -105,7 +106,8 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
         elevation: 0,
       ),
       body: SafeArea(
-        child: Padding(
+        child: KeyboardDismissWrapper(
+          child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Form(
             key: _formKey,
@@ -130,6 +132,7 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
                   controller: _valorController,
                   hintText: 'R\$ 0,00',
                   labelText: 'Valor da Venda',
+                  autofocus: true, // Focar automaticamente ao entrar na tela
                   keyboardType: TextInputType.number,
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
@@ -222,6 +225,7 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

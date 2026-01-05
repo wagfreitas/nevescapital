@@ -4,6 +4,7 @@ import 'package:neves_capital/shared/components/cpf_input_field.dart';
 import 'package:neves_capital/shared/helpers/cpf_helper.dart';
 import 'package:neves_capital/features/auth/presentation/screens/reset_password_otp_screen.dart';
 import 'package:neves_capital/core/config/feature_flags.dart';
+import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   final AuthController authController;
@@ -42,7 +43,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
       ),
       body: SafeArea(
-        child: Container(
+        child: KeyboardDismissWrapper(
+          child: Container(
           width: double.infinity,
           height: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16.0), // px-4
@@ -67,15 +69,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
           ),
         ),
+        ),
       ),
     );
   }
 
   Widget _buildLogo() {
     return Image.asset(
-      'assets/icons/logo_ios_filled.png',
-      width: 80,
-      height: 80,
+      'assets/icons/PagPag_icon.png',
+      width: 120,
+      height: 120,
       fit: BoxFit.contain,
     );
   }
@@ -180,6 +183,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return CpfInputField(
       controller: _cpfController,
       hintText: 'Digite seu CPF',
+      autofocus: true, // Focar automaticamente ao entrar na tela
     );
   }
 

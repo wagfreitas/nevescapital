@@ -20,7 +20,7 @@ class PaymentStep5Screen extends StatefulWidget {
   final String vencimento;
 
   const PaymentStep5Screen({
-    Key? key,
+    super.key,
     required this.nomeEstabelecimento,
     required this.ramoAtuacao,
     required this.valorCentavos,
@@ -30,7 +30,7 @@ class PaymentStep5Screen extends StatefulWidget {
     required this.numeroCartao,
     required this.cvv,
     required this.vencimento,
-  }) : super(key: key);
+  });
 
   @override
   State<PaymentStep5Screen> createState() => _PaymentStep5ScreenState();

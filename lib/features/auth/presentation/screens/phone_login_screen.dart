@@ -1,4 +1,6 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:neves_capital/shared/components/phone_input_field.dart';
 import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
@@ -6,6 +8,7 @@ import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/features/auth/presentation/screens/login_otp/login_step3_otp_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
 /// Tela de Login via Telefone (Phone-First)
 class PhoneLoginScreen extends StatefulWidget {
@@ -24,6 +27,7 @@ class PhoneLoginScreen extends StatefulWidget {
 
 class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
+  final FocusNode _phoneFocusNode = FocusNode();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   String? _errorMessage;
@@ -31,12 +35,24 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
   @override
   void dispose() {
     _phoneController.dispose();
+    _phoneFocusNode.dispose();
     super.dispose();
   }
 
-  // 🎭 MODO FAKE OTP PARA DESENVOLVIMENTO
-  static const bool _useFakeOtp = true;
+  // 🎭 MODO FAKE OTP - DESABILITADO PARA PRODUÇÃO
+  // Não usar em produção - apenas para desenvolvimento local
+  static const bool _useFakeOtp = false;
   static const String _fakeVerificationId = 'fake-verification-id-123';
+  
+  // Lista de números de teste do Firebase (para validação)
+  // IMPORTANTE: O número deve estar no formato E.164 SEM espaços no Firebase Console
+  // Exemplo: +5511989630454 (não +55 11 98963-0454)
+  static const List<String> _testPhoneNumbers = [
+    '+5511999999999',
+    '+5511987654321',
+    '+5511123456789',
+    '+5511989630454', // Número do usuário atual
+  ];
 
   Future<void> _handleNext() async {
     if (!_formKey.currentState!.validate()) return;
@@ -50,7 +66,16 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
       // Obter telefone limpo (apenas números, com DDI 55 se não tiver)
       String phone = PhoneHelper.getPhoneNumbers(_phoneController.text);
 
-      // Garantir DDI 55
+      // Validar se o telefone tem pelo menos 10 dígitos (sem DDI)
+      if (phone.length < 10) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Telefone inválido. Digite um número válido.';
+        });
+        return;
+      }
+
+      // Garantir DDI 55 (Brasil)
       if (!phone.startsWith('55')) {
         phone = '55$phone';
       }
@@ -58,8 +83,19 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
       // Formatar para E.164 (+55...)
       final formattedPhone = '+$phone';
 
-      AppLogger.info(
-          '🚀 Iniciando login Firebase para telefone: $formattedPhone');
+      AppLogger.info('🚀 Iniciando login Firebase');
+      AppLogger.info('📱 Telefone original: ${_phoneController.text}');
+      AppLogger.info('📱 Telefone limpo: $phone');
+      AppLogger.info('📱 Telefone formatado (E.164): $formattedPhone');
+      AppLogger.info('📱 Comprimento: ${formattedPhone.length} caracteres');
+      
+      // Verificar se é número de teste conhecido
+      if (_testPhoneNumbers.contains(formattedPhone)) {
+        AppLogger.info('✅ Número de teste detectado');
+      } else {
+        AppLogger.warning('⚠️ Número não está na lista de testes do Firebase');
+        AppLogger.warning('💡 Configure este número em: Firebase Console > Authentication > Phone > Test phone numbers');
+      }
 
       // 🎭 MODO FAKE: Simular envio de OTP
       if (_useFakeOtp) {
@@ -127,24 +163,50 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
         },
         verificationFailed: (FirebaseAuthException e) {
           AppLogger.error('❌ Falha na verificação: ${e.code} - ${e.message}');
+          AppLogger.error('📱 Telefone formatado: $formattedPhone');
+          AppLogger.error('📱 Telefone original: ${_phoneController.text}');
+          
           if (mounted) {
             setState(() {
               _isLoading = false;
               if (e.code == 'invalid-phone-number') {
-                _errorMessage = 'Número de telefone inválido.';
+                _errorMessage = 'Número de telefone inválido. Verifique o formato.';
               } else if (e.code == 'too-many-requests') {
                 _errorMessage = 'Muitas tentativas. Aguarde alguns minutos.';
               } else if (e.code == 'internal-error') {
-                _errorMessage =
-                    'Erro interno. Use um dispositivo real ou configure número de teste no Firebase Console.';
+                // Erro interno pode ter várias causas
+                final normalizedPhone = formattedPhone.replaceAll(' ', '').replaceAll('-', '').replaceAll('(', '').replaceAll(')', '');
+                
+                // Detectar plataforma para dar instruções específicas
+                final isIOS = !kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS || Platform.isIOS);
+                
+                // Mensagem focada na solução real para produção
+                _errorMessage = 'Erro de configuração do Firebase (internal-error).\n\n'
+                    '🔧 AÇÃO NECESSÁRIA:\n\n'
+                    '${isIOS ? "1. Configure APNs no Firebase Console:" : "1. Configure SHA-1 no Firebase Console:"}\n'
+                    '   ${isIOS ? "Project Settings > Cloud Messaging > APNs authentication key" : "Project Settings > Your apps > Android > SHA certificate fingerprints"}\n'
+                    '   ${isIOS ? "Faça upload do arquivo .p8 da Apple Developer" : "SHA-1 Debug: 33:2A:B5:0C:B5:9B:A9:C1:F2:8D:02:13:AE:01:67:56:AE:11:CB:16"}\n\n'
+                    '2. Verifique Phone Auth habilitado:\n'
+                    '   Authentication > Sign-in method > Phone > Enable\n\n'
+                    '3. Número de teste (se usar):\n'
+                    '   $normalizedPhone com código 123456';
+              } else if (e.code == 'missing-phone-number') {
+                _errorMessage = 'Número de telefone não fornecido.';
+              } else if (e.code == 'quota-exceeded') {
+                _errorMessage = 'Limite de SMS excedido. Tente mais tarde.';
+              } else if (e.code == 'user-disabled') {
+                _errorMessage = 'Conta desabilitada. Contate o suporte.';
+              } else if (e.code == 'operation-not-allowed') {
+                _errorMessage = 'Autenticação por telefone não habilitada.';
               } else {
-                _errorMessage = 'Erro: ${e.message}';
+                _errorMessage = 'Erro: ${e.message ?? e.code}';
               }
             });
           }
         },
         codeSent: (String verificationId, int? resendToken) {
           AppLogger.info('✅ Código enviado. VerificationId: $verificationId');
+          AppLogger.debug('📱 ResendToken: ${resendToken != null ? "disponível" : "não disponível"}');
 
           if (!mounted) return;
 
@@ -163,7 +225,9 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
               settings: RouteSettings(
                 arguments: {
                   'phone': phone,
+                  'formattedPhone': formattedPhone, // Telefone formatado E.164 para reenvio
                   'verificationId': verificationId,
+                  'resendToken': resendToken, // Token para reenvio
                   'maskedPhone': PhoneHelper.maskPhoneLast4(phone),
                 },
               ),
@@ -192,137 +256,161 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF122118),
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () async {
+            // Evita crash: não dar pop enquanto teclado está aberto.
+            if (FocusManager.instance.primaryFocus != null) {
+              FocusScope.of(context).unfocus();
+              return;
+            }
+            if (!context.mounted) return;
+            await Navigator.of(context).maybePop();
+          },
         ),
       ),
-      body: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(height: 40),
-              Image.asset(
-                'assets/icons/logo_ios_filled.png',
-                width: 80,
-                height: 80,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(height: 40),
-              const Text(
-                'Bem-vindo',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Digite seu celular para entrar ou criar uma conta',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white70,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 40),
-              if (_errorMessage != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline,
-                          color: Colors.red, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style:
-                              const TextStyle(color: Colors.red, fontSize: 14),
+      body: KeyboardDismissWrapper(
+        focusNodes: [_phoneFocusNode],
+        doneText: 'OK',
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.only(top: 40.0, bottom: 24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Image.asset(
+                          'assets/icons/PagPag_icon.png',
+                          width: 120,
+                          height: 120,
+                          fit: BoxFit.contain,
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              Form(
-                key: _formKey,
-                child: PhoneInputField(
-                  controller: _phoneController,
-                  labelText: 'Celular',
-                  hintText: '(00) 00000-0000',
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Digite seu celular';
-                    }
-                    if (!PhoneHelper.isValidPhone(value)) {
-                      return 'Celular inválido';
-                    }
-                    return null;
-                  },
-                ),
-              ),
-              // 🎯 BOTÃO DE AUTO-FILL (MODO DEBUG)
-              if (_useFakeOtp) ...[
-                TextButton.icon(
-                  onPressed: () {
-                    _phoneController.text = '11989630454';
-                  },
-                  icon: const Icon(Icons.flash_on, color: Colors.orange),
-                  label: const Text(
-                    'Auto-preencher teste',
-                    style: TextStyle(color: Colors.orange),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleNext,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF28CC28),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Text(
-                          'Continuar',
+                        const SizedBox(height: 40),
+                        const Text(
+                          'Bem-vindo',
                           style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Digite seu celular para entrar ou criar uma conta',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.white70,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 40),
+                        if (_errorMessage != null) ...[
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline,
+                                    color: Colors.red, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _errorMessage!,
+                                    style: const TextStyle(
+                                        color: Colors.red, fontSize: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        Form(
+                          key: _formKey,
+                          child: PhoneInputField(
+                            controller: _phoneController,
+                            focusNode: _phoneFocusNode,
+                            labelText: 'Celular',
+                            hintText: '(00) 00000-0000',
+                            autofocus: true,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Digite seu celular';
+                              }
+                              if (!PhoneHelper.isValidPhone(value)) {
+                                return 'Celular inválido';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                        if (_useFakeOtp) ...[
+                          const SizedBox(height: 16),
+                          TextButton.icon(
+                            onPressed: () {
+                              _phoneController.text = '11989630454';
+                            },
+                            icon:
+                                const Icon(Icons.flash_on, color: Colors.orange),
+                            label: const Text(
+                              'Auto-preencher teste',
+                              style: TextStyle(color: Colors.orange),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              const Spacer(),
-            ],
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _handleNext,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF28CC28),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            'Continuar',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),

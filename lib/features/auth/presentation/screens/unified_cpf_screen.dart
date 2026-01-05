@@ -5,9 +5,13 @@ import 'package:neves_capital/features/auth/presentation/controllers/auth_contro
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/features/auth/presentation/screens/new_registration/step2_phone_screen.dart';
+import 'package:neves_capital/features/auth/presentation/screens/new_registration/step4_email_screen.dart';
 import 'package:neves_capital/features/auth/data/services/registration_service.dart';
 import 'package:neves_capital/features/auth/presentation/helpers/registration_navigator.dart';
-import 'package:neves_capital/features/auth/data/services/auth_api_service.dart';
+import 'package:neves_capital/shared/helpers/phone_helper.dart';
+import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
+import 'package:neves_capital/features/home/presentation/screens/dashboard_screen.dart';
+import 'package:neves_capital/shared/services/firestore_service.dart';
 
 /// Tela Unificada: Insira seu CPF
 /// Verifica se o CPF existe e direciona automaticamente para:
@@ -16,11 +20,15 @@ import 'package:neves_capital/features/auth/data/services/auth_api_service.dart'
 class UnifiedCpfScreen extends StatefulWidget {
   final AuthController? authController;
   final ThemeController? themeController;
+  final String? initialPhone;
+  final String? initialCpf;
 
   const UnifiedCpfScreen({
     super.key,
     this.authController,
     this.themeController,
+    this.initialPhone,
+    this.initialCpf,
   });
 
   @override
@@ -36,6 +44,14 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
   @override
   void initState() {
     super.initState();
+    
+    // Restaurar CPF se fornecido
+    if (widget.initialCpf != null && widget.initialCpf!.isNotEmpty) {
+      // Formatar o CPF para exibição
+      _cpfController.text = CpfHelper.formatCpf(widget.initialCpf!);
+      AppLogger.debug('CPF restaurado: ${widget.initialCpf!.substring(0, 3)}***');
+    }
+    
     // Limpar mensagem de erro quando o usuário começar a digitar
     _cpfController.addListener(() {
       if (_errorMessage != null) {
@@ -74,10 +90,12 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
     });
 
     try {
-      // Verificar se CPF existe no banco
+      // Verificar se CPF existe no banco usando Firestore (busca por hash)
       AppLogger.info('🚀 Verificando CPF: ${cpf.substring(0, 3)}***');
+      AppLogger.debug('Usando FirestoreService.checkCpf para buscar por cpfHash');
 
-      final result = await AuthApiService.checkCpf(cpf);
+      // Usar FirestoreService que busca pelo hash corretamente
+      final result = await FirestoreService.checkCpf(cpf);
 
       if (!mounted) return;
 
@@ -86,17 +104,45 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
 
       if (success && exists) {
         // ============================================
-        // CPF EXISTE: Fluxo de Login (Phone Auth)
+        // CPF EXISTE: Fazer login automaticamente
         // ============================================
         AppLogger.info(
-            '✅ CPF encontrado - Redirecionando para login via telefone');
+            '✅ CPF encontrado - Fazendo login automaticamente');
 
-        // TODO: Implementar navegação para tela de Phone Login
-        // Por enquanto, mostrar mensagem
-        if (mounted) {
+        // Verificar se authController está disponível
+        if (widget.authController == null) {
+          if (mounted) {
+            setState(() {
+              _errorMessage = 'Erro: AuthController não disponível';
+            });
+          }
+          return;
+        }
+
+        // Fazer login com OTP (já validado na tela anterior)
+        final loginSuccess = await widget.authController!.loginWithOtpMock(cpf);
+
+        if (!mounted) return;
+
+        if (loginSuccess) {
+          AppLogger.info(
+              '✅ Login realizado com sucesso - redirecionando para DashboardScreen');
+          
+          // Navegar para Dashboard quando login bem-sucedido
+          Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => DashboardScreen(
+                authController: widget.authController!,
+                themeController: widget.themeController ?? ThemeController(),
+              ),
+            ),
+            (route) => false, // Remove todas as rotas anteriores
+          );
+        } else {
+          // Login falhou - mostrar erro
           setState(() {
-            _errorMessage =
-                'Login via telefone ainda não implementado. Em breve!';
+            _errorMessage = widget.authController?.errorMessage ??
+                'Erro ao fazer login. Tente novamente.';
           });
         }
       } else if (success && !exists) {
@@ -135,15 +181,26 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
 
         // Novo cadastro
         if (mounted) {
+          final normalizedPhone = _normalizeInitialPhone(widget.initialPhone);
+          AppLogger.debug('Novo cadastro - initialPhone: ${widget.initialPhone}, normalizedPhone: $normalizedPhone');
+          
+          final nextScreen = normalizedPhone != null
+              ? Step4EmailScreen(
+                  authController: widget.authController,
+                  themeController: widget.themeController,
+                  cpf: cpf,
+                  phone: normalizedPhone,
+                )
+              : Step2PhoneScreen(
+                  authController: widget.authController,
+                  themeController: widget.themeController,
+                  cpf: cpf,
+                );
+
+          AppLogger.info('Navegando para: ${normalizedPhone != null ? "Step4EmailScreen" : "Step2PhoneScreen"}');
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => Step2PhoneScreen(
-                authController: widget.authController,
-                themeController: widget.themeController,
-                cpf: cpf,
-              ),
-            ),
+            MaterialPageRoute(builder: (context) => nextScreen),
           );
         }
       } else {
@@ -172,37 +229,58 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF122118),
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            }
+          },
         ),
       ),
       body: SafeArea(
-        child: Container(
-          width: double.infinity,
-          height: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const SizedBox(height: 40),
-                _buildLogo(),
-                const SizedBox(height: 40.0),
-                _buildTitle(),
-                const SizedBox(height: 8.0),
-                _buildSubtitle(),
-                const SizedBox(height: 40.0),
-                if (_errorMessage != null) ...[
-                  _buildErrorMessage(),
-                  const SizedBox(height: 16.0),
-                ],
-                _buildForm(),
-              ],
-            ),
+        child: KeyboardDismissWrapper(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+              return SingleChildScrollView(
+                reverse: true,
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.only(
+                  left: 16.0,
+                  right: 16.0,
+                  top: 40.0,
+                  bottom: bottomInset + 32.0,
+                ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
+                  ),
+                  child: IntrinsicHeight(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildLogo(),
+                        const SizedBox(height: 40.0),
+                        _buildTitle(),
+                        const SizedBox(height: 8.0),
+                        _buildSubtitle(),
+                        const SizedBox(height: 40.0),
+                        if (_errorMessage != null) ...[
+                          _buildErrorMessage(),
+                          const SizedBox(height: 16.0),
+                        ],
+                        _buildForm(),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -211,9 +289,9 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
 
   Widget _buildLogo() {
     return Image.asset(
-      'assets/icons/logo_ios_filled.png',
-      width: 80,
-      height: 80,
+      'assets/icons/PagPag_icon.png',
+      width: 120,
+      height: 120,
       fit: BoxFit.contain,
     );
   }
@@ -274,6 +352,7 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
             controller: _cpfController,
             labelText: 'CPF',
             hintText: '000.000.000-00',
+            autofocus: widget.initialCpf == null || widget.initialCpf!.isEmpty,
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'Por favor, digite seu CPF';
@@ -326,5 +405,38 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
         ],
       ),
     );
+  }
+
+  String? _normalizeInitialPhone(String? phone) {
+    if (phone == null || phone.trim().isEmpty) {
+      AppLogger.debug('_normalizeInitialPhone: phone é null ou vazio');
+      return null;
+    }
+
+    try {
+      // Obter apenas os números (remove +, espaços, etc)
+      final phoneNumbers = PhoneHelper.getPhoneNumbers(phone);
+      AppLogger.debug('_normalizeInitialPhone: telefone original: $phone, números: $phoneNumbers');
+      
+      // Se o telefone tem código do país (55) e mais de 11 dígitos, remover o código do país
+      // O Step4EmailScreen espera o telefone sem o código do país
+      if (phoneNumbers.length > 11 && phoneNumbers.startsWith('55')) {
+        final phoneWithoutCountryCode = phoneNumbers.substring(2);
+        AppLogger.debug('_normalizeInitialPhone: removendo código do país, resultado: $phoneWithoutCountryCode');
+        return phoneWithoutCountryCode;
+      }
+      
+      // Se já está no formato correto (10 ou 11 dígitos), retornar como está
+      if (phoneNumbers.length >= 10 && phoneNumbers.length <= 11) {
+        AppLogger.debug('_normalizeInitialPhone: telefone já está no formato correto');
+        return phoneNumbers;
+      }
+      
+      AppLogger.warning('_normalizeInitialPhone: formato de telefone inválido: $phoneNumbers (${phoneNumbers.length} dígitos)');
+      return null;
+    } catch (e) {
+      AppLogger.error('_normalizeInitialPhone: erro ao normalizar telefone', e);
+      return null;
+    }
   }
 }

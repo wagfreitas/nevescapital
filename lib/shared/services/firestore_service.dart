@@ -92,16 +92,33 @@ class FirestoreService {
       }
 
       // Adicionar endereço se fornecido
-      if (address != null && city != null && state != null) {
+      // Modelagem: endereço como objeto aninhado com todos os campos
+      // Campos obrigatórios: street (ou address), city, state
+      // Campos opcionais: cep, number, complement, neighborhood
+      final hasRequiredAddressFields = (address != null && address.isNotEmpty) && 
+                                      (city != null && city.isNotEmpty) && 
+                                      (state != null && state.isNotEmpty);
+      
+      if (hasRequiredAddressFields) {
         userData['address'] = {
-          'cep': cep ?? '',
-          'street': address,
-          'number': number ?? '',
-          'complement': complement ?? '',
-          'neighborhood': neighborhood ?? '',
-          'city': city,
-          'state': state,
+          'cep': cep?.trim() ?? '',
+          'street': address.trim(),
+          'number': number?.trim() ?? '',
+          'complement': complement?.trim() ?? '',
+          'neighborhood': neighborhood?.trim() ?? '',
+          'city': city.trim(),
+          'state': state.trim(),
         };
+        AppLogger.info('✅ Endereço adicionado ao usuário: ${city}/${state}');
+        AppLogger.debug('  - CEP: ${cep ?? "não informado"}');
+        AppLogger.debug('  - Rua: $address');
+        AppLogger.debug('  - Número: ${number ?? "não informado"}');
+        AppLogger.debug('  - Bairro: ${neighborhood ?? "não informado"}');
+      } else {
+        AppLogger.warning('⚠️ Endereço não adicionado - campos obrigatórios ausentes:');
+        AppLogger.warning('  - address: ${address != null && address.isNotEmpty}');
+        AppLogger.warning('  - city: ${city != null && city.isNotEmpty}');
+        AppLogger.warning('  - state: ${state != null && state.isNotEmpty}');
       }
 
       // Salvar no Firestore
@@ -193,14 +210,14 @@ class FirestoreService {
     }
   }
 
-  /// Buscar usuário por Firebase UID
-  static Future<Map<String, dynamic>?> getUserByUid(String uid) async {
+  /// Buscar usuário pelo ID do documento (usado após backend retornar userId)
+  static Future<Map<String, dynamic>?> getUserByDocumentId(String docId) async {
     try {
-      AppLogger.debug('Buscando usuário por UID no Firestore');
+      AppLogger.debug('Buscando usuário pelo ID do documento no Firestore');
 
-      final doc = await _firestore.collection('users').doc(uid).get();
+      final doc = await _firestore.collection('users').doc(docId).get();
       if (!doc.exists) {
-        AppLogger.warning('Usuário não encontrado com UID fornecido');
+        AppLogger.warning('Usuário não encontrado com ID fornecido');
         return null;
       }
 
@@ -215,8 +232,32 @@ class FirestoreService {
       AppLogger.info('Usuário encontrado no Firestore');
       return decryptedData;
     } catch (e) {
-      AppLogger.error('Erro ao buscar usuário por UID', e);
+      AppLogger.error('Erro ao buscar usuário pelo ID do documento', e);
       return null;
+    }
+  }
+
+  /// Vincula o documento do usuário ao UID do Firebase Auth
+  static Future<void> linkUserDocumentToFirebaseUid({
+    required String userId,
+    required String firebaseUid,
+  }) async {
+    try {
+      AppLogger.debug(
+          'Vinculando documento $userId ao Firebase UID ${firebaseUid.substring(0, 6)}...');
+
+      await _firestore.collection('users').doc(userId).set(
+        {
+          'ownerUid': firebaseUid,
+          'ownerLinkedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+
+      AppLogger.info('Documento vinculado ao Firebase UID com sucesso');
+    } catch (e) {
+      AppLogger.error('Erro ao vincular documento ao Firebase UID', e);
+      rethrow;
     }
   }
 
@@ -260,7 +301,7 @@ class FirestoreService {
         'message': exists ? 'CPF já cadastrado' : 'CPF não cadastrado',
       };
     } catch (e, stackTrace) {
-      AppLogger.error('❌ [FIRESTORE] Erro ao verificar CPF: $e', stackTrace);
+      AppLogger.error('❌ [FIRESTORE] Erro ao verificar CPF: $e', e, stackTrace);
 
       return {
         'success': false,
@@ -293,6 +334,7 @@ class FirestoreService {
     String? selfieUrl,
     String? frontDocumentUrl,
     String? backDocumentUrl,
+    String? documentType,
   }) async {
     try {
       AppLogger.debug('Iniciando atualização do usuário no Firestore');
@@ -345,16 +387,34 @@ class FirestoreService {
       }
 
       // Atualizar endereço se fornecido
-      if (address != null && city != null && state != null) {
+      // Modelagem: endereço como objeto aninhado com todos os campos
+      // Campos obrigatórios: street (ou address), city, state
+      // Campos opcionais: cep, number, complement, neighborhood
+      final hasRequiredAddressFields = (address != null && address.isNotEmpty) && 
+                                      (city != null && city.isNotEmpty) && 
+                                      (state != null && state.isNotEmpty);
+      
+      if (hasRequiredAddressFields) {
         updates['address'] = {
-          'cep': cep ?? '',
-          'street': address,
-          'number': number ?? '',
-          'complement': complement ?? '',
-          'neighborhood': neighborhood ?? '',
-          'city': city,
-          'state': state,
+          'cep': cep?.trim() ?? '',
+          'street': address.trim(),
+          'number': number?.trim() ?? '',
+          'complement': complement?.trim() ?? '',
+          'neighborhood': neighborhood?.trim() ?? '',
+          'city': city.trim(),
+          'state': state.trim(),
         };
+        AppLogger.info('✅ Endereço atualizado: ${city}/${state}');
+        AppLogger.debug('  - CEP: ${cep ?? "não informado"}');
+        AppLogger.debug('  - Rua: $address');
+        AppLogger.debug('  - Número: ${number ?? "não informado"}');
+        AppLogger.debug('  - Bairro: ${neighborhood ?? "não informado"}');
+      } else if (cep != null || address != null || city != null || state != null) {
+        // Se pelo menos um campo de endereço foi fornecido, mas não todos obrigatórios
+        AppLogger.warning('⚠️ Endereço parcial fornecido - campos obrigatórios ausentes:');
+        AppLogger.warning('  - address: ${address != null && address.isNotEmpty}');
+        AppLogger.warning('  - city: ${city != null && city.isNotEmpty}');
+        AppLogger.warning('  - state: ${state != null && state.isNotEmpty}');
       }
 
       // Atualizar URLs dos documentos KYC se fornecidas
@@ -366,6 +426,9 @@ class FirestoreService {
       }
       if (backDocumentUrl != null && backDocumentUrl.isNotEmpty) {
         updates['kycDocuments.backDocumentUrl'] = backDocumentUrl;
+      }
+      if (documentType != null && documentType.isNotEmpty) {
+        updates['kycDocuments.documentType'] = documentType;
       }
 
       AppLogger.debug(
@@ -430,6 +493,26 @@ class FirestoreService {
       decrypted['address'] = data['address'];
     }
 
+    // Copiar dados pessoais adicionais (não sensíveis)
+    if (data['birthDate'] != null) {
+      decrypted['birthDate'] = data['birthDate'];
+    }
+    if (data['motherName'] != null) {
+      decrypted['motherName'] = data['motherName'];
+    }
+    if (data['isPep'] != null) {
+      decrypted['isPep'] = data['isPep'];
+    }
+    if (data['occupation'] != null) {
+      decrypted['occupation'] = data['occupation'];
+    }
+    if (data['incomeRange'] != null) {
+      decrypted['incomeRange'] = data['incomeRange'];
+    }
+    if (data['documentType'] != null) {
+      decrypted['documentType'] = data['documentType'];
+    }
+
     // Copiar dados da loja
     if (data['store'] != null) {
       decrypted['store'] = data['store'];
@@ -446,9 +529,9 @@ class FirestoreService {
   /// Obter usuário atual (logado)
   ///
   /// **Nota:** Não usa Firebase Auth. O estado de login é gerenciado pelo AuthController.
-  /// Use getUserByCpf() ou getUserByUid() diretamente.
+  /// Use getUserByCpf() ou getUserByDocumentId() diretamente.
   static Future<Map<String, dynamic>?> getCurrentUser() async {
-    // Não implementado - usar getUserByCpf() ou getUserByUid() diretamente
+    // Não implementado - usar getUserByCpf() ou getUserByDocumentId() diretamente
     // O estado de login é gerenciado pelo AuthController via SharedPreferences
     return null;
   }

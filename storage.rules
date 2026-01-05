@@ -8,11 +8,17 @@ service firebase.storage {
 
     // Permite upload de documentos KYC
     match /users/{userId}/kyc/{document} {
+      // Permitir criação durante o cadastro inicial (sem autenticação)
+      // Isso é necessário porque o usuário ainda não está autenticado no Firebase Auth
+      // durante o processo de cadastro
+      allow create: if request.resource.size < 5 * 1024 * 1024  // Max 5MB
+                   && request.resource.contentType.matches('image/.*');
+      
       // Leitura apenas para usuário autenticado dono dos documentos
       allow read: if isOwner(userId);
       
-      // Escrita apenas para usuário autenticado dono dos documentos
-      allow write: if isOwner(userId)
+      // Atualização apenas para usuário autenticado dono dos documentos
+      allow update: if isOwner(userId)
                    && request.resource.size < 5 * 1024 * 1024  // Max 5MB
                    && request.resource.contentType.matches('image/.*');
       

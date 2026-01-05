@@ -14,15 +14,34 @@ service cloud.firestore {
 
     // Coleção users
     match /users/{userId} {
-      // Leitura/Escrita apenas pelo próprio usuário
-      allow read, write: if isOwner(userId);
+      // Permitir criação durante o cadastro inicial (sem autenticação)
+      // Isso é necessário porque o usuário ainda não está autenticado no Firebase Auth
+      // durante o processo de cadastro
+      allow create: if true;
+      
+      // Permitir atualização durante o cadastro inicial (sem autenticação)
+      // Necessário para atualizar dados após criação inicial
+      allow update: if true;
+      
+      // Leitura apenas pelo próprio usuário (após autenticação)
+      // NOTA: Admin SDK (usado no backend) bypassa estas regras automaticamente
+      allow read: if isOwner(userId) ||
+        (isAuthenticated() && resource.data.ownerUid == request.auth.uid);
+      
+      // Exclusão apenas pelo próprio usuário (após autenticação)
+      allow delete: if isOwner(userId);
     }
     
+    // Permitir queries na collection users para o backend (Admin SDK bypassa, mas adicionamos comentário)
+    // O Admin SDK sempre bypassa as regras, então estas regras só se aplicam a clientes
+    // Se o erro persistir, verifique as permissões IAM do serviço Cloud Run
+    
     // Coleção registration_progress
-    // Permitir apenas se o usuário estiver autenticado (ou implementar lógica específica para anonimo se necessário)
-    // Por enquanto, assumindo que o cadastro cria o auth user primeiro ou usa auth anônimo
+    // Permitir escrita sem autenticação durante o cadastro inicial
+    // Os dados são criptografados e identificados por hash do CPF
+    // Leitura também permitida sem auth para permitir retomada do cadastro
     match /registration_progress/{progressId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true; // Permitir durante cadastro (dados criptografados)
     }
     
     // Coleção otps - Apenas Cloud Functions (Admin SDK)

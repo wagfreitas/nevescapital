@@ -162,7 +162,7 @@ class RegistrationLifecycleObserver extends WidgetsBindingObserver {
       AppLogger.info('[TELA] ✅ Progresso salvo localmente também');
     } catch (e, stackTrace) {
       AppLogger.error(
-          '[TELA] ❌ ERRO ao salvar progresso no Firestore: $e', stackTrace);
+          '[TELA] ❌ ERRO ao salvar progresso no Firestore: $e', e, stackTrace);
     } finally {
       _isSaving = false;
     }

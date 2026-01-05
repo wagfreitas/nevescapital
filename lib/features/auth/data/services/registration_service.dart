@@ -25,12 +25,14 @@ class RegistrationService {
       final cpfEncrypted = await EncryptionService.encrypt(progress.cpf);
       AppLogger.debug('✓ CPF criptografado');
 
-      // Preparar dados
+      // Preparar dados - REMOVER campos null para não sobrescrever dados salvos
       final data = progress.toMap();
+      // Remover campos null do map para não sobrescrever dados existentes no Firestore
+      data.removeWhere((key, value) => value == null);
       data['cpfHash'] = cpfHash;
       data['cpfEncrypted'] = cpfEncrypted;
       data.remove('cpf'); // Remove CPF em texto claro
-      AppLogger.debug('✓ Dados preparados');
+      AppLogger.debug('✓ Dados preparados (campos null removidos)');
 
       // Criptografar dados sensíveis
       if (progress.phone != null) {
@@ -53,15 +55,19 @@ class RegistrationService {
       }
       AppLogger.debug('✓ DateTime convertidos para Timestamp');
 
-      // Salvar no Firestore (usa cpfHash como ID do documento)
+      // Salvar no Firestore usando merge para não sobrescrever campos existentes
+      // Isso garante que dados de outras telas não sejam perdidos
       AppLogger.info(
-          '🔥 [FIRESTORE] Escrevendo documento ${cpfHash.substring(0, 8)}... na collection $_collection');
-      await _firestore.collection(_collection).doc(cpfHash).set(data);
+          '🔥 [FIRESTORE] Escrevendo documento ${cpfHash.substring(0, 8)}... na collection $_collection (com merge)');
+      await _firestore.collection(_collection).doc(cpfHash).set(
+        data,
+        SetOptions(merge: true), // MERGE: não sobrescreve campos que não estão no data
+      );
 
-      AppLogger.info('✅ [FIRESTORE] Progresso salvo COM SUCESSO no Firestore!');
+      AppLogger.info('✅ [FIRESTORE] Progresso salvo COM SUCESSO no Firestore (merge aplicado)!');
     } catch (e, stackTrace) {
       AppLogger.error(
-          '❌ [FIRESTORE] ERRO ao salvar progresso do cadastro: $e', stackTrace);
+          '❌ [FIRESTORE] ERRO ao salvar progresso do cadastro: $e', e, stackTrace);
       rethrow;
     }
   }
@@ -133,6 +139,13 @@ class RegistrationService {
         documentFrontPath: data['documentFrontPath'] as String?,
         documentBackPath: data['documentBackPath'] as String?,
         documentType: data['documentType'] as String?,
+        cep: data['cep'] as String?,
+        street: data['street'] as String?,
+        number: data['number'] as String?,
+        complement: data['complement'] as String?,
+        neighborhood: data['neighborhood'] as String?,
+        city: data['city'] as String?,
+        state: data['state'] as String?,
       );
 
       AppLogger.info(

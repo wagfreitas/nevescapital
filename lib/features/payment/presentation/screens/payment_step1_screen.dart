@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/components/custom_text_field.dart';
+import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'payment_step2_screen.dart';
 
 /// Tela 1: Inserir nome do estabelecimento e ramo de atuação
 class PaymentStep1Screen extends StatefulWidget {
-  const PaymentStep1Screen({Key? key}) : super(key: key);
+  const PaymentStep1Screen({super.key});
 
   @override
   State<PaymentStep1Screen> createState() => _PaymentStep1ScreenState();
@@ -63,7 +64,8 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
         elevation: 0,
       ),
       body: SafeArea(
-        child: Padding(
+        child: KeyboardDismissWrapper(
+          child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Form(
             key: _formKey,
@@ -88,6 +90,8 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
                   controller: _nomeEstabelecimentoController,
                   hintText: 'Nome do Estabelecimento',
                   labelText: 'Nome do Estabelecimento',
+                  autofocus: true, // Focar automaticamente ao entrar na tela
+                  textInputAction: TextInputAction.next, // Próximo campo
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Por favor, insira o nome do estabelecimento';
@@ -103,7 +107,7 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
 
                 // Campo de ramo de atuação (dropdown)
                 DropdownButtonFormField<String>(
-                  value: _ramoAtuacao,
+                  initialValue: _ramoAtuacao,
                   decoration: const InputDecoration(
                     labelText: 'Selected option',
                     hintText: 'Selected option',
@@ -172,6 +176,7 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

@@ -47,23 +47,36 @@ class AuthApiService {
 
     try {
       AppLogger.info('🚀 [API] Verificando status do usuário...');
+      AppLogger.debug('📍 [API] URL: $url');
+      AppLogger.debug(
+          '🔑 [API] API Key: ${_apiKey.isNotEmpty ? "${_apiKey.substring(0, 10)}..." : "VAZIA"}');
 
-      final response = await http.post(
+      final response = await http
+          .post(
         url,
         headers: _headers,
         body: jsonEncode({'token': token}),
+      )
+          .timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Timeout na requisição');
+        },
       );
 
       AppLogger.debug('📡 [API] Response status: ${response.statusCode}');
+      AppLogger.debug('📡 [API] Response body: ${response.body}');
 
       final data = jsonDecode(response.body);
 
-      if (response.statusCode == 200) {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         return {
           'success': true,
-          'status': data['status'], // REQUIRE_CPF_CHECK ou REGISTER
+          'status': data['status'], // LOGGED_IN, REQUIRE_CPF_CHECK ou REGISTER
           'message': data['message'],
           'phone': data['phone'],
+          'userId': data['userId'], // ID do usuário quando status é LOGGED_IN
+          'user': data['user'], // Dados do usuário quando status é LOGGED_IN
         };
       } else {
         return {
@@ -73,9 +86,20 @@ class AuthApiService {
       }
     } catch (e) {
       AppLogger.error('❌ [API] Erro em checkUserStatus: $e');
+      AppLogger.error('📍 [API] URL tentada: $url');
+      AppLogger.error('🔑 [API] API Key configurada: ${_apiKey.isNotEmpty}');
+
+      String errorMessage = 'Erro de conexão. Tente novamente.';
+      if (e.toString().contains('Connection refused')) {
+        errorMessage =
+            'Backend não está rodando. Verifique se o servidor está ativo em $_baseUrl';
+      } else if (e.toString().contains('Timeout')) {
+        errorMessage = 'Timeout na conexão. Verifique sua internet.';
+      }
+
       return {
         'success': false,
-        'message': 'Erro de conexão. Tente novamente.',
+        'message': errorMessage,
       };
     }
   }
@@ -122,20 +146,20 @@ class AuthApiService {
 
   /// Verifica se um CPF já está cadastrado no sistema
   static Future<Map<String, dynamic>> checkCpf(String cpf) async {
-    final url = Uri.parse('$_baseUrl/api/auth/check-cpf');
+    final cleanCpf = cpf.replaceAll(RegExp(r'[^0-9]'), '');
+    final url = Uri.parse('$_baseUrl/api/users/check-cpf/$cleanCpf');
 
     try {
       AppLogger.info('🚀 [API] Verificando CPF...');
 
-      final response = await http.post(
+      final response = await http.get(
         url,
         headers: _headers,
-        body: jsonEncode({'cpf': cpf}),
       );
 
       final data = jsonDecode(response.body);
 
-      if (response.statusCode == 200) {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         return {
           'success': true,
           'exists': data['exists'] ?? false,
@@ -158,6 +182,85 @@ class AuthApiService {
     }
   }
 
+  /// Envia código OTP via backend (alternativa ao Firebase Phone Auth)
+  static Future<Map<String, dynamic>> sendOtp(String phone) async {
+    final url = Uri.parse('$_baseUrl/api/auth/send-otp');
+
+    try {
+      AppLogger.info('🚀 [API] Enviando OTP para: $phone');
+
+      final response = await http.post(
+        url,
+        headers: _headers,
+        body: jsonEncode({'phone': phone}),
+      );
+
+      AppLogger.debug('📡 [API] Response status: ${response.statusCode}');
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'code': data['code'], // ⚠️ APENAS PARA TESTES
+          'message': data['message'] ?? 'Código OTP enviado',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Erro ao enviar OTP',
+        };
+      }
+    } catch (e) {
+      AppLogger.error('❌ [API] Erro em sendOtp: $e');
+      return {
+        'success': false,
+        'message': 'Erro de conexão. Tente novamente.',
+      };
+    }
+  }
+
+  /// Verifica código OTP via backend
+  static Future<Map<String, dynamic>> verifyOtp(
+      String phone, String code) async {
+    final url = Uri.parse('$_baseUrl/api/auth/verify-otp');
+
+    try {
+      AppLogger.info('🚀 [API] Verificando OTP...');
+
+      final response = await http.post(
+        url,
+        headers: _headers,
+        body: jsonEncode({
+          'phone': phone,
+          'code': code,
+        }),
+      );
+
+      AppLogger.debug('📡 [API] Response status: ${response.statusCode}');
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Código OTP verificado',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Código inválido',
+        };
+      }
+    } catch (e) {
+      AppLogger.error('❌ [API] Erro em verifyOtp: $e');
+      return {
+        'success': false,
+        'message': 'Erro de conexão. Tente novamente.',
+      };
+    }
+  }
+
   /// Verifica usuário pelo CPF completo após validação OTP
   /// Retorna o status do usuário e determina o fluxo (login, cadastro, etc)
   static Future<Map<String, dynamic>> checkUserByCpf(
@@ -166,7 +269,8 @@ class AuthApiService {
 
     // 🎭 MODO MOCK: Retornar dados fake
     if (_useMockData) {
-      await Future.delayed(const Duration(milliseconds: 800)); // Simular latência
+      await Future.delayed(
+          const Duration(milliseconds: 800)); // Simular latência
 
       final cleanCpf = cpf.replaceAll(RegExp(r'[^0-9]'), '');
       final mockUser = _mockUsers[cleanCpf];

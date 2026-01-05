@@ -1,7 +1,7 @@
 {
   "name": "neves-capital-api",
   "version": "1.0.0",
-  "description": "API Backend for Neves Capital - NestJS + PostgreSQL",
+  "description": "API Backend for Neves Capital - NestJS + Firebase",
   "author": "Neves Capital",
   "private": true,
   "license": "MIT",
@@ -34,10 +34,8 @@
     "firebase-admin": "^12.6.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.11.3",
     "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.1",
-    "twilio": "^4.20.0"
+    "rxjs": "^7.8.1"
   },
   "optionalDependencies": {
     "@aws-sdk/client-ses": "^3.490.0",
@@ -54,7 +52,6 @@
     "@types/jest": "^29.5.11",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/node": "^20.10.6",
-    "@types/pg": "^8.10.9",
     "@typescript-eslint/eslint-plugin": "^6.17.0",
     "@typescript-eslint/parser": "^6.17.0",
     "eslint": "^8.56.0",

@@ -87,7 +87,7 @@ export class UsersController {
   }
 
   @Post('sync-firebase-email')
-  @ApiOperation({ summary: 'Sincronizar email do Firebase com PostgreSQL' })
+  @ApiOperation({ summary: 'Sincronizar email do Firebase com Firestore' })
   @ApiResponse({ status: 200, description: 'Email sincronizado com sucesso' })
   @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
   syncFirebaseEmail(@Body() body: { cpf: string; oldEmail: string }) {

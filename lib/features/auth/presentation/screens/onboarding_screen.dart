@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/features/auth/presentation/screens/phone_login_screen.dart';
+import 'package:neves_capital/features/auth/presentation/screens/unified_cpf_screen.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/features/auth/data/services/registration_service.dart';
 import 'package:neves_capital/features/auth/data/services/local_registration_storage.dart';
 import 'package:neves_capital/features/auth/presentation/helpers/registration_navigator.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/shared/services/biometric_service.dart';
+import 'package:neves_capital/features/home/presentation/screens/main_tab_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final AuthController authController;
@@ -23,12 +26,150 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _hasCheckedResume = false;
+  bool _hasCheckedBiometric = false;
+  bool _isCheckingBiometric = false;
+  bool _resumedRegistration = false;
 
   @override
   void initState() {
     super.initState();
+    // Aguardar um frame para garantir que o AuthController foi totalmente inicializado
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkBiometricAndPendingRegistration();
+    });
+  }
+
+  /// Verifica biometria se usuário está logado, depois verifica cadastro pendente
+  Future<void> _checkBiometricAndPendingRegistration() async {
+    // Aguardar um pouco para garantir que o AuthController foi totalmente inicializado
+    await Future.delayed(const Duration(milliseconds: 150));
+    
+    // Primeiro: se existe cadastro incompleto, retomar antes de qualquer biometria/dashboard
+    await _checkPendingRegistration();
+    if (_resumedRegistration) {
+      AppLogger.info('Cadastro incompleto retomado - biometria/dashboard cancelados');
+      return;
+    }
+
+    // 1. Primeiro verificar se usuário está logado - SEMPRE pedir biometria se disponível
+    // IMPORTANTE: Não limpar estado de login aqui - ele deve ser mantido quando o app é fechado
+    // O estado só deve ser limpo quando o usuário clica explicitamente em "Sair"
+    AppLogger.info('🔐 [ONBOARDING] Verificando estado de login:');
+    AppLogger.info('  - isLoggedIn: ${widget.authController.isLoggedIn}');
+    AppLogger.info('  - currentUser: ${widget.authController.currentUser != null}');
+    AppLogger.info('  - isLoading: ${widget.authController.isLoading}');
+    
+    // Verificar novamente após um pequeno delay para evitar race condition
+    await Future.delayed(const Duration(milliseconds: 50));
+    
+    // Verificar múltiplas vezes para garantir que o estado está estável
+    // (evita race condition após logout)
+    bool isLoggedIn = widget.authController.isLoggedIn;
+    await Future.delayed(const Duration(milliseconds: 50));
+    final isLoggedInSecondCheck = widget.authController.isLoggedIn;
+    
+    // Se o estado mudou entre as verificações, aguardar mais um pouco
+    if (isLoggedIn != isLoggedInSecondCheck) {
+      AppLogger.warning('Estado de login instável detectado - aguardando estabilização...');
+      await Future.delayed(const Duration(milliseconds: 100));
+      isLoggedIn = widget.authController.isLoggedIn;
+    }
+    
+    AppLogger.info('🔐 [ONBOARDING] Estado final verificado: isLoggedIn = $isLoggedIn');
+    
+    if (isLoggedIn) {
+      final isBiometricAvailable = await BiometricService.isAvailable();
+      
+      if (isBiometricAvailable && !_hasCheckedBiometric) {
+        _hasCheckedBiometric = true;
+        _isCheckingBiometric = true;
+        
+        AppLogger.info('Usuário logado - solicitando autenticação biométrica...');
+        
+        if (mounted) {
+          setState(() {});
+        }
+
+        // IMPORTANTE (iOS): garantir que a tela de fundo (verde) seja pintada
+        // antes do prompt nativo do Face ID aparecer. Sem isso, o iOS pode
+        // capturar um frame "em branco" como snapshot do app.
+        await WidgetsBinding.instance.endOfFrame;
+        
+        // Solicitar biometria (com fallback para senha do dispositivo)
+        // O iOS mostrará opção de usar senha se biometria falhar
+        final authenticated = await BiometricService.authenticate(
+          reason: 'Use sua biometria para acessar o app',
+        );
+        
+        // Manter tela verde escuro até processar resultado
+        if (mounted) {
+          setState(() {
+            _isCheckingBiometric = false;
+          });
+        }
+        
+        // Verificar novamente se ainda está logado após biometria
+        // (pode ter sido feito logout durante a biometria)
+        if (!mounted || !widget.authController.isLoggedIn) {
+          AppLogger.info('Estado de login mudou durante biometria - cancelando redirecionamento');
+          return;
+        }
+        
+        if (authenticated) {
+          AppLogger.info('✅ Biometria ou senha validada - redirecionando para Dashboard');
+          // Autenticação validada (biometria ou senha) - redirecionar para Dashboard
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => MainTabScreen(
+                  authController: widget.authController,
+                  themeController: widget.themeController ?? ThemeController(),
+                ),
+              ),
+            );
+          }
+          return; // Não verificar cadastro pendente se autenticação foi validada
+        } else {
+          AppLogger.warning('❌ Biometria e senha falharam ou foram canceladas - redirecionando para login (sem fazer logout)');
+          // Se biometria E senha falharam ou foram canceladas, redirecionar para login
+          // NÃO fazer logout - o status de logged in deve ser mantido
+          // O usuário precisará fazer login novamente (telefone + OTP + CPF) para acessar
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => PhoneLoginScreen(
+                  authController: widget.authController,
+                  themeController: widget.themeController,
+                ),
+              ),
+            );
+          }
+          return; // Não verificar cadastro pendente se autenticação falhou
+        }
+      } else if (!isBiometricAvailable && isLoggedIn) {
+        // Biometria não disponível mas usuário está logado - ir direto para dashboard
+        // Verificar novamente antes de redirecionar
+        if (widget.authController.isLoggedIn) {
+          AppLogger.info('Usuário logado mas biometria não disponível - redirecionando para Dashboard');
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => MainTabScreen(
+                  authController: widget.authController,
+                  themeController: widget.themeController ?? ThemeController(),
+                ),
+              ),
+            );
+          }
+        }
+        return;
+      }
+    }
+    
+    // 2. Verificar cadastro pendente (apenas se não passou pela biometria)
     _checkPendingRegistration();
   }
+
 
   Future<void> _checkPendingRegistration() async {
     if (_hasCheckedResume) return;
@@ -98,6 +239,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
       if (shouldResume) {
         // Retomar cadastro
+        _resumedRegistration = true;
         RegistrationNavigator.navigateToStep(
           context: context,
           progress: progress,
@@ -105,10 +247,46 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           themeController: widget.themeController,
         );
       } else {
-        // Recomeçar - deletar progresso local e do Firestore
+        // Recomeçar - obter telefone do progresso ANTES de deletar
+        // O progresso sempre terá o telefone se o usuário já passou pela etapa de telefone
+        String? authenticatedPhone = progress.phone;
+        
+        if (authenticatedPhone == null || authenticatedPhone.isEmpty) {
+          // Se o progresso não tem telefone, tentar obter do usuário autenticado no Firebase
+          try {
+            final currentUser = widget.authController.currentUser;
+            AppLogger.debug('Progresso não tem telefone, tentando obter do Firebase - currentUser: ${currentUser != null}, phoneNumber: ${currentUser?.phoneNumber}');
+            
+            if (currentUser != null && currentUser.phoneNumber != null) {
+              authenticatedPhone = currentUser.phoneNumber!;
+              AppLogger.info('Telefone obtido do Firebase: ${authenticatedPhone.substring(0, 4)}****');
+            }
+          } catch (e) {
+            AppLogger.error('Erro ao obter telefone do usuário autenticado', e);
+          }
+        } else {
+          AppLogger.info('Telefone obtido do progresso: ${authenticatedPhone.substring(0, 4)}****');
+        }
+        
+        // Deletar progresso local e do Firestore
         await LocalRegistrationStorage.clearLocal();
         await RegistrationService.deleteProgress(progress.cpf);
         AppLogger.info('Usuário optou por recomeçar - progresso deletado');
+        
+        // Navegar para a tela de cadastro de CPF para iniciar novo cadastro
+        // O usuário já fez a autenticação normal, então pode iniciar o cadastro
+        // Passar o telefone autenticado para pular a tela de telefone
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => UnifiedCpfScreen(
+                authController: widget.authController,
+                themeController: widget.themeController,
+                initialPhone: authenticatedPhone,
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
       AppLogger.error('Erro ao verificar cadastro pendente', e);
@@ -118,7 +296,49 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Mostrar loading enquanto verifica biometria
+    // IMPORTANTE: Esta tela deve permanecer visível durante TODA a autenticação
+    // (biometria + fallback para senha do dispositivo)
+    if (_isCheckingBiometric) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF02391E), // Verde escuro PagPag
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Logo PagPag centralizado
+                Image.asset(
+                  'assets/icons/PagPag_icon.png',
+                  width: 150,
+                  height: 150,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 40),
+                // Indicador de loading
+                const CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  strokeWidth: 3,
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Aguardando autenticação...',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    
     return Scaffold(
+      // Evita flash branco (asset de fundo pode demorar 1 frame para pintar)
+      backgroundColor: const Color(0xFF02391E),
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(

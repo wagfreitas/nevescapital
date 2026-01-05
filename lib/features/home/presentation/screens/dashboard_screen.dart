@@ -3,9 +3,10 @@ import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../payment/presentation/screens/payment_step1_screen.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'sales_history_screen.dart';
-import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_controller.dart';
+import '../../../../shared/services/firestore_service.dart';
+import '../../../../shared/services/secure_storage_service.dart';
 
 /// Tela principal do dashboard moderna baseada no React
 class DashboardScreen extends StatefulWidget {
@@ -23,36 +24,80 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  
+  String? _userDisplayName;
+  bool _isLoadingName = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserName();
+  }
+
+  /// Carregar nome do usuário do Firestore
+  Future<void> _loadUserName() async {
+    try {
+      // Buscar CPF do SecureStorage
+      final cpf = await SecureStorageService.getLastCpf();
+      if (cpf == null || cpf.isEmpty) {
+        AppLogger.warning('CPF não encontrado para buscar nome do usuário');
+        setState(() {
+          _userDisplayName = null;
+          _isLoadingName = false;
+        });
+        return;
+      }
+
+      // Buscar dados do usuário no Firestore
+      final userData = await FirestoreService.getUserByCpf(cpf);
+      
+      if (userData != null && userData['displayName'] != null) {
+        final displayName = userData['displayName'] as String;
+        // Pegar os dois primeiros nomes
+        final nameParts = displayName.trim().split(' ');
+        final twoFirstNames = nameParts.length >= 2 
+            ? '${nameParts[0]} ${nameParts[1]}'
+            : nameParts[0];
+        
+        setState(() {
+          _userDisplayName = twoFirstNames;
+          _isLoadingName = false;
+        });
+        AppLogger.debug('Nome do usuário carregado: $twoFirstNames');
+      } else {
+        AppLogger.warning('DisplayName não encontrado no Firestore');
+        setState(() {
+          _userDisplayName = null;
+          _isLoadingName = false;
+        });
+      }
+    } catch (e) {
+      AppLogger.error('Erro ao carregar nome do usuário', e);
+      setState(() {
+        _userDisplayName = null;
+        _isLoadingName = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       body: SafeArea(
-        child: Column(
-          children: [
-            // Conteúdo principal
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Mensagem de boas-vindas
-                    _buildWelcomeMessage(context),
-                    
-                    const SizedBox(height: 60),
-                    
-                    // Botões principais
-                    _buildMainButtons(context),
-                  ],
-                ),
-              ),
-            ),
-            
-            // Barra de navegação inferior
-            _buildBottomNavigation(context),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Mensagem de boas-vindas
+              _buildWelcomeMessage(context),
+              
+              const SizedBox(height: 60),
+              
+              // Botões principais
+              _buildMainButtons(context),
+            ],
+          ),
         ),
       ),
     );
@@ -62,40 +107,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildWelcomeMessage(BuildContext context) {
     String userName = 'Usuário';
     
-    // Verificar se o controller ainda está ativo antes de usar
-    try {
-      if (!widget.authController.isDisposed && widget.authController.currentUser != null) {
-        final user = widget.authController.currentUser!;
-        
-        // Tentar pegar o nome de várias formas
-        if (user.displayName != null && user.displayName!.isNotEmpty) {
-          // Pegar apenas o primeiro nome
-          userName = user.displayName!.split(' ').first;
-          AppLogger.debug('Nome do usuário obtido do displayName');
-        } else if (user.email != null) {
-          // Se não tem displayName, usar a parte antes do @ do email
-          userName = user.email!.split('@').first;
-          AppLogger.debug('Nome obtido do email (displayName vazio)');
+    // Usar nome carregado do Firestore se disponível
+    if (_userDisplayName != null && _userDisplayName!.isNotEmpty) {
+      userName = _userDisplayName!;
+    } else if (!_isLoadingName) {
+      // Se não carregou do Firestore, tentar do Firebase Auth como fallback
+      try {
+        if (!widget.authController.isDisposed && widget.authController.currentUser != null) {
+          final user = widget.authController.currentUser!;
+          
+          if (user.displayName != null && user.displayName!.isNotEmpty) {
+            final nameParts = user.displayName!.trim().split(' ');
+            userName = nameParts.length >= 2 
+                ? '${nameParts[0]} ${nameParts[1]}'
+                : nameParts[0];
+          } else if (user.email != null) {
+            userName = user.email!.split('@').first;
+          }
         }
-        
-        AppLogger.debug('Nome de usuário definido para exibição');
-      } else {
-        AppLogger.warning('Usuário não encontrado no authController');
+      } catch (e) {
+        AppLogger.warning('Erro ao obter nome do Firebase Auth: $e');
       }
-    } catch (e) {
-      AppLogger.warning('Erro ao acessar authController');
     }
     
     return Column(
       children: [
-        Text(
-          'Olá, $userName 👋',
-          style: const TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
+        // Usar FittedBox para garantir que o texto não quebre a linha
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            'Olá, $userName 👋',
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
           ),
-          textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
         Text(
@@ -177,112 +226,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
-        ),
-      ),
-    );
-  }
-  
-  /// Barra de navegação inferior
-  Widget _buildBottomNavigation(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        border: Border(
-          top: BorderSide(color: AppTheme.borderColor),
-        ),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              // Botão Vendas (ativo)
-              _buildNavButton(
-                context,
-                icon: Icons.check_circle,
-                label: 'Vendas',
-                isActive: true,
-                onTap: () {
-                  // Já estamos na tela de vendas
-                },
-              ),
-              
-              // Botão Conta
-              _buildNavButton(
-                context,
-                icon: Icons.person,
-                label: 'Conta',
-                isActive: false,
-                onTap: () {
-                  AppLogger.debug('Navegação para conta iniciada');
-                  
-                  // Verificar se o usuário está logado e o controller está válido
-                  if (widget.authController.isLoggedIn && !widget.authController.isDisposed) {
-                    AppLogger.debug('Navegando para ProfileScreen');
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ProfileScreen(
-                          authController: widget.authController,
-                        ),
-                      ),
-                    );
-                  } else {
-                    AppLogger.warning('Não é possível navegar - usuário não logado ou controller inválido');
-                    // Não fazer nada - o AppWrapper vai lidar com o estado
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Botão de navegação inferior
-  Widget _buildNavButton(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? AppTheme.primaryColor.withValues(alpha: 0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: isActive ? AppTheme.primaryColor : Colors.grey[600],
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: isActive ? AppTheme.primaryColor : Colors.grey[600],
-              ),
-            ),
-          ],
         ),
       ),
     );

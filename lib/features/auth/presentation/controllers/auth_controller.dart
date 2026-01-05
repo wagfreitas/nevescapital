@@ -48,13 +48,15 @@ class AuthController extends ChangeNotifier {
     
     try {
       // 1. Verificar estado de login via OTP no SharedPreferences
+      AppLogger.info('🔐 [AUTH] Iniciando carregamento do estado de login...');
       await _loadOtpLoginState();
       
       // 2. Verificar usuário atual do Firebase (para compatibilidade com login antigo)
       _currentUser = AuthService.currentUser;
-      AppLogger.debug('AuthController.initialize() - currentUser: ${_currentUser != null}');
-      AppLogger.debug('AuthController.initialize() - isLoggedInOtp: $_isLoggedInOtp');
-      AppLogger.debug('AuthController.initialize() - isLoggedIn: $isLoggedIn');
+      AppLogger.info('🔐 [AUTH] AuthController.initialize() concluído:');
+      AppLogger.info('  - currentUser: ${_currentUser != null}');
+      AppLogger.info('  - isLoggedInOtp: $_isLoggedInOtp');
+      AppLogger.info('  - isLoggedIn: $isLoggedIn');
       
       // Escutar mudanças de autenticação (apenas para login via Firebase)
       _authStateSubscription = AuthService.authStateChanges.listen((firebase_auth.User? user) {
@@ -88,10 +90,12 @@ class AuthController extends ChangeNotifier {
   Future<void> _loadOtpLoginState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _isLoggedInOtp = prefs.getBool(_isLoggedInKey) ?? false;
-      AppLogger.debug('Estado de login OTP carregado: $_isLoggedInOtp');
+      final savedState = prefs.getBool(_isLoggedInKey);
+      _isLoggedInOtp = savedState ?? false;
+      AppLogger.info('🔐 [AUTH] Estado de login OTP carregado do SharedPreferences: $_isLoggedInOtp (valor salvo: $savedState)');
+      AppLogger.debug('🔐 [AUTH] Chave usada: $_isLoggedInKey');
     } catch (e) {
-      AppLogger.error('Erro ao carregar estado de login OTP', e);
+      AppLogger.error('❌ [AUTH] Erro ao carregar estado de login OTP', e);
       _isLoggedInOtp = false;
     }
   }
@@ -100,11 +104,16 @@ class AuthController extends ChangeNotifier {
   Future<void> _saveOtpLoginState(bool isLoggedIn) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_isLoggedInKey, isLoggedIn);
+      final saved = await prefs.setBool(_isLoggedInKey, isLoggedIn);
       _isLoggedInOtp = isLoggedIn;
-      AppLogger.debug('Estado de login OTP salvo: $isLoggedIn');
+      AppLogger.info('🔐 [AUTH] Estado de login OTP salvo no SharedPreferences: $isLoggedIn (sucesso: $saved)');
+      AppLogger.debug('🔐 [AUTH] Chave usada: $_isLoggedInKey');
+      
+      // Verificar se foi salvo corretamente
+      final verification = prefs.getBool(_isLoggedInKey);
+      AppLogger.debug('🔐 [AUTH] Verificação após salvar: $verification');
     } catch (e) {
-      AppLogger.error('Erro ao salvar estado de login OTP', e);
+      AppLogger.error('❌ [AUTH] Erro ao salvar estado de login OTP', e);
     }
   }
 
@@ -470,15 +479,31 @@ class AuthController extends ChangeNotifier {
       _loginProgress = LoginProgress.idle;
       _errorMessage = null;
 
+      // 6. Verificar se o estado foi realmente limpo antes de notificar
       AppLogger.debug('Verificando estado antes de notificar...');
       AppLogger.debug('currentUser: ${_currentUser != null}');
       AppLogger.debug('isLoggedInOtp: $_isLoggedInOtp');
       AppLogger.debug('isLoggedIn: $isLoggedIn');
       
-      AppLogger.debug('Notificando listeners...');
+      // Garantir que o estado está realmente limpo
+      if (_isLoggedInOtp) {
+        AppLogger.warning('⚠️ isLoggedInOtp ainda é true após limpeza - forçando reset');
+        _isLoggedInOtp = false;
+        await _saveOtpLoginState(false);
+      }
+      
+      if (_currentUser != null) {
+        AppLogger.warning('⚠️ currentUser ainda não é null após signOut - forçando limpeza');
+        _currentUser = null;
+      }
+      
+      AppLogger.debug('Notificando listeners após garantir limpeza completa...');
       notifyListeners();
       
-      AppLogger.info('Logout realizado com sucesso!');
+      // Aguardar um pouco para garantir que os listeners foram notificados
+      await Future.delayed(const Duration(milliseconds: 50));
+      
+      AppLogger.info('✅ Logout realizado com sucesso!');
       AppLogger.debug('currentUser após logout: ${_currentUser != null}');
       AppLogger.debug('isLoggedInOtp após logout: $_isLoggedInOtp');
       AppLogger.debug('isLoggedIn após logout: $isLoggedIn');
@@ -507,9 +532,11 @@ class AuthController extends ChangeNotifier {
       await UserCacheService.clearCache();
       AppLogger.debug('Cache do usuário limpo');
       
-      // Limpar todos os dados sensíveis do secure storage
+      // Limpar todos os dados sensíveis do secure storage (inclui biometria)
       await SecureStorageService.clearAll();
-      AppLogger.debug('Dados sensíveis limpos');
+      // Garantir que biometria está desabilitada explicitamente
+      await SecureStorageService.setBiometricEnabled(false);
+      AppLogger.debug('Dados sensíveis limpos (incluindo biometria)');
       
       // Limpar dados do SharedPreferences (incluindo estado de login OTP)
       final prefs = await SharedPreferences.getInstance();

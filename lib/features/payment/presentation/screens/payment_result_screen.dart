@@ -12,13 +12,13 @@ class PaymentResultScreen extends StatelessWidget {
   final String nomeEstabelecimento;
 
   const PaymentResultScreen({
-    Key? key,
+    super.key,
     required this.sucesso,
     required this.mensagem,
     this.transactionId,
     required this.valorCentavos,
     required this.nomeEstabelecimento,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -57,10 +57,11 @@ class BiometricService {
       }
 
       // Realizar autenticação com parâmetros otimizados para iOS
+      // biometricOnly: false permite fallback para senha do dispositivo
       final bool didAuthenticate = await _localAuth.authenticate(
         localizedReason: reason,
         options: const AuthenticationOptions(
-          biometricOnly: true, // Usar apenas biometria, não senha de dispositivo
+          biometricOnly: false, // Permitir fallback para senha do dispositivo
           stickyAuth: false, // Sempre solicitar autenticação (não reutilizar autenticação anterior)
           useErrorDialogs: true, // Mostrar diálogos de erro nativos do iOS
           sensitiveTransaction: false, // Transação não é extremamente sensível

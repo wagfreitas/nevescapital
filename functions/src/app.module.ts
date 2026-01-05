@@ -3,9 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
-import { DatabaseModule } from './database/database.module';
 import { HealthController } from './health.controller';
-import { MigrationController } from './migration.controller';
 
 @Module({
   imports: [
@@ -22,11 +20,10 @@ import { MigrationController } from './migration.controller';
     }]),
     
     // Modules
-    DatabaseModule,
     UsersModule,
     AuthModule,
   ],
-  controllers: [HealthController, MigrationController],
+  controllers: [HealthController],
 })
 export class AppModule {}
 

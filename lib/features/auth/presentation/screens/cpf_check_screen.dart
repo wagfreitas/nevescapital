@@ -5,6 +5,7 @@ import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/features/auth/data/services/auth_api_service.dart';
 import 'package:neves_capital/shared/helpers/cpf_helper.dart';
+import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
 /// Tela de Verificação de CPF (Segundo Fator)
 /// Pede o CPF COMPLETO (11 dígitos) para confirmar identidade e determinar o fluxo
@@ -250,6 +251,7 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF122118),
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -259,46 +261,66 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
         ),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 40),
-                const Text(
-                  'Confirme sua identidade',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Digite seu CPF completo para continuar',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white70,
-                  ),
-                ),
-                const SizedBox(height: 40),
-                // 🎯 BOTÕES DE TESTE RÁPIDO (MODO DEBUG)
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+        child: KeyboardDismissWrapper(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            return SingleChildScrollView(
+              reverse: true,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.only(
+                left: 24.0,
+                right: 24.0,
+                top: 40.0,
+                bottom: bottomInset + 32.0,
+              ),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildTestButton('A: Login OK', '123.456.789-01', Colors.green),
-                    _buildTestButton('B: Troca Tel', '987.654.321-00', Colors.orange),
-                    _buildTestButton('C: Pré-Cadastro', '111.222.333-44', Colors.blue),
-                    _buildTestButton('D: Novo User', '555.666.777-88', Colors.purple),
-                  ],
-                ),
-                const SizedBox(height: 24),
+                    const Text(
+                      'Confirme sua identidade',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Digite seu CPF completo para continuar',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                    // 🎯 BOTÕES DE TESTE RÁPIDO (MODO DEBUG)
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildTestButton('A: Login OK', '123.456.789-01', Colors.green),
+                        _buildTestButton('B: Troca Tel', '987.654.321-00', Colors.orange),
+                        _buildTestButton('C: Pré-Cadastro', '111.222.333-44', Colors.blue),
+                        _buildTestButton('D: Novo User', '555.666.777-88', Colors.purple),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
                 TextFormField(
                   controller: _cpfController,
+                  autofocus: true,
                   keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) {
+                    // Fechar teclado quando usuário pressionar "OK" ou "Done"
+                    FocusScope.of(context).unfocus();
+                    // Opcional: validar e submeter automaticamente se CPF completo
+                    if (_cpfController.text.length == 14) {
+                      _handleCompleteLogin();
+                    }
+                  },
                   enabled: !_isBlocked(),
                   maxLength: 14, // 11 dígitos + 3 caracteres de formatação
                   inputFormatters: [
@@ -394,7 +416,7 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
                     ),
                   ),
                 ],
-                const Spacer(),
+                const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -427,10 +449,12 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
                           ),
                   ),
                 ),
-                const SizedBox(height: 40),
               ],
             ),
-          ),
+              ),
+            );
+          },
+        ),
         ),
       ),
     );

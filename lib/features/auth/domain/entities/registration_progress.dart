@@ -4,7 +4,7 @@
 class RegistrationProgress {
   final String cpf;
   final String
-      currentStep; // 'phone', 'otp', 'email', 'personal1', 'personal2', 'selfie', 'document', 'completed'
+      currentStep; // 'phone', 'otp', 'email', 'personal1', 'address', 'personal2', 'selfie', 'document', 'completed'
   final RegistrationStatus status; // 'in_progress', 'abandoned', 'completed'
   final DateTime lastUpdated;
 
@@ -21,6 +21,14 @@ class RegistrationProgress {
   final String? documentFrontPath;
   final String? documentBackPath;
   final String? documentType; // 'RG', 'CNH', 'RNE'
+  // Dados de endereço
+  final String? cep;
+  final String? street; // logradouro
+  final String? number;
+  final String? complement;
+  final String? neighborhood; // bairro
+  final String? city; // cidade
+  final String? state; // UF
 
   RegistrationProgress({
     required this.cpf,
@@ -39,6 +47,13 @@ class RegistrationProgress {
     this.documentFrontPath,
     this.documentBackPath,
     this.documentType,
+    this.cep,
+    this.street,
+    this.number,
+    this.complement,
+    this.neighborhood,
+    this.city,
+    this.state,
   });
 
   /// Converte de Map (Firestore) para entidade
@@ -63,6 +78,13 @@ class RegistrationProgress {
       documentFrontPath: map['documentFrontPath'] as String?,
       documentBackPath: map['documentBackPath'] as String?,
       documentType: map['documentType'] as String?,
+      cep: map['cep'] as String?,
+      street: map['street'] as String?,
+      number: map['number'] as String?,
+      complement: map['complement'] as String?,
+      neighborhood: map['neighborhood'] as String?,
+      city: map['city'] as String?,
+      state: map['state'] as String?,
     );
   }
 
@@ -85,6 +107,13 @@ class RegistrationProgress {
       if (documentFrontPath != null) 'documentFrontPath': documentFrontPath,
       if (documentBackPath != null) 'documentBackPath': documentBackPath,
       if (documentType != null) 'documentType': documentType,
+      if (cep != null) 'cep': cep,
+      if (street != null) 'street': street,
+      if (number != null) 'number': number,
+      if (complement != null) 'complement': complement,
+      if (neighborhood != null) 'neighborhood': neighborhood,
+      if (city != null) 'city': city,
+      if (state != null) 'state': state,
     };
   }
 
@@ -108,6 +137,13 @@ class RegistrationProgress {
       if (documentFrontPath != null) 'documentFrontPath': documentFrontPath,
       if (documentBackPath != null) 'documentBackPath': documentBackPath,
       if (documentType != null) 'documentType': documentType,
+      if (cep != null) 'cep': cep,
+      if (street != null) 'street': street,
+      if (number != null) 'number': number,
+      if (complement != null) 'complement': complement,
+      if (neighborhood != null) 'neighborhood': neighborhood,
+      if (city != null) 'city': city,
+      if (state != null) 'state': state,
     };
   }
 
@@ -140,6 +176,13 @@ class RegistrationProgress {
       documentFrontPath: json['documentFrontPath'] as String?,
       documentBackPath: json['documentBackPath'] as String?,
       documentType: json['documentType'] as String?,
+      cep: json['cep'] as String?,
+      street: json['street'] as String?,
+      number: json['number'] as String?,
+      complement: json['complement'] as String?,
+      neighborhood: json['neighborhood'] as String?,
+      city: json['city'] as String?,
+      state: json['state'] as String?,
     );
   }
 
@@ -160,6 +203,13 @@ class RegistrationProgress {
     String? documentFrontPath,
     String? documentBackPath,
     String? documentType,
+    String? cep,
+    String? street,
+    String? number,
+    String? complement,
+    String? neighborhood,
+    String? city,
+    String? state,
   }) {
     return RegistrationProgress(
       cpf: cpf,
@@ -178,6 +228,13 @@ class RegistrationProgress {
       documentFrontPath: documentFrontPath ?? this.documentFrontPath,
       documentBackPath: documentBackPath ?? this.documentBackPath,
       documentType: documentType ?? this.documentType,
+      cep: cep ?? this.cep,
+      street: street ?? this.street,
+      number: number ?? this.number,
+      complement: complement ?? this.complement,
+      neighborhood: neighborhood ?? this.neighborhood,
+      city: city ?? this.city,
+      state: state ?? this.state,
     );
   }
 

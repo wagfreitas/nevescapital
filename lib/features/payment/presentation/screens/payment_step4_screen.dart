@@ -4,6 +4,7 @@ import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/components/custom_text_field.dart';
 import 'package:neves_capital/shared/helpers/card_brand_detector.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 // import 'package:credit_card_scanner/credit_card_scanner.dart'; // TEMPORARIAMENTE DESABILITADO
 import 'payment_step5_screen.dart';
 
@@ -16,13 +17,13 @@ class PaymentStep4Screen extends StatefulWidget {
   final String tipoChavePix;
 
   const PaymentStep4Screen({
-    Key? key,
+    super.key,
     required this.nomeEstabelecimento,
     required this.ramoAtuacao,
     required this.valorCentavos,
     required this.chavePix,
     required this.tipoChavePix,
-  }) : super(key: key);
+  });
 
   @override
   State<PaymentStep4Screen> createState() => _PaymentStep4ScreenState();
@@ -133,7 +134,8 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
         elevation: 0,
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: KeyboardDismissWrapper(
+          child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Form(
             key: _formKey,
@@ -163,6 +165,8 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                   controller: _nomeTitularController,
                   hintText: 'Nome Completo do Titular',
                   labelText: 'Nome Completo do Titular',
+                  autofocus: true, // Focar automaticamente ao entrar na tela
+                  textInputAction: TextInputAction.next, // Próximo campo
                   textCapitalization: TextCapitalization.words,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -333,6 +337,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

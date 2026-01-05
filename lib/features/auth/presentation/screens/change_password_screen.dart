@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/shared/services/database_service.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   final String resetToken;
@@ -104,6 +105,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF122118),
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -113,30 +115,45 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         ),
       ),
       body: SafeArea(
-        child: Container(
-          width: double.infinity,
-          height: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildLogo(),
-                const SizedBox(height: 40.0),
-                _buildTitle(),
-                const SizedBox(height: 24.0),
-                if (_errorMessage != null) ...[
-                  _buildErrorMessage(),
-                  const SizedBox(height: 16.0),
-                ],
-                if (_successMessage != null) ...[
-                  _buildSuccessMessage(),
-                  const SizedBox(height: 16.0),
-                ],
-                _buildForm(),
-              ],
-            ),
-          ),
+        child: KeyboardDismissWrapper(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            return SingleChildScrollView(
+              reverse: true,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.only(
+                left: 16.0,
+                right: 16.0,
+                top: 16.0,
+                bottom: bottomInset + 32.0,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildLogo(),
+                      const SizedBox(height: 40.0),
+                      _buildTitle(),
+                      const SizedBox(height: 24.0),
+                      if (_errorMessage != null) ...[
+                        _buildErrorMessage(),
+                        const SizedBox(height: 16.0),
+                      ],
+                      if (_successMessage != null) ...[
+                        _buildSuccessMessage(),
+                        const SizedBox(height: 16.0),
+                      ],
+                      _buildForm(),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
         ),
       ),
     );
@@ -144,9 +161,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   Widget _buildLogo() {
     return Image.asset(
-      'assets/icons/logo_ios_filled.png',
-      width: 80,
-      height: 80,
+      'assets/icons/PagPag_icon.png',
+      width: 120,
+      height: 120,
       fit: BoxFit.contain,
     );
   }
@@ -214,6 +231,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             controller: _oldPasswordController,
             label: 'Senha Atual',
             obscureText: _obscureOldPassword,
+            autofocus: true,
             onToggleVisibility: () {
               setState(() {
                 _obscureOldPassword = !_obscureOldPassword;
@@ -310,9 +328,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     required bool obscureText,
     required VoidCallback onToggleVisibility,
     required String? Function(String?) validator,
+    bool autofocus = false,
   }) {
     return TextFormField(
       controller: controller,
+      autofocus: autofocus,
       obscureText: obscureText,
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(

@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:neves_capital/shared/components/custom_text_field.dart';
 import 'package:neves_capital/shared/components/phone_input_field.dart';
 import 'package:neves_capital/shared/helpers/phone_helper.dart';
-import 'package:neves_capital/shared/services/database_service.dart';
+import 'package:neves_capital/shared/services/firestore_service.dart';
 import 'package:neves_capital/shared/services/auth_service.dart';
 import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/features/auth/presentation/screens/personal_data_screen.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
 /// Tela para alterar dados pessoais (Email, Telefone, Endereço)
 /// Conforme wireframe fornecido
@@ -46,7 +47,7 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
     super.dispose();
   }
 
-  /// Carregar dados do PostgreSQL usando CPF (como no login)
+  /// Carregar dados do Firestore usando CPF (como no login)
   /// Os dados são guardados em _userData (variável de estado)
   Future<void> _loadUserData() async {
     setState(() {
@@ -65,15 +66,15 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
 
       AppLogger.sensitive('CPF encontrado no SecureStorage', cpf);
 
-      // 2. Buscar dados completos do PostgreSQL usando CPF (como no login)
-      AppLogger.debug('Buscando dados do PostgreSQL usando CPF...');
-      final userData = await DatabaseService.getUserByCpf(cpf);
+      // 2. Buscar dados completos do Firestore usando CPF (como no login)
+      AppLogger.debug('Buscando dados do Firestore usando CPF...');
+      final userData = await FirestoreService.getUserByCpf(cpf);
       
       if (userData != null && userData['id'] != null) {
         // ✅ Encontrou dados - guardar em variável de estado
         setState(() {
           _userData = userData; // Guarda todos os dados (email, telefone, endereço)
-          _userId = userData['id'] as String; // UUID do PostgreSQL
+          _userId = userData['id'] as String; // ID do documento Firestore
           
           // Preencher campos na tela
           _emailController.text = userData['email'] ?? '';
@@ -81,7 +82,7 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
         });
         
         AppLogger.info('Dados carregados e guardados em _userData');
-        AppLogger.debug('UUID presente: ${_userId != null}');
+        AppLogger.debug('Document ID presente: ${_userId != null}');
         AppLogger.debug('Dados carregados com sucesso');
       } else {
         throw Exception('Não foi possível carregar seus dados do banco de dados.');
@@ -143,7 +144,7 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
 
     // Se o usuário salvou o endereço, atualizar estado
     if (result == true && mounted) {
-      await _loadUserData(); // Recarregar dados do PostgreSQL
+      await _loadUserData(); // Recarregar dados do Firestore
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Endereço atualizado com sucesso!'),
@@ -187,9 +188,9 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
   /// Salvar alterações de email e telefone
   /// Fluxo conforme requisitos:
   /// 1. Buscar dados do usuário usando CPF (como no login)
-  /// 2. Atualizar dados criptografados no Postgres
-  /// 3. Se email mudou: atualizar email no Firebase E deslogar usuário
-  /// 4. Se email não mudou: atualizar apenas no Postgres
+  /// 2. Atualizar dados criptografados no Firestore
+  /// 3. Se email mudou: atualizar email no Firebase Auth E deslogar usuário
+  /// 4. Se email não mudou: atualizar apenas no Firestore
   /// 5. NÃO alterar o ID do usuário no Firebase
   Future<void> _handleConfirm() async {
     if (!_formKey.currentState!.validate()) {
@@ -213,41 +214,51 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
       
       // 2. Buscar dados atuais do usuário usando CPF (como no login)
       AppLogger.debug('Buscando dados atuais do usuário usando CPF...');
-      final userDataAtual = await DatabaseService.getUserByCpf(cpf);
+      final userDataAtual = await FirestoreService.getUserByCpf(cpf);
       
       if (userDataAtual == null || userDataAtual['id'] == null) {
         throw Exception('Não foi possível encontrar seus dados. Tente novamente.');
       }
       
-      final userIdPostgres = userDataAtual['id'] as String;
-      final emailAtualPostgres = userDataAtual['email'] as String? ?? '';
-      final telefoneAtualPostgres = userDataAtual['phone'] as String? ?? '';
+      final userIdFirestore = userDataAtual['id'] as String;
+      final emailAtualFirestore = userDataAtual['email'] as String? ?? '';
+      final telefoneAtualFirestore = userDataAtual['phone'] as String? ?? '';
       
       AppLogger.debug('Dados atuais carregados');
-      AppLogger.debug('UUID PostgreSQL presente: ${userIdPostgres.isNotEmpty}');
+      AppLogger.debug('Document ID Firestore presente: ${userIdFirestore.isNotEmpty}');
       
       // 3. Obter valores dos campos editados
       final novoEmail = _emailController.text.trim();
       final novoTelefone = PhoneHelper.getPhoneNumbers(_phoneController.text);
       
       // 4. Verificar o que mudou
-      final emailMudou = novoEmail != emailAtualPostgres && novoEmail.isNotEmpty;
-      final telefoneMudou = novoTelefone != telefoneAtualPostgres && novoTelefone.isNotEmpty;
+      final emailMudou = novoEmail != emailAtualFirestore && novoEmail.isNotEmpty;
+      final telefoneMudou = novoTelefone != telefoneAtualFirestore && novoTelefone.isNotEmpty;
       
       AppLogger.debug('Verificando mudanças...');
       AppLogger.debug('Email mudou: $emailMudou');
       AppLogger.debug('Telefone mudou: $telefoneMudou');
       
       if (!emailMudou && !telefoneMudou) {
-        throw Exception('Nenhuma alteração foi feita');
+        // Se não houver alterações, apenas mostrar mensagem informativa e retornar
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Nenhuma alteração foi feita nos dados.'),
+              backgroundColor: Colors.blue,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
       }
       
-      // CASO 1: Email NÃO mudou - Atualizar apenas telefone no PostgreSQL
+      // CASO 1: Email NÃO mudou - Atualizar apenas telefone no Firestore
       if (!emailMudou && telefoneMudou) {
-        AppLogger.debug('Email não mudou - Atualizando apenas telefone no PostgreSQL');
+        AppLogger.debug('Email não mudou - Atualizando apenas telefone no Firestore');
         
-        final success = await DatabaseService.updateUser(
-          userId: userIdPostgres,
+        final success = await FirestoreService.updateUser(
+          userId: userIdFirestore,
           phone: novoTelefone,
         );
         
@@ -255,7 +266,7 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
           throw Exception('Erro ao atualizar telefone no servidor');
         }
         
-        AppLogger.info('Telefone atualizado com sucesso no PostgreSQL');
+        AppLogger.info('Telefone atualizado com sucesso no Firestore');
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -273,54 +284,41 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
         return;
       }
       
-      // CASO 2: Email mudou - Atualizar no PostgreSQL E no Firebase, depois deslogar
+      // CASO 2: Email mudou - Atualizar no Firestore E no Firebase Auth, depois deslogar
       if (emailMudou) {
         AppLogger.debug('Email mudou - Iniciando atualização completa');
         
-        // 2.1. Atualizar dados no PostgreSQL (email criptografado + telefone se mudou)
-        AppLogger.debug('Passo 1: Atualizando dados no PostgreSQL');
-        final successPostgres = await DatabaseService.updateUser(
-          userId: userIdPostgres,
+        // 2.1. Atualizar dados no Firestore (email criptografado + telefone se mudou)
+        AppLogger.debug('Passo 1: Atualizando dados no Firestore');
+        final successFirestore = await FirestoreService.updateUser(
+          userId: userIdFirestore,
           email: novoEmail,
           phone: telefoneMudou ? novoTelefone : null,
         );
         
-        if (!successPostgres) {
-          throw Exception('Erro ao atualizar dados no PostgreSQL');
+        if (!successFirestore) {
+          throw Exception('Erro ao atualizar dados no Firestore');
         }
         
-        AppLogger.info('Dados atualizados no PostgreSQL');
+        AppLogger.info('Dados atualizados no Firestore');
         
-        // 2.2. Atualizar email no Firebase (NÃO altera o ID do usuário)
-        AppLogger.debug('Passo 2: Atualizando email no Firebase');
+        // 2.2. Atualizar email no Firebase Auth (NÃO altera o ID do usuário)
+        AppLogger.debug('Passo 2: Atualizando email no Firebase Auth');
         bool firebaseUpdated = false;
         
         // Tentar atualizar diretamente primeiro (método mais rápido)
         try {
           await AuthService.updateEmail(novoEmail);
-          AppLogger.info('Email atualizado no Firebase via cliente (ID preservado)');
+          AppLogger.info('Email atualizado no Firebase Auth via cliente (ID preservado)');
           firebaseUpdated = true;
         } catch (e) {
-          AppLogger.warning('Erro ao atualizar email no Firebase via cliente');
-          AppLogger.debug('Tentando sincronização via backend como fallback');
-          
-          // Fallback: usar endpoint do backend que atualiza via Admin SDK
-          try {
-            final syncSuccess = await DatabaseService.syncFirebaseEmail(cpf, emailAtualPostgres);
-            if (syncSuccess) {
-              AppLogger.info('Email sincronizado no Firebase via backend');
-              firebaseUpdated = true;
-            } else {
-              AppLogger.error('Falha ao sincronizar email via backend', null);
-            }
-          } catch (syncError) {
-            AppLogger.error('Erro ao sincronizar email via backend', syncError);
-          }
+          AppLogger.warning('Erro ao atualizar email no Firebase Auth via cliente: $e');
+          // Se falhar, continuar mesmo assim - o email já foi atualizado no Firestore
         }
         
         if (!firebaseUpdated) {
-          AppLogger.warning('ATENÇÃO: Email atualizado no PostgreSQL mas não no Firebase');
-          AppLogger.warning('O usuário precisará usar o endpoint de sincronização manualmente');
+          AppLogger.warning('ATENÇÃO: Email atualizado no Firestore mas não no Firebase Auth');
+          AppLogger.warning('O usuário precisará fazer login novamente');
         }
         
         // 2.3. Deslogar usuário para que ele faça login novamente com o novo email
@@ -343,8 +341,8 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
           
           // Voltar para o AppWrapper (que vai mostrar o OnboardingScreen automaticamente)
           if (mounted) {
-            // Remover todas as rotas até chegar ao AppWrapper
-            Navigator.of(context).popUntil((route) => route.isFirst);
+            // Remover todas as rotas até chegar ao AppWrapper usando rootNavigator
+            Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
           }
         }
         return;
@@ -392,7 +390,8 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
               child: CircularProgressIndicator(color: Color(0xFF4ADE80)),
             )
           : SafeArea(
-              child: Column(
+              child: KeyboardDismissWrapper(
+                child: Column(
                 children: [
                   Expanded(
                     child: SingleChildScrollView(
@@ -421,6 +420,7 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
                               controller: _emailController,
                               hintText: 'Email',
                               labelText: 'Email',
+                              autofocus: true, // Focar automaticamente ao entrar na tela
                               keyboardType: TextInputType.emailAddress,
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
@@ -510,15 +510,16 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
                             // Botão Confirmar
                             SizedBox(
                               width: double.infinity,
-                              height: 50,
+                              height: 56,
                               child: ElevatedButton(
                                 onPressed: _isLoading ? null : _handleConfirm,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF4ADE80),
-                                  foregroundColor: Colors.white,
+                                  backgroundColor: const Color(0xFF22C55E),
+                                  foregroundColor: const Color(0xFF122118),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
+                                  elevation: 0,
                                 ),
                                 child: _isLoading
                                     ? const SizedBox(
@@ -526,14 +527,16 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
                                         width: 20,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          color: Colors.white,
+                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                            Color(0xFF122118),
+                                          ),
                                         ),
                                       )
                                     : const Text(
                                         'CONFIRMAR',
                                         style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
                               ),
@@ -546,6 +549,7 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
                 ],
               ),
             ),
+        ),
     );
   }
 }

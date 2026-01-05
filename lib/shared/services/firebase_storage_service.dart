@@ -31,10 +31,10 @@ class FirebaseStorageService {
       );
 
       final downloadUrl = await uploadTask.ref.getDownloadURL();
-      AppLogger.info('Selfie uploaded com sucesso: $downloadUrl');
+      AppLogger.info('✅ Selfie uploaded com sucesso: $downloadUrl');
       return downloadUrl;
-    } catch (e) {
-      AppLogger.error('Erro ao fazer upload da selfie: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error('❌ Erro ao fazer upload da selfie: $e', e, stackTrace);
       return null;
     }
   }
@@ -69,10 +69,10 @@ class FirebaseStorageService {
 
       final downloadUrl = await uploadTask.ref.getDownloadURL();
       AppLogger.info(
-          'Documento ($documentSide) uploaded com sucesso: $downloadUrl');
+          '✅ Documento ($documentSide) uploaded com sucesso: $downloadUrl');
       return downloadUrl;
-    } catch (e) {
-      AppLogger.error('Erro ao fazer upload do documento ($documentSide): $e');
+    } catch (e, stackTrace) {
+      AppLogger.error('❌ Erro ao fazer upload do documento ($documentSide): $e', e, stackTrace);
       return null;
     }
   }
@@ -90,22 +90,27 @@ class FirebaseStorageService {
     final results = <String, String?>{};
 
     // Upload paralelo para melhor performance
-    final futures = await Future.wait([
-      uploadSelfie(userId: userId, filePath: selfiePath),
-      uploadDocument(
-          userId: userId, filePath: frontDocumentPath, documentSide: 'front'),
-      uploadDocument(
-          userId: userId, filePath: backDocumentPath, documentSide: 'back'),
-    ]);
+    try {
+      final futures = await Future.wait([
+        uploadSelfie(userId: userId, filePath: selfiePath),
+        uploadDocument(
+            userId: userId, filePath: frontDocumentPath, documentSide: 'front'),
+        uploadDocument(
+            userId: userId, filePath: backDocumentPath, documentSide: 'back'),
+      ]);
 
-    results['selfieUrl'] = futures[0];
-    results['frontDocumentUrl'] = futures[1];
-    results['backDocumentUrl'] = futures[2];
+      results['selfieUrl'] = futures[0];
+      results['frontDocumentUrl'] = futures[1];
+      results['backDocumentUrl'] = futures[2];
 
-    AppLogger.info('Upload de documentos KYC concluído');
-    AppLogger.debug('Selfie URL: ${results['selfieUrl']}');
-    AppLogger.debug('Front Document URL: ${results['frontDocumentUrl']}');
-    AppLogger.debug('Back Document URL: ${results['backDocumentUrl']}');
+      AppLogger.info('✅ Upload de documentos KYC concluído');
+      AppLogger.debug('Selfie URL: ${results['selfieUrl']}');
+      AppLogger.debug('Front Document URL: ${results['frontDocumentUrl']}');
+      AppLogger.debug('Back Document URL: ${results['backDocumentUrl']}');
+    } catch (e, stackTrace) {
+      AppLogger.error('❌ Erro durante upload paralelo de documentos KYC: $e', e, stackTrace);
+      // Os resultados já terão null nos campos que falharam
+    }
 
     return results;
   }

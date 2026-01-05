@@ -61,12 +61,12 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCsFaxeejMMNYvjzZVdIXhv8dQJEI3Xq1Y',
-    appId: '1:124871515546:ios:9da6a3d40a751e12b1ee23',
+    apiKey: 'AIzaSyAHv0W_SQdzTf9tctrSrogk6KkWhD-YUvU',
+    appId: '1:124871515546:ios:022617e3375e9945b1ee23',
     messagingSenderId: '124871515546',
     projectId: 'pagpagapp',
     storageBucket: 'pagpagapp.firebasestorage.app',
-    iosBundleId: 'com.nevescapital.pagpag',
+    iosBundleId: 'com.pagpag.pagpagapp',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(

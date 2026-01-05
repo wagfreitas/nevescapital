@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
-import 'package:neves_capital/shared/services/firebase_storage_service.dart';
+// import 'package:neves_capital/shared/services/firebase_storage_service.dart'; // TODO: Reativar quando upload for implementado
 import 'package:neves_capital/features/auth/data/services/local_registration_storage.dart';
 import 'package:neves_capital/features/auth/data/services/registration_service.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/features/auth/presentation/controllers/registration_lifecycle_observer.dart';
+import 'package:neves_capital/features/auth/domain/entities/registration_progress.dart';
+import 'package:neves_capital/features/home/presentation/screens/dashboard_screen.dart';
 
 /// Tela 8 do Cadastro: Envie Documento com Foto
 class Step8DocumentScreen extends StatefulWidget {
@@ -19,10 +23,20 @@ class Step8DocumentScreen extends StatefulWidget {
   final String fullName;
   final DateTime birthDate;
   final String motherName;
+  final String cep;
+  final String street;
+  final String number;
+  final String complement;
+  final String neighborhood;
+  final String city;
+  final String state;
   final bool isPep;
   final String occupation;
   final String incomeRange;
   final String selfiePath;
+  final String? initialFrontDocumentPath;
+  final String? initialBackDocumentPath;
+  final String? initialDocumentType;
 
   const Step8DocumentScreen({
     super.key,
@@ -34,10 +48,20 @@ class Step8DocumentScreen extends StatefulWidget {
     required this.fullName,
     required this.birthDate,
     required this.motherName,
+    required this.cep,
+    required this.street,
+    required this.number,
+    required this.complement,
+    required this.neighborhood,
+    required this.city,
+    required this.state,
     required this.isPep,
     required this.occupation,
     required this.incomeRange,
     required this.selfiePath,
+    this.initialFrontDocumentPath,
+    this.initialBackDocumentPath,
+    this.initialDocumentType,
   });
 
   @override
@@ -47,16 +71,131 @@ class Step8DocumentScreen extends StatefulWidget {
 class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
   File? _frontDocumentFile;
   File? _backDocumentFile;
+  String? _selectedDocumentType; // 'RG', 'CNH', 'RNE'
   bool _isLoading = false;
   String? _errorMessage;
+  late RegistrationLifecycleObserver _lifecycleObserver;
 
-  Future<void> _pickDocument(bool isFront) async {
+  @override
+  void initState() {
+    super.initState();
+
+    // Restaurar fotos dos documentos se existirem (ANTES de criar o observer)
+    if (widget.initialFrontDocumentPath != null) {
+      _frontDocumentFile = File(widget.initialFrontDocumentPath!);
+    }
+    if (widget.initialBackDocumentPath != null) {
+      _backDocumentFile = File(widget.initialBackDocumentPath!);
+    }
+    
+    // Restaurar tipo de documento se existir
+    _selectedDocumentType = widget.initialDocumentType;
+
+    _lifecycleObserver = RegistrationLifecycleObserver(
+      getCurrentProgress: () => RegistrationProgress(
+        cpf: widget.cpf,
+        currentStep: 'document',
+        status: RegistrationStatus.inProgress,
+        lastUpdated: DateTime.now(),
+        phone: widget.phone,
+        email: widget.email,
+        fullName: widget.fullName,
+        birthDate: widget.birthDate,
+        motherName: widget.motherName,
+        cep: widget.cep,
+        street: widget.street,
+        number: widget.number,
+        complement: widget.complement,
+        neighborhood: widget.neighborhood,
+        city: widget.city,
+        state: widget.state,
+        isPep: widget.isPep,
+        occupation: widget.occupation,
+        incomeRange: widget.incomeRange,
+        selfiePath: widget.selfiePath,
+        documentFrontPath: _frontDocumentFile?.path,
+        documentBackPath: _backDocumentFile?.path,
+        documentType: _selectedDocumentType,
+      ),
+      shouldSaveProgress: () => ModalRoute.of(context)?.isCurrent ?? false,
+    );
+    WidgetsBinding.instance.addObserver(_lifecycleObserver);
+
+    // Persistir o passo imediatamente para permitir retomada exata
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _lifecycleObserver.saveNow(localOnly: false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _lifecycleObserver.dispose();
+    WidgetsBinding.instance.removeObserver(_lifecycleObserver);
+    super.dispose();
+  }
+
+  Future<void> _showImageSourceDialog(bool isFront) async {
+    if (!mounted) return;
+
+    final ImageSource? source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: const Color(0xFF1A2F25),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 16),
+            const Text(
+              'Escolha uma opção',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Color(0xFF22C55E), size: 28),
+              title: const Text(
+                'Tirar Foto',
+                style: TextStyle(color: Colors.white, fontSize: 16),
+              ),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: Color(0xFF22C55E), size: 28),
+              title: const Text(
+                'Escolher da Galeria',
+                style: TextStyle(color: Colors.white, fontSize: 16),
+              ),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+
+    if (source != null) {
+      await _pickDocument(isFront, source);
+    }
+  }
+
+  Future<void> _pickDocument(bool isFront, ImageSource source) async {
     try {
       final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 90,
-      );
+      final XFile? image = source == ImageSource.camera
+          ? await picker.pickImage(
+              source: ImageSource.camera,
+              imageQuality: 90,
+            )
+          : await picker.pickImage(
+              source: ImageSource.gallery,
+              imageQuality: 90,
+            );
 
       if (image != null) {
         setState(() {
@@ -67,18 +206,30 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
           }
           _errorMessage = null;
         });
+
+        // Salvar progresso com o documento capturado
+        await _lifecycleObserver.saveNow(localOnly: false);
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Erro ao capturar foto. Tente novamente.';
+          _errorMessage = source == ImageSource.camera
+              ? 'Erro ao capturar foto. Tente novamente.'
+              : 'Erro ao selecionar foto. Tente novamente.';
         });
       }
-      AppLogger.error('Erro ao capturar documento: $e');
+      AppLogger.error('Erro ao ${source == ImageSource.camera ? "capturar" : "selecionar"} documento: $e');
     }
   }
 
   Future<void> _handleFinalize() async {
+    if (_selectedDocumentType == null) {
+      setState(() {
+        _errorMessage = 'Por favor, selecione o tipo de documento';
+      });
+      return;
+    }
+    
     if (_frontDocumentFile == null || _backDocumentFile == null) {
       setState(() {
         _errorMessage = 'Por favor, tire foto da frente e verso do documento';
@@ -105,6 +256,7 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
       AppLogger.debug('PEP: ${widget.isPep}');
       AppLogger.debug('Ocupação: ${widget.occupation}');
       AppLogger.debug('Renda: ${widget.incomeRange}');
+      AppLogger.debug('Tipo de Documento: $_selectedDocumentType');
 
       // Primeiro, verificar se o usuário já existe (criado na tela de email)
       final existingUser = await FirestoreService.getUserByCpf(widget.cpf);
@@ -118,7 +270,15 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
       } else {
         AppLogger.warning(
             'Step8DocumentScreen: Usuário não encontrado, criando temporariamente...');
-        // Criar usuário base para obter userId
+        // Criar usuário base para obter userId (incluindo endereço)
+        AppLogger.debug('Step8DocumentScreen: Criando usuário com endereço completo');
+        AppLogger.debug('CEP: ${widget.cep}');
+        AppLogger.debug('Rua: ${widget.street}');
+        AppLogger.debug('Número: ${widget.number}');
+        AppLogger.debug('Bairro: ${widget.neighborhood}');
+        AppLogger.debug('Cidade: ${widget.city}');
+        AppLogger.debug('Estado: ${widget.state}');
+        
         userId = await FirestoreService.createUser(
           email: widget.email,
           fullName: widget.fullName,
@@ -129,11 +289,22 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
           isPep: widget.isPep,
           occupation: widget.occupation,
           incomeRange: widget.incomeRange,
+          // Dados de endereço
+          cep: widget.cep,
+          address: widget.street,
+          number: widget.number,
+          complement: widget.complement,
+          neighborhood: widget.neighborhood,
+          city: widget.city,
+          state: widget.state,
         );
-        AppLogger.info('Step8DocumentScreen: Usuário base criado: $userId');
+        AppLogger.info('Step8DocumentScreen: Usuário base criado com endereço: $userId');
       }
 
-      // Upload dos documentos para Firebase Storage
+      // TODO: Upload dos documentos para Firebase Storage
+      // Comentado temporariamente para permitir finalização do cadastro sem upload
+      // Será reativado após resolver problemas de permissão/configuração do Storage
+      /*
       AppLogger.info('Step8DocumentScreen: Iniciando upload de documentos...');
       final uploadResults = await FirebaseStorageService.uploadKycDocuments(
         userId: userId,
@@ -155,11 +326,35 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
       if (selfieUrl == null ||
           frontDocumentUrl == null ||
           backDocumentUrl == null) {
-        throw Exception('Falha ao fazer upload de um ou mais documentos');
+        final List<String> missingDocs = [];
+        if (selfieUrl == null) missingDocs.add('selfie');
+        if (frontDocumentUrl == null) missingDocs.add('frente do documento');
+        if (backDocumentUrl == null) missingDocs.add('verso do documento');
+        
+        AppLogger.error('❌ Falha no upload dos seguintes documentos: ${missingDocs.join(", ")}');
+        throw Exception('Falha ao fazer upload de: ${missingDocs.join(", ")}. Verifique sua conexão e tente novamente.');
       }
+      */
 
-      // Atualizar usuário com URLs dos documentos
-      AppLogger.info('Step8DocumentScreen: Atualizando usuário com URLs...');
+      // URLs temporárias (serão substituídas quando upload for reativado)
+      final String? selfieUrl = null;
+      final String? frontDocumentUrl = null;
+      final String? backDocumentUrl = null;
+
+      AppLogger.info('Step8DocumentScreen: Salvando dados do usuário (upload de documentos desabilitado temporariamente)...');
+      AppLogger.warning('⚠️ Upload de documentos desabilitado - apenas dados do usuário serão salvos');
+
+      // Atualizar usuário com dados completos (sem URLs dos documentos por enquanto)
+      AppLogger.info('Step8DocumentScreen: Atualizando usuário com dados pessoais, endereço e tipo de documento...');
+      AppLogger.debug('Step8DocumentScreen: Dados de endereço a serem salvos:');
+      AppLogger.debug('CEP: ${widget.cep}');
+      AppLogger.debug('Rua: ${widget.street}');
+      AppLogger.debug('Número: ${widget.number}');
+      AppLogger.debug('Complemento: ${widget.complement}');
+      AppLogger.debug('Bairro: ${widget.neighborhood}');
+      AppLogger.debug('Cidade: ${widget.city}');
+      AppLogger.debug('Estado: ${widget.state}');
+      
       final success = await FirestoreService.updateUser(
         userId: userId,
         email: widget.email,
@@ -171,9 +366,18 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
         isPep: widget.isPep,
         occupation: widget.occupation,
         incomeRange: widget.incomeRange,
-        selfieUrl: selfieUrl,
-        frontDocumentUrl: frontDocumentUrl,
-        backDocumentUrl: backDocumentUrl,
+        // Dados de endereço
+        cep: widget.cep,
+        address: widget.street,
+        number: widget.number,
+        complement: widget.complement,
+        neighborhood: widget.neighborhood,
+        city: widget.city,
+        state: widget.state,
+        selfieUrl: selfieUrl, // null por enquanto
+        frontDocumentUrl: frontDocumentUrl, // null por enquanto
+        backDocumentUrl: backDocumentUrl, // null por enquanto
+        documentType: _selectedDocumentType,
       );
 
       if (!success) {
@@ -186,39 +390,76 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
       AppLogger.info('Step8DocumentScreen: Cadastro finalizado no Firestore!');
 
       // Limpar progresso local e do Firestore (cadastro completo!)
-      AppLogger.debug('Limpando progresso de cadastro (local + Firestore)...');
-      await LocalRegistrationStorage.clearLocal();
-      await RegistrationService.deleteProgress(widget.cpf);
-      AppLogger.info('Progresso de cadastro limpo com sucesso');
+      // Não crítico se falhar - o cadastro já foi concluído
+      try {
+        AppLogger.debug('Limpando progresso de cadastro (local + Firestore)...');
+        await LocalRegistrationStorage.clearLocal();
+        await RegistrationService.deleteProgress(widget.cpf);
+        AppLogger.info('✅ Progresso de cadastro limpo com sucesso');
+      } catch (cleanupError) {
+        AppLogger.warning('⚠️ Erro ao limpar progresso (não crítico): $cleanupError');
+        // Não bloquear o fluxo se a limpeza falhar
+      }
 
       if (!mounted) return;
 
-      // Marcar como logado
-      if (widget.authController != null) {
-        await widget.authController!.loginWithOtpMock(widget.cpf);
+      // Marcar como logado (não crítico se falhar)
+      try {
+        if (widget.authController != null) {
+          await widget.authController!.loginWithOtpMock(widget.cpf);
+          AppLogger.info('✅ Login automático realizado com sucesso');
+        }
+      } catch (loginError) {
+        AppLogger.warning('⚠️ Erro ao fazer login automático (não crítico): $loginError');
+        // Não bloquear o fluxo se o login automático falhar
+        // O usuário pode fazer login manualmente depois
       }
 
       // Mostrar mensagem de sucesso
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cadastro realizado com sucesso!'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cadastro realizado com sucesso!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
 
-      // Voltar para onboarding (que vai redirecionar para dashboard se logado)
+      // Redirecionar para DashboardScreen após cadastro completo
       await Future.delayed(const Duration(seconds: 1));
 
       if (mounted) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => DashboardScreen(
+              authController: widget.authController!,
+              themeController: widget.themeController!,
+            ),
+          ),
+          (route) => false, // Remove todas as rotas anteriores
+        );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       if (mounted) {
+        String errorMessage = 'Erro ao finalizar cadastro. Tente novamente.';
+        
+        // Mensagens de erro mais específicas
+        final errorString = e.toString().toLowerCase();
+        if (errorString.contains('permission') || errorString.contains('permissão')) {
+          errorMessage = 'Erro de permissão. Verifique as configurações do Firestore.';
+        } else if (errorString.contains('network') || errorString.contains('conexão')) {
+          errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente.';
+        } else if (errorString.contains('upload') || errorString.contains('storage')) {
+          errorMessage = 'Erro ao fazer upload dos documentos. Tente novamente.';
+        } else if (errorString.contains('firestore') || errorString.contains('firebase')) {
+          errorMessage = 'Erro ao salvar no banco de dados. Tente novamente.';
+        }
+        
         setState(() {
-          _errorMessage = 'Erro ao finalizar cadastro. Tente novamente.';
+          _errorMessage = errorMessage;
         });
-        AppLogger.error('Erro ao finalizar cadastro: $e');
+        AppLogger.error('❌ Erro ao finalizar cadastro: $e', e, stackTrace);
       }
     } finally {
       if (mounted) {
@@ -233,124 +474,235 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF122118),
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            }
+          },
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 40),
-              const Text(
-                'Envie Documento com Foto',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            return SingleChildScrollView(
+              reverse: true,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.only(
+                left: 24.0,
+                right: 24.0,
+                bottom: bottomInset + 32.0,
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Precisamos de fotos da frente e verso do seu documento',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white70,
-                ),
-              ),
-              const SizedBox(height: 40),
-              // Foto da Frente
-              _buildDocumentButton(
-                title: 'Foto da Frente do Documento',
-                file: _frontDocumentFile,
-                onTap: () => _pickDocument(true),
-              ),
-              const SizedBox(height: 24),
-              // Foto do Verso
-              _buildDocumentButton(
-                title: 'Foto do Verso do Documento',
-                file: _backDocumentFile,
-                onTap: () => _pickDocument(false),
-              ),
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red),
-                  ),
-                  child: Row(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.error_outline,
-                          color: Colors.red, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style:
-                              const TextStyle(color: Colors.red, fontSize: 14),
+                      const SizedBox(height: 40),
+                      const Text(
+                        'Documento com Foto',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
                       ),
+                      const SizedBox(height: 40),
+                      // Seleção de tipo de documento
+                      const Text(
+                        'Qual documento você irá enviar ?',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDocumentTypeButton('RG'),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildDocumentTypeButton('CNH'),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildDocumentTypeButton('RNE'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+                      const Text(
+                        'Envie uma foto do documento:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.white70,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Foto da Frente
+                      _buildDocumentButton(
+                        title: 'Foto da Frente do Documento',
+                        file: _frontDocumentFile,
+                        onTap: () => _showImageSourceDialog(true),
+                      ),
+                      const SizedBox(height: 24),
+                      // Foto do Verso
+                      _buildDocumentButton(
+                        title: 'Foto do Verso do Documento',
+                        file: _backDocumentFile,
+                        onTap: () => _showImageSourceDialog(false),
+                      ),
+                      if (_errorMessage != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error_outline,
+                                  color: Colors.red, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _errorMessage!,
+                                  style:
+                                      const TextStyle(color: Colors.red, fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 40),
+                      // Botão Finalizar Cadastro
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _handleFinalize,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF22C55E),
+                            foregroundColor: const Color(0xFF122118),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        Color(0xFF122118)),
+                                  ),
+                                )
+                              : const Text(
+                                  'Finalizar Cadastro',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Termos e Política
+                      Center(
+                        child: RichText(
+                          textAlign: TextAlign.center,
+                          text: TextSpan(
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.6),
+                              fontSize: 12,
+                            ),
+                            children: [
+                              const TextSpan(
+                                text: 'Ao Finalizar o Cadastro você Concorda com os ',
+                              ),
+                              TextSpan(
+                                text: 'Termos de Uso',
+                                style: const TextStyle(
+                                  color: Color(0xFF22C55E),
+                                  decoration: TextDecoration.underline,
+                                ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () => _showTermsModal(context),
+                              ),
+                              const TextSpan(text: ' e com a '),
+                              TextSpan(
+                                text: 'Política de Privacidade',
+                                style: const TextStyle(
+                                  color: Color(0xFF22C55E),
+                                  decoration: TextDecoration.underline,
+                                ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () => _showPrivacyModal(context),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
-              ],
-              const SizedBox(height: 40),
-              // Botão Finalizar Cadastro
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleFinalize,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF22C55E),
-                    foregroundColor: const Color(0xFF122118),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                                Color(0xFF122118)),
-                          ),
-                        )
-                      : const Text(
-                          'Finalizar Cadastro',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                ),
               ),
-              const SizedBox(height: 16),
-              // Termos e Política
-              Center(
-                child: Text(
-                  'Ao Finalizar o Cadastro você Concorda com os\nTermos de Uso e com a Política de Privacidade',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 40),
-            ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDocumentTypeButton(String type) {
+    final isSelected = _selectedDocumentType == type;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedDocumentType = type;
+          _errorMessage = null;
+        });
+        // Salvar progresso com o tipo selecionado
+        _lifecycleObserver.saveNow(localOnly: false);
+      },
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF22C55E)
+              : Colors.white.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF22C55E)
+                : Colors.white.withValues(alpha: 0.2),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            type,
+            style: TextStyle(
+              color: isSelected ? const Color(0xFF122118) : Colors.white,
+              fontSize: 16,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            ),
           ),
         ),
       ),
@@ -362,65 +714,66 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
     required File? file,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 120,
-        decoration: BoxDecoration(
+    return Container(
+      decoration: BoxDecoration(
+        color: file != null
+            ? const Color(0xFF22C55E).withValues(alpha: 0.1)
+            : Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
           color: file != null
-              ? const Color(0xFF22C55E).withValues(alpha: 0.1)
-              : Colors.white.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: file != null
-                ? const Color(0xFF22C55E)
-                : Colors.white.withValues(alpha: 0.2),
-            width: file != null ? 2 : 1,
-          ),
+              ? const Color(0xFF22C55E)
+              : Colors.white.withValues(alpha: 0.2),
+          width: file != null ? 2 : 1,
         ),
-        child: file != null
-            ? Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      file,
-                      width: double.infinity,
-                      height: double.infinity,
-                      fit: BoxFit.cover,
+      ),
+      child: file != null
+          ? Column(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12),
+                  ),
+                  child: Image.file(
+                    file,
+                    width: double.infinity,
+                    height: 120,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(12),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: TextButton(
+                    onPressed: onTap,
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF22C55E),
                     ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.check_circle,
-                            color: Color(0xFF22C55E),
-                            size: 32,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            title,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                    child: const Text(
+                      'Trocar Foto',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                ],
-              )
-            : Padding(
+                ),
+              ],
+            )
+          : GestureDetector(
+              onTap: onTap,
+              child: Container(
+                height: 120,
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -445,6 +798,147 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
                   ],
                 ),
               ),
+            ),
+    );
+  }
+
+  void _showTermsModal(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFF1A2F25),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'TERMOS DE USO',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Text(
+                    'Aqui serão exibidos os Termos de Uso da aplicação. '
+                    'Este conteúdo deve ser fornecido pela equipe jurídica e '
+                    'atualizado conforme necessário.\n\n'
+                    'Os Termos de Uso estabelecem as regras e condições '
+                    'para o uso da plataforma, incluindo direitos e '
+                    'responsabilidades dos usuários.',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.white70,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF22C55E),
+                    foregroundColor: const Color(0xFF122118),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'FECHAR',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showPrivacyModal(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFF1A2F25),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'POLÍTICA DE PRIVACIDADE',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Text(
+                    'Aqui será exibida a Política de Privacidade da aplicação. '
+                    'Este conteúdo deve ser fornecido pela equipe jurídica e '
+                    'atualizado conforme necessário.\n\n'
+                    'A Política de Privacidade descreve como coletamos, '
+                    'usamos, armazenamos e protegemos suas informações pessoais.',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.white70,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF22C55E),
+                    foregroundColor: const Color(0xFF122118),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'FECHAR',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

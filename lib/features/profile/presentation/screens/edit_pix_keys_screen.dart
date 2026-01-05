@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:neves_capital/shared/services/database_service.dart';
 import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
 /// Tela para alterar chaves PIX cadastradas
 /// Conforme wireframe fornecido
@@ -237,11 +238,12 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
         ),
       ),
       body: SafeArea(
-        child: _isLoadingData
-            ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFF22C55E)),
-              )
-            : SingleChildScrollView(
+        child: KeyboardDismissWrapper(
+          child: _isLoadingData
+              ? const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF22C55E)),
+                )
+              : SingleChildScrollView(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -466,6 +468,7 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
                   ],
                 ),
               ),
+        ),
       ),
     );
   }

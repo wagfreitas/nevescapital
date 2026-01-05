@@ -25,29 +25,31 @@ class EnvService {
       'https://neves-capital-api-124871515546.us-central1.run.app';
 
   static String get apiKey =>
-      dotenv.env['API_KEY'] ?? _throwMissingKey('API_KEY');
+      dotenv.env['API_KEY'] ?? '';
 
   // Pagar.me
   static String get pagarmeApiKey =>
-      dotenv.env['PAGARME_API_KEY'] ?? _throwMissingKey('PAGARME_API_KEY');
+      dotenv.env['PAGARME_API_KEY'] ?? '';
 
   static String get pagarmeBaseUrl =>
       dotenv.env['PAGARME_BASE_URL'] ?? 'https://api.pagar.me/core/v5';
 
-  /// Lança erro se chave obrigatória estiver faltando
-  static String _throwMissingKey(String key) {
-    throw Exception('Variável de ambiente $key não configurada!\n'
-        'Crie o arquivo .env baseado em .env.example');
-  }
-
   /// Verifica se todas as chaves obrigatórias estão configuradas
   static bool validateRequiredKeys() {
     try {
-      // Tenta acessar todas as chaves obrigatórias
-      final _ = [
-        apiKey,
-        pagarmeApiKey,
-      ];
+      final apiKeyValue = apiKey;
+      final pagarmeKeyValue = pagarmeApiKey;
+      
+      if (apiKeyValue.isEmpty) {
+        AppLogger.warning('⚠️ API_KEY não configurada');
+        return false;
+      }
+      
+      if (pagarmeKeyValue.isEmpty) {
+        AppLogger.warning('⚠️ PAGARME_API_KEY não configurada');
+        return false;
+      }
+      
       return true;
     } catch (e) {
       AppLogger.error('❌ Erro na validação de chaves: $e');

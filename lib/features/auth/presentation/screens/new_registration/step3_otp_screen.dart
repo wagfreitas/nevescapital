@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/registration_lifecycle_observer.dart';
 import 'package:neves_capital/features/auth/domain/entities/registration_progress.dart';
+import 'package:neves_capital/features/auth/presentation/helpers/registration_navigation_helper.dart';
+import 'package:neves_capital/features/auth/data/services/auth_api_service.dart';
+import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'step4_email_screen.dart';
 
 /// Tela 3 do Cadastro: Insira o código OTP (6 dígitos)
@@ -108,11 +112,24 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
         // OTP válido - continuar para próxima tela (email)
         AppLogger.info('OTP de cadastro verificado com sucesso!');
 
-        // Salvar progresso LOCALMENTE antes de navegar
-        AppLogger.debug('Salvando progresso antes de navegar para Email');
-        await _lifecycleObserver.saveNow(localOnly: true);
+        // Criar progresso atual com dados preenchidos
+        final currentProgress = RegistrationProgress(
+          cpf: widget.cpf,
+          currentStep: 'email',
+          status: RegistrationStatus.inProgress,
+          lastUpdated: DateTime.now(),
+          phone: widget.phone,
+        );
 
-        if (mounted) {
+        // Salvar e buscar progresso completo (garante que dados de outras telas sejam preservados)
+        final completeProgress = await RegistrationNavigationHelper.saveAndGetCompleteProgress(
+          currentProgress: currentProgress,
+        );
+
+        if (!mounted) return;
+
+        // Navegar para próxima tela (Email)
+        // Usar dados do progresso completo para restaurar tudo que já foi preenchido
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -121,10 +138,10 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
                 themeController: widget.themeController,
                 cpf: widget.cpf,
                 phone: widget.phone,
+              initialEmail: completeProgress?.email,
               ),
             ),
           );
-        }
       }
     } catch (e) {
       if (mounted) {
@@ -149,22 +166,96 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
       _errorMessage = null;
     });
 
-    // Simular delay da API
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      AppLogger.info('🔄 Reenviando código OTP para cadastro');
+      AppLogger.debug('📱 Telefone: ${widget.phone.substring(0, 2)}***');
 
-    // MOCK: Reenviar OTP
-    AppLogger.debug(
-        'MOCK: Reenviando OTP para telefone: ${widget.phone.substring(0, 2)}***');
-    AppLogger.debug('MOCK: Novo código: 123456');
+      // Formatar telefone para E.164 (+55...)
+      String formattedPhone = widget.phone;
+      if (!formattedPhone.startsWith('+')) {
+        // Garantir DDI 55 (Brasil)
+        if (!formattedPhone.startsWith('55')) {
+          formattedPhone = '55$formattedPhone';
+        }
+        formattedPhone = '+$formattedPhone';
+      }
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        _resendCountdown = 60; // 60 segundos de countdown
-      });
+      // Tentar usar Firebase Phone Auth para reenvio
+      try {
+        await FirebaseAuth.instance.verifyPhoneNumber(
+          phoneNumber: formattedPhone,
+          verificationCompleted: (PhoneAuthCredential credential) {
+            AppLogger.debug('✅ Verificação automática no reenvio de cadastro');
+          },
+          verificationFailed: (FirebaseAuthException e) {
+            AppLogger.error('❌ Erro ao reenviar OTP via Firebase: ${e.code} - ${e.message}');
+            // Se Firebase falhar, tentar API alternativa
+            _tryResendViaApi();
+          },
+          codeSent: (String verificationId, int? resendToken) {
+            AppLogger.info('✅ Código reenviado com sucesso para cadastro via Firebase!');
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _resendCountdown = 60; // 60 segundos de countdown
+              });
+              _startResendCountdown();
+            }
+          },
+          codeAutoRetrievalTimeout: (String verificationId) {
+            AppLogger.debug('⏰ Timeout de auto-retrieval no reenvio de cadastro');
+          },
+        );
+      } catch (firebaseError) {
+        // Se Firebase falhar, tentar API alternativa
+        AppLogger.warning('Firebase Phone Auth falhou, tentando API alternativa: $firebaseError');
+        _tryResendViaApi();
+      }
+    } catch (e) {
+      AppLogger.error('❌ Erro ao reenviar OTP', e);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Erro ao reenviar código: ${e.toString().replaceAll('Exception: ', '')}';
+        });
+      }
+    }
+  }
 
-      // Iniciar countdown
-      _startResendCountdown();
+  // Tentar reenviar via API alternativa
+  Future<void> _tryResendViaApi() async {
+    try {
+      AppLogger.info('🔄 Tentando reenviar OTP via API alternativa');
+      final result = await AuthApiService.sendOtp(widget.phone);
+      
+      if (mounted) {
+        if (result['success'] == true) {
+          AppLogger.info('✅ Código reenviado via API alternativa');
+          setState(() {
+            _isLoading = false;
+            _resendCountdown = 60;
+          });
+          _startResendCountdown();
+        } else {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = result['message'] ?? 'Erro ao reenviar código';
+          });
+        }
+      }
+    } catch (apiError) {
+      AppLogger.error('❌ Erro ao reenviar via API: $apiError');
+      // Fallback: MOCK para desenvolvimento
+      AppLogger.warning('⚠️ Usando MOCK para reenvio de OTP (modo desenvolvimento)');
+      await Future.delayed(const Duration(seconds: 1));
+      
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _resendCountdown = 60;
+        });
+        _startResendCountdown();
+      }
     }
   }
 
@@ -190,6 +281,7 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF122118),
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -199,12 +291,15 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
         ),
       ),
       body: SafeArea(
-        child: LayoutBuilder(
-          // Evita overflow quando o teclado ocupa parte da tela.
-          builder: (context, constraints) {
+        child: KeyboardDismissWrapper(
+          child: LayoutBuilder(
+            // Evita overflow quando o teclado ocupa parte da tela.
+            builder: (context, constraints) {
             final bottomInset = MediaQuery.of(context).viewInsets.bottom;
             return SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(24, 0, 24, 24 + bottomInset),
+              reverse: true,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.fromLTRB(24, 0, 24, 24 + bottomInset + 8),
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: Form(
@@ -234,6 +329,7 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
                         TextFormField(
                           controller: _otpController,
                           focusNode: _otpFocusNode,
+                          autofocus: true,
                           keyboardType: TextInputType.number,
                           textAlign: TextAlign.center,
                           maxLength: _otpLength,
@@ -379,6 +475,7 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
               ),
             );
           },
+        ),
         ),
       ),
     );

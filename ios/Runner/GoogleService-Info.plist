@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyCsFaxeejMMNYvjzZVdIXhv8dQJEI3Xq1Y</string>
+	<string>AIzaSyAHv0W_SQdzTf9tctrSrogk6KkWhD-YUvU</string>
 	<key>GCM_SENDER_ID</key>
 	<string>124871515546</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.nevescapital.pagpag</string>
+	<string>com.pagpag.pagpagapp</string>
 	<key>PROJECT_ID</key>
 	<string>pagpagapp</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:124871515546:ios:9da6a3d40a751e12b1ee23</string>
+	<string>1:124871515546:ios:022617e3375e9945b1ee23</string>
 </dict>
 </plist>

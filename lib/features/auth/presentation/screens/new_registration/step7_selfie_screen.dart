@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/features/auth/presentation/controllers/registration_lifecycle_observer.dart';
+import 'package:neves_capital/features/auth/domain/entities/registration_progress.dart';
+import 'package:neves_capital/features/auth/presentation/helpers/registration_navigation_helper.dart';
 import 'step8_document_screen.dart';
 
 /// Tela 7 do Cadastro: Tire uma Selfie
@@ -16,6 +19,13 @@ class Step7SelfieScreen extends StatefulWidget {
   final String fullName;
   final DateTime birthDate;
   final String motherName;
+  final String cep;
+  final String street;
+  final String number;
+  final String complement;
+  final String neighborhood;
+  final String city;
+  final String state;
   final bool isPep;
   final String occupation;
   final String incomeRange;
@@ -30,6 +40,13 @@ class Step7SelfieScreen extends StatefulWidget {
     required this.fullName,
     required this.birthDate,
     required this.motherName,
+    required this.cep,
+    required this.street,
+    required this.number,
+    required this.complement,
+    required this.neighborhood,
+    required this.city,
+    required this.state,
     required this.isPep,
     required this.occupation,
     required this.incomeRange,
@@ -43,8 +60,55 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
   File? _selfieFile;
   bool _isLoading = false;
   String? _errorMessage;
+  late RegistrationLifecycleObserver _lifecycleObserver;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _lifecycleObserver = RegistrationLifecycleObserver(
+      getCurrentProgress: () => RegistrationProgress(
+        cpf: widget.cpf,
+        currentStep: 'selfie',
+        status: RegistrationStatus.inProgress,
+        lastUpdated: DateTime.now(),
+        phone: widget.phone,
+        email: widget.email,
+        fullName: widget.fullName,
+        birthDate: widget.birthDate,
+        motherName: widget.motherName,
+        cep: widget.cep,
+        street: widget.street,
+        number: widget.number,
+        complement: widget.complement,
+        neighborhood: widget.neighborhood,
+        city: widget.city,
+        state: widget.state,
+        isPep: widget.isPep,
+        occupation: widget.occupation,
+        incomeRange: widget.incomeRange,
+        selfiePath: _selfieFile?.path,
+      ),
+      shouldSaveProgress: () => ModalRoute.of(context)?.isCurrent ?? false,
+    );
+    WidgetsBinding.instance.addObserver(_lifecycleObserver);
+
+    // Persistir o passo imediatamente para permitir retomada exata
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _lifecycleObserver.saveNow(localOnly: false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _lifecycleObserver.dispose();
+    WidgetsBinding.instance.removeObserver(_lifecycleObserver);
+    super.dispose();
+  }
 
   Future<void> _takeSelfie() async {
+    if (!mounted) return;
+
     try {
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(
@@ -58,6 +122,9 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
           _selfieFile = File(image.path);
           _errorMessage = null;
         });
+
+        // Salvar progresso com a selfie capturada
+        await _lifecycleObserver.saveNow(localOnly: false);
       }
     } catch (e) {
       if (mounted) {
@@ -85,7 +152,39 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
     try {
       if (!mounted) return;
 
+      // Criar progresso atual com dados preenchidos
+      final currentProgress = RegistrationProgress(
+        cpf: widget.cpf,
+        currentStep: 'document', // Avançar para próxima etapa
+        status: RegistrationStatus.inProgress,
+        lastUpdated: DateTime.now(),
+        phone: widget.phone,
+        email: widget.email,
+        fullName: widget.fullName,
+        birthDate: widget.birthDate,
+        motherName: widget.motherName,
+        cep: widget.cep,
+        street: widget.street,
+        number: widget.number,
+        complement: widget.complement,
+        neighborhood: widget.neighborhood,
+        city: widget.city,
+        state: widget.state,
+        isPep: widget.isPep,
+        occupation: widget.occupation,
+        incomeRange: widget.incomeRange,
+        selfiePath: _selfieFile!.path, // Selfie completada
+      );
+
+      // Salvar e buscar progresso completo (garante que dados de outras telas sejam preservados)
+      final completeProgress = await RegistrationNavigationHelper.saveAndGetCompleteProgress(
+        currentProgress: currentProgress,
+      );
+
+      if (!mounted) return;
+
       // Navegar para próxima tela (documentos)
+      // Usar dados do progresso completo para restaurar tudo que já foi preenchido
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -93,15 +192,25 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
             authController: widget.authController,
             themeController: widget.themeController,
             cpf: widget.cpf,
-            phone: widget.phone,
-            email: widget.email,
-            fullName: widget.fullName,
-            birthDate: widget.birthDate,
-            motherName: widget.motherName,
-            isPep: widget.isPep,
-            occupation: widget.occupation,
-            incomeRange: widget.incomeRange,
-            selfiePath: _selfieFile!.path,
+            phone: completeProgress?.phone ?? widget.phone,
+            email: completeProgress?.email ?? widget.email,
+            fullName: completeProgress?.fullName ?? widget.fullName,
+            birthDate: completeProgress?.birthDate ?? widget.birthDate,
+            motherName: completeProgress?.motherName ?? widget.motherName,
+            cep: completeProgress?.cep ?? widget.cep,
+            street: completeProgress?.street ?? widget.street,
+            number: completeProgress?.number ?? widget.number,
+            complement: completeProgress?.complement ?? widget.complement,
+            neighborhood: completeProgress?.neighborhood ?? widget.neighborhood,
+            city: completeProgress?.city ?? widget.city,
+            state: completeProgress?.state ?? widget.state,
+            isPep: completeProgress?.isPep ?? widget.isPep,
+            occupation: completeProgress?.occupation ?? widget.occupation,
+            incomeRange: completeProgress?.incomeRange ?? widget.incomeRange,
+            selfiePath: completeProgress?.selfiePath ?? _selfieFile!.path,
+            initialFrontDocumentPath: completeProgress?.documentFrontPath,
+            initialBackDocumentPath: completeProgress?.documentBackPath,
+            initialDocumentType: completeProgress?.documentType,
           ),
         ),
       );
@@ -158,64 +267,48 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 40),
-              // Preview da Selfie com Oval
-              SizedBox(
-                height: 400,
+              // Preview da Selfie - Layout simplificado
+              Container(
+                height: 220,
                 width: double.infinity,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Fundo escurecido
-                    Container(
-                      color: Colors.black.withValues(alpha: 0.3),
-                    ),
-                    // Oval Guide
-                    CustomPaint(
-                      size: const Size(280, 360),
-                      painter: _selfieFile != null ? null : _OvalGuidePainter(),
-                    ),
-                    // Preview da foto ou placeholder
-                    if (_selfieFile != null)
-                      ClipPath(
-                        clipper: _OvalClipper(),
-                        child: SizedBox(
-                          width: 280,
-                          height: 360,
-                          child: Image.file(
-                            _selfieFile!,
-                            fit: BoxFit.cover,
-                          ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    width: 2,
+                  ),
+                ),
+                child: _selfieFile != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Image.file(
+                          _selfieFile!,
+                          fit: BoxFit.cover,
                         ),
                       )
-                    else
-                      SizedBox(
-                        width: 280,
-                        height: 360,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.person_outline,
-                              size: 120,
-                              color: Colors.white.withValues(alpha: 0.5),
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.camera_alt,
+                            size: 56,
+                            color: Colors.white.withValues(alpha: 0.6),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tire uma foto sua',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.8),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Posicione seu rosto\nno centro do oval',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.8),
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                  ],
-                ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               // Instruções
               Container(
                 padding: const EdgeInsets.all(20),
@@ -241,7 +334,7 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               // Botão Tirar Foto / Alterar Foto
               SizedBox(
                 width: double.infinity,
@@ -264,7 +357,7 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        _selfieFile == null ? 'Tirar Foto' : 'Alterar Foto',
+                        _selfieFile == null ? 'Tirar Foto' : 'Tirar Nova Foto',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -334,7 +427,7 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
                         ),
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -354,65 +447,4 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
       ),
     );
   }
-}
-
-/// Custom Painter para desenhar o guia oval
-class _OvalGuidePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF22C55E)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0;
-
-    // Desenhar oval
-    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
-    final rrect = RRect.fromRectAndRadius(
-      rect,
-      Radius.circular(size.width / 2),
-    );
-
-    canvas.drawRRect(rrect, paint);
-
-    // Desenhar linhas de guia (opcional)
-    final dashPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.3)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-
-    // Linha horizontal central
-    canvas.drawLine(
-      Offset(size.width * 0.2, size.height / 2),
-      Offset(size.width * 0.8, size.height / 2),
-      dashPaint,
-    );
-
-    // Linha vertical central
-    canvas.drawLine(
-      Offset(size.width / 2, size.height * 0.2),
-      Offset(size.width / 2, size.height * 0.8),
-      dashPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-/// Custom Clipper para recortar a imagem em formato oval
-class _OvalClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    final path = Path();
-    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
-    final rrect = RRect.fromRectAndRadius(
-      rect,
-      Radius.circular(size.width / 2),
-    );
-    path.addRRect(rrect);
-    return path;
-  }
-
-  @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }

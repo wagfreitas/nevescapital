@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/features/auth/presentation/screens/onboarding_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final AuthController authController;
@@ -26,7 +28,54 @@ class HomeScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              await authController.logout();
+              try {
+                AppLogger.debug('HomeScreen: Iniciando logout...');
+                await authController.logout();
+                AppLogger.debug('HomeScreen: Logout concluído');
+                
+                // Após logout, navegar diretamente para a tela de onboarding
+                // O OnboardingScreen não solicitará biometria pois isLoggedIn será false
+                if (context.mounted) {
+                  AppLogger.debug('Navegando diretamente para OnboardingScreen');
+                  
+                  // Criar um novo AuthController para a tela de onboarding
+                  final newAuthController = AuthController();
+                  await newAuthController.initialize();
+                  
+                  // Remover todas as rotas e navegar para OnboardingScreen
+                  Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (context) => OnboardingScreen(
+                        authController: newAuthController,
+                        themeController: themeController,
+                      ),
+                    ),
+                    (route) => false, // Remove todas as rotas anteriores
+                  );
+                  
+                  AppLogger.debug('Navegação para onboarding concluída');
+                }
+              } catch (e, stackTrace) {
+                AppLogger.error('Erro no logout', e, stackTrace);
+                if (context.mounted) {
+                  try {
+                    final newAuthController = AuthController();
+                    await newAuthController.initialize();
+                    
+                    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (context) => OnboardingScreen(
+                          authController: newAuthController,
+                          themeController: themeController,
+                        ),
+                      ),
+                      (route) => false,
+                    );
+                  } catch (navError) {
+                    AppLogger.error('Erro ao navegar após logout', navError);
+                  }
+                }
+              }
             },
           ),
         ],

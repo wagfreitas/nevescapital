@@ -9,11 +9,11 @@ class PaymentStep3Screen extends StatefulWidget {
   final int valorCentavos;
 
   const PaymentStep3Screen({
-    Key? key,
+    super.key,
     required this.nomeEstabelecimento,
     required this.ramoAtuacao,
     required this.valorCentavos,
-  }) : super(key: key);
+  });
 
   @override
   State<PaymentStep3Screen> createState() => _PaymentStep3ScreenState();

@@ -3,6 +3,7 @@ import 'package:neves_capital/shared/services/database_service.dart';
 import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
 /// Tela para alterar dados da loja (Nome e Ramo)
 /// Conforme wireframe fornecido
@@ -166,11 +167,12 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
         ),
       ),
       body: SafeArea(
-        child: _isLoadingData
-            ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFF22C55E)),
-              )
-            : SingleChildScrollView(
+        child: KeyboardDismissWrapper(
+          child: _isLoadingData
+              ? const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF22C55E)),
+                )
+              : SingleChildScrollView(
                 padding: const EdgeInsets.all(16.0),
                 child: Form(
                   key: _formKey,
@@ -190,6 +192,8 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                       // Nome da loja (read-only conforme wireframe)
                       TextFormField(
                         controller: _storeNameController,
+                        autofocus: true, // Focar automaticamente ao entrar na tela
+                        textInputAction: TextInputAction.next,
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
                           labelText: 'Nome da Loja escolhido anteriormente',
@@ -223,7 +227,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                       
                       // Ramo de atividade (dropdown)
                       DropdownButtonFormField<String>(
-                        value: _selectedBusinessType,
+                        initialValue: _selectedBusinessType,
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
                           labelText: 'Nome do Ramo escolhido',
@@ -303,6 +307,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                   ),
                 ),
               ),
+        ),
       ),
     );
   }
