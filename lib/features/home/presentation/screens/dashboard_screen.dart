@@ -115,6 +115,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Mostrar loading enquanto os dados do usuário estão sendo carregados
+    if (_isLoadingName) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Loading indicator
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Carregando...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -141,7 +167,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Usar nome carregado do Firestore se disponível
     if (_userDisplayName != null && _userDisplayName!.isNotEmpty) {
       userName = _userDisplayName!;
-    } else if (!_isLoadingName) {
+    } else {
       // Se não carregou do Firestore, tentar do Firebase Auth como fallback
       try {
         if (!widget.authController.isDisposed && widget.authController.currentUser != null) {

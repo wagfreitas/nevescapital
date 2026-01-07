@@ -7,6 +7,7 @@ import 'edit_pix_keys_screen.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import '../../../auth/presentation/screens/onboarding_screen.dart';
 import '../../../../core/theme/theme_controller.dart';
+import '../../../../shared/services/auth_service.dart';
 
 /// Tela de perfil do usuário
 class ProfileScreen extends StatefulWidget {
@@ -107,8 +108,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildOptionCard(
                 context,
                 icon: Icons.pix,
-                title: 'Chave Pix',
-                subtitle: 'Gerenciar chaves cadastradas',
+                title: 'Dados Bancários',
+                subtitle: 'Gerenciar Dados Bancários',
                 showLeftIcon: true,
                 onTap: () {
                   Navigator.push(
@@ -147,82 +148,95 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
   
   void _showLogoutDialog(BuildContext context) {
+    // Capturar o contexto do widget ANTES de qualquer operação assíncrona
+    final widgetContext = context;
+    
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Confirmar Saída'),
         content: const Text('Tem certeza que deseja sair da aplicação?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancelar'),
           ),
           TextButton(
             onPressed: () async {
-              // Fechar dialog primeiro
-              Navigator.of(context).pop();
+              // Fechar dialog primeiro usando o contexto do dialog
+              Navigator.of(dialogContext).pop();
               
               // Aguardar um frame para garantir que o dialog foi fechado
               await Future.delayed(const Duration(milliseconds: 100));
               
-              if (!context.mounted) return;
+              // Usar o contexto do widget (ProfileScreen) que é mais estável
+              if (!widgetContext.mounted) {
+                AppLogger.warning('Context não está montado - tentando usar rootNavigator');
+                // Se o contexto não estiver montado, tentar usar o rootNavigator diretamente
+                final navigator = Navigator.maybeOf(widgetContext, rootNavigator: true);
+                if (navigator == null) {
+                  AppLogger.error('Não foi possível obter Navigator');
+                  return;
+                }
+              }
               
               AppLogger.info('ProfileScreen: Iniciando logout...');
               
-              // Forçar logout de forma mais direta
+              // 1. GARANTIR que a flag is_logged_in_otp está FALSE no SharedPreferences (PRIMEIRO PASSO)
               try {
-                // 1. Limpar SharedPreferences diretamente
                 final prefs = await SharedPreferences.getInstance();
-                await prefs.remove('is_logged_in_otp');
-                await prefs.clear();
-                AppLogger.info('SharedPreferences limpo');
-                
-                // 2. Fazer logout no controller
-                if (!widget.authController.isDisposed) {
-                  await widget.authController.logout().timeout(
-                    const Duration(seconds: 5),
-                    onTimeout: () {
-                      AppLogger.warning('Logout timeout - continuando mesmo assim');
-                    },
-                  );
-                }
-                
-                // 3. Forçar limpeza do estado
-                widget.authController.clearState();
-                
+                await prefs.setBool('is_logged_in_otp', false);
+                AppLogger.info('✅ Flag is_logged_in_otp definida como FALSE no SharedPreferences');
               } catch (e) {
-                AppLogger.error('Erro no logout', e);
-                // Continuar mesmo com erro
+                AppLogger.error('Erro ao definir flag', e);
               }
               
-              // Aguardar um pouco para garantir que tudo foi processado
-              await Future.delayed(const Duration(milliseconds: 500));
-              
-              // Navegar SEMPRE para OnboardingScreen
-              if (context.mounted) {
-                AppLogger.info('ProfileScreen: Navegando para OnboardingScreen');
-                
-                // Criar novo controller para garantir estado limpo
-                final newAuthController = AuthController();
-                await newAuthController.initialize();
-                
-                // Se ainda estiver logado, forçar logout
-                if (newAuthController.isLoggedIn) {
-                  await newAuthController.logout();
-                  await Future.delayed(const Duration(milliseconds: 200));
+              // 2. Fazer logout completo no controller
+              try {
+                if (!widget.authController.isDisposed) {
+                  await widget.authController.logout();
+                  AppLogger.info('✅ Logout realizado no controller');
                 }
-                
-                // Navegar usando rootNavigator para garantir que remove todas as rotas
-                Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-                  MaterialPageRoute(
-                    builder: (context) => OnboardingScreen(
-                      authController: newAuthController,
-                      themeController: ThemeController(),
-                    ),
-                  ),
-                  (route) => false,
-                );
+              } catch (e) {
+                AppLogger.error('Erro no logout do controller', e);
               }
+              
+              // 3. GARANTIR que o Firebase também está limpo
+              try {
+                await AuthService.signOut();
+                AppLogger.info('✅ Firebase signOut realizado');
+              } catch (e) {
+                AppLogger.error('Erro ao fazer signOut do Firebase', e);
+              }
+              
+              // 4. Criar NOVO AuthController limpo ANTES de navegar
+              final newAuthController = AuthController();
+              await newAuthController.initialize();
+              
+              // 5. Verificar se a flag está realmente FALSE
+              final prefs = await SharedPreferences.getInstance();
+              final flagValue = prefs.getBool('is_logged_in_otp') ?? false;
+              AppLogger.info('Verificação final da flag: $flagValue');
+              
+              // 6. NAVEGAR DIRETAMENTE para OnboardingScreen usando rootNavigator
+              // Usar rootNavigator sempre para garantir que funciona independente do contexto
+              AppLogger.info('ProfileScreen: Navegando DIRETAMENTE para OnboardingScreen');
+              
+              // Obter o Navigator do root sempre, independente do contexto atual
+              final rootNavigator = Navigator.maybeOf(widgetContext, rootNavigator: true) ??
+                                   Navigator.of(widgetContext, rootNavigator: true);
+              
+              rootNavigator.pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (context) => OnboardingScreen(
+                    authController: newAuthController,
+                    themeController: ThemeController(),
+                  ),
+                ),
+                (route) => false,
+              );
+              
+              AppLogger.info('✅ Navegação para OnboardingScreen concluída');
             },
             child: const Text('Sair'),
           ),

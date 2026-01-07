@@ -9,7 +9,7 @@ import 'package:neves_capital/features/auth/presentation/screens/cpf_check_scree
 import 'package:neves_capital/features/auth/presentation/screens/unified_cpf_screen.dart';
 import 'package:neves_capital/features/auth/data/services/auth_api_service.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
-import 'package:neves_capital/features/home/presentation/screens/dashboard_screen.dart';
+import 'package:neves_capital/features/home/presentation/screens/main_tab_screen.dart';
 import 'package:neves_capital/features/auth/presentation/screens/onboarding_screen.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
@@ -303,13 +303,13 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
               }
 
               AppLogger.info(
-                  '✅ Login realizado com sucesso - redirecionando para DashboardScreen');
+                  '✅ Login realizado com sucesso - redirecionando para MainTabScreen');
               
               // Navegar diretamente para Dashboard quando usuário está logado e cadastro completo
               if (mounted) {
                 Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
                   MaterialPageRoute(
-                    builder: (context) => DashboardScreen(
+                    builder: (context) => MainTabScreen(
                       authController: widget.authController!,
                       themeController: widget.themeController ?? ThemeController(),
                     ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/features/auth/presentation/screens/phone_login_screen.dart';
 import 'package:neves_capital/features/auth/presentation/screens/unified_cpf_screen.dart';
@@ -58,32 +59,52 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       return;
     }
 
-    // 1. Primeiro verificar se usuário está logado - SEMPRE pedir biometria se disponível
-    // IMPORTANTE: Não limpar estado de login aqui - ele deve ser mantido quando o app é fechado
-    // O estado só deve ser limpo quando o usuário clica explicitamente em "Sair"
-    AppLogger.info('🔐 [ONBOARDING] Verificando estado de login:');
+    // 1. Primeiro verificar DIRETAMENTE no SharedPreferences se o usuário está logado
+    // Isso é mais confiável que confiar apenas no estado do controller
+    AppLogger.info('🔐 [ONBOARDING] Verificando estado de login DIRETAMENTE no SharedPreferences...');
+    
+    bool isLoggedInFromPrefs = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      isLoggedInFromPrefs = prefs.getBool('is_logged_in_otp') ?? false;
+      AppLogger.info('🔐 [ONBOARDING] Flag is_logged_in_otp do SharedPreferences: $isLoggedInFromPrefs');
+    } catch (e) {
+      AppLogger.error('Erro ao ler SharedPreferences', e);
+      isLoggedInFromPrefs = false;
+    }
+    
+    // 2. Verificar também o estado do controller (para compatibilidade)
+    AppLogger.info('🔐 [ONBOARDING] Verificando estado do controller:');
     AppLogger.info('  - isLoggedIn: ${widget.authController.isLoggedIn}');
     AppLogger.info('  - currentUser: ${widget.authController.currentUser != null}');
     AppLogger.info('  - isLoading: ${widget.authController.isLoading}');
     
-    // Verificar novamente após um pequeno delay para evitar race condition
-    await Future.delayed(const Duration(milliseconds: 50));
-    
-    // Verificar múltiplas vezes para garantir que o estado está estável
-    // (evita race condition após logout)
-    bool isLoggedIn = widget.authController.isLoggedIn;
-    await Future.delayed(const Duration(milliseconds: 50));
-    final isLoggedInSecondCheck = widget.authController.isLoggedIn;
-    
-    // Se o estado mudou entre as verificações, aguardar mais um pouco
-    if (isLoggedIn != isLoggedInSecondCheck) {
-      AppLogger.warning('Estado de login instável detectado - aguardando estabilização...');
+    // 3. Se a flag do SharedPreferences for FALSE, FORÇAR o estado do controller também
+    if (!isLoggedInFromPrefs) {
+      AppLogger.info('🔐 [ONBOARDING] Flag é FALSE - forçando limpeza do controller');
+      // Forçar limpeza do estado do controller
+      widget.authController.clearState();
+      // Aguardar um pouco para garantir que o estado foi limpo
       await Future.delayed(const Duration(milliseconds: 100));
-      isLoggedIn = widget.authController.isLoggedIn;
     }
     
-    AppLogger.info('🔐 [ONBOARDING] Estado final verificado: isLoggedIn = $isLoggedIn');
+    // 4. Usar APENAS a flag do SharedPreferences como fonte da verdade
+    // Se a flag for FALSE, o usuário NÃO está logado, independente do estado do controller
+    bool isLoggedIn = isLoggedInFromPrefs;
     
+    AppLogger.info('🔐 [ONBOARDING] Estado final verificado:');
+    AppLogger.info('  - isLoggedInFromPrefs (FONTE DA VERDADE): $isLoggedInFromPrefs');
+    AppLogger.info('  - controller.isLoggedIn: ${widget.authController.isLoggedIn}');
+    AppLogger.info('  - isLoggedIn (final, usando apenas SharedPreferences): $isLoggedIn');
+    
+    // IMPORTANTE: Se a flag for FALSE, NÃO fazer nenhuma verificação de biometria ou redirecionamento
+    // Apenas mostrar a tela de onboarding normalmente
+    if (!isLoggedIn) {
+      AppLogger.info('🔐 [ONBOARDING] Flag é FALSE - usuário NÃO está logado. Mostrando tela de onboarding.');
+      return; // Sair da função e mostrar a tela normalmente
+    }
+    
+    // Só continuar com verificações se a flag for TRUE
     if (isLoggedIn) {
       final isBiometricAvailable = await BiometricService.isAvailable();
       

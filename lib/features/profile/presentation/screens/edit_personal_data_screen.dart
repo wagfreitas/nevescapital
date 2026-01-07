@@ -36,20 +36,47 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
   bool _isLoadingData = true;
   Map<String, dynamic>? _userData;
   String? _userId;
+  
+  // Valores originais para comparar mudanças
+  String _originalEmail = '';
+  String _originalPhone = '';
+  bool _hasChanges = false; // Flag para habilitar/desabilitar botão
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    // Adicionar listeners para detectar mudanças
+    _emailController.addListener(_checkForChanges);
+    _phoneController.addListener(_checkForChanges);
   }
 
   @override
   void dispose() {
+    _emailController.removeListener(_checkForChanges);
+    _phoneController.removeListener(_checkForChanges);
     _emailController.dispose();
     _phoneController.dispose();
     _emailFocusNode.dispose();
     _phoneFocusNode.dispose();
     super.dispose();
+  }
+  
+  /// Verificar se houve alterações nos campos de email ou telefone
+  void _checkForChanges() {
+    final currentEmail = _emailController.text.trim();
+    final currentPhone = PhoneHelper.getPhoneNumbers(_phoneController.text);
+    
+    final emailChanged = currentEmail != _originalEmail;
+    final phoneChanged = currentPhone != _originalPhone;
+    
+    final hasChanges = emailChanged || phoneChanged;
+    
+    if (hasChanges != _hasChanges) {
+      setState(() {
+        _hasChanges = hasChanges;
+      });
+    }
   }
 
   /// Carregar dados do Firestore usando CPF (como no login)
@@ -77,13 +104,21 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
       
       if (userData != null && userData['id'] != null) {
         // ✅ Encontrou dados - guardar em variável de estado
+        final email = userData['email'] ?? '';
+        final phone = userData['phone'] ?? '';
+        
         setState(() {
           _userData = userData; // Guarda todos os dados (email, telefone, endereço)
           _userId = userData['id'] as String; // ID do documento Firestore
           
           // Preencher campos na tela
-          _emailController.text = userData['email'] ?? '';
-          _phoneController.text = userData['phone'] ?? '';
+          _emailController.text = email;
+          _phoneController.text = phone;
+          
+          // Guardar valores originais para comparar mudanças
+          _originalEmail = email;
+          _originalPhone = phone;
+          _hasChanges = false; // Inicialmente sem mudanças
         });
         
         AppLogger.info('Dados carregados e guardados em _userData');
@@ -283,7 +318,7 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
 
           await Future.delayed(const Duration(seconds: 1));
           if (mounted) {
-            await _loadUserData(); // Recarregar dados
+            await _loadUserData(); // Recarregar dados (vai resetar _hasChanges)
           }
         }
         return;
@@ -515,10 +550,10 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
                             
                             const SizedBox(height: 40),
                             
-                            // Botão Confirmar
+                            // Botão Confirmar (desabilitado se não houver mudanças)
                             CustomButton(
                               text: 'Confirmar',
-                              onPressed: _isLoading ? null : _handleConfirm,
+                              onPressed: (_isLoading || !_hasChanges) ? null : _handleConfirm,
                               isLoading: _isLoading,
                             ),
                           ],

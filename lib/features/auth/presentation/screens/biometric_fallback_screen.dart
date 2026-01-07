@@ -5,7 +5,7 @@ import 'package:neves_capital/shared/components/cpf_input_field.dart';
 import 'package:neves_capital/shared/helpers/cpf_helper.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
-import 'package:neves_capital/features/home/presentation/screens/dashboard_screen.dart';
+import 'package:neves_capital/features/home/presentation/screens/main_tab_screen.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
 /// Tela de fallback quando biometria falha
@@ -132,7 +132,7 @@ class _BiometricFallbackScreenState extends State<BiometricFallbackScreen> {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => DashboardScreen(
+            builder: (context) => MainTabScreen(
               authController: widget.authController,
               themeController: widget.themeController ?? ThemeController(),
             ),

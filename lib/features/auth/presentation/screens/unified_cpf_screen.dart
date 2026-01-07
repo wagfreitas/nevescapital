@@ -10,7 +10,7 @@ import 'package:neves_capital/features/auth/data/services/registration_service.d
 import 'package:neves_capital/features/auth/presentation/helpers/registration_navigator.dart';
 import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
-import 'package:neves_capital/features/home/presentation/screens/dashboard_screen.dart';
+import 'package:neves_capital/features/home/presentation/screens/main_tab_screen.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
 
 /// Tela Unificada: Insira seu CPF
@@ -126,12 +126,12 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
 
         if (loginSuccess) {
           AppLogger.info(
-              '✅ Login realizado com sucesso - redirecionando para DashboardScreen');
+              '✅ Login realizado com sucesso - redirecionando para MainTabScreen');
           
           // Navegar para Dashboard quando login bem-sucedido
           Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
             MaterialPageRoute(
-              builder: (context) => DashboardScreen(
+              builder: (context) => MainTabScreen(
                 authController: widget.authController!,
                 themeController: widget.themeController ?? ThemeController(),
               ),

@@ -11,7 +11,7 @@ import 'package:neves_capital/features/auth/data/services/registration_service.d
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/registration_lifecycle_observer.dart';
 import 'package:neves_capital/features/auth/domain/entities/registration_progress.dart';
-import 'package:neves_capital/features/home/presentation/screens/dashboard_screen.dart';
+import 'package:neves_capital/features/home/presentation/screens/main_tab_screen.dart';
 
 /// Tela 8 do Cadastro: Envie Documento com Foto
 class Step8DocumentScreen extends StatefulWidget {
@@ -426,13 +426,13 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
         );
       }
 
-      // Redirecionar para DashboardScreen após cadastro completo
+      // Redirecionar para MainTabScreen após cadastro completo
       await Future.delayed(const Duration(seconds: 1));
 
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
-            builder: (context) => DashboardScreen(
+            builder: (context) => MainTabScreen(
               authController: widget.authController!,
               themeController: widget.themeController!,
             ),
