@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:flutter/gestures.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -158,7 +159,7 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
             ),
             const SizedBox(height: 24),
             ListTile(
-              leading: const Icon(Icons.camera_alt, color: Color(0xFF22C55E), size: 28),
+              leading: Icon(Icons.camera_alt, color: AppTheme.primaryColor, size: 28),
               title: const Text(
                 'Tirar Foto',
                 style: TextStyle(color: Colors.white, fontSize: 16),
@@ -166,7 +167,7 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: Color(0xFF22C55E), size: 28),
+              leading: Icon(Icons.photo_library, color: AppTheme.primaryColor, size: 28),
               title: const Text(
                 'Escolher da Galeria',
                 style: TextStyle(color: Colors.white, fontSize: 16),
@@ -473,7 +474,7 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -595,8 +596,8 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _handleFinalize,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF22C55E),
-                            foregroundColor: const Color(0xFF122118),
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: AppTheme.backgroundColor,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -609,7 +610,7 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     valueColor: AlwaysStoppedAnimation<Color>(
-                                        Color(0xFF122118)),
+                                        AppTheme.backgroundColor),
                                   ),
                                 )
                               : const Text(
@@ -638,7 +639,7 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
                               TextSpan(
                                 text: 'Termos de Uso',
                                 style: const TextStyle(
-                                  color: Color(0xFF22C55E),
+                                  color: AppTheme.primaryColor,
                                   decoration: TextDecoration.underline,
                                 ),
                                 recognizer: TapGestureRecognizer()
@@ -648,7 +649,7 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
                               TextSpan(
                                 text: 'Política de Privacidade',
                                 style: const TextStyle(
-                                  color: Color(0xFF22C55E),
+                                  color: AppTheme.primaryColor,
                                   decoration: TextDecoration.underline,
                                 ),
                                 recognizer: TapGestureRecognizer()
@@ -685,12 +686,12 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
         height: 48,
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF22C55E)
+              ? AppTheme.primaryColor
               : Colors.white.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFF22C55E)
+                ? AppTheme.primaryColor
                 : Colors.white.withValues(alpha: 0.2),
             width: isSelected ? 2 : 1,
           ),
@@ -699,7 +700,7 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
           child: Text(
             type,
             style: TextStyle(
-              color: isSelected ? const Color(0xFF122118) : Colors.white,
+              color: isSelected ? AppTheme.backgroundColor : Colors.white,
               fontSize: 16,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
             ),
@@ -717,12 +718,12 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
     return Container(
       decoration: BoxDecoration(
         color: file != null
-            ? const Color(0xFF22C55E).withValues(alpha: 0.1)
+            ? AppTheme.primaryColor.withValues(alpha: 0.1)
             : Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: file != null
-              ? const Color(0xFF22C55E)
+              ? AppTheme.primaryColor
               : Colors.white.withValues(alpha: 0.2),
           width: file != null ? 2 : 1,
         ),
@@ -757,7 +758,7 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
                   child: TextButton(
                     onPressed: onTap,
                     style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF22C55E),
+                      foregroundColor: AppTheme.primaryColor,
                     ),
                     child: const Text(
                       'Trocar Foto',
@@ -851,8 +852,8 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
                 child: ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF22C55E),
-                    foregroundColor: const Color(0xFF122118),
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: AppTheme.backgroundColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -921,8 +922,8 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
                 child: ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF22C55E),
-                    foregroundColor: const Color(0xFF122118),
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: AppTheme.backgroundColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

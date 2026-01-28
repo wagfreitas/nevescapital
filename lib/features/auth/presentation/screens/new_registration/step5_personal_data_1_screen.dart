@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
@@ -128,12 +129,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
     _birthDateController.addListener(_onFieldChanged);
     _motherNameController.addListener(_onFieldChanged);
 
-    // Abrir teclado automaticamente apenas se não houver valores restaurados
-    if (widget.initialFullName == null || widget.initialFullName!.isEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _fullNameFocusNode.requestFocus();
-      });
-    }
+    // Não abrir teclado automaticamente
   }
 
   void _onFieldChanged() {
@@ -273,7 +269,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -345,7 +341,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                                 width: 32,
                                 height: 4,
                                 decoration: BoxDecoration(
-                                  color: Color(0xFF22C55E),
+                                  color: AppTheme.primaryColor,
                                   borderRadius: BorderRadius.circular(2),
                                 ),
                               ),
@@ -385,13 +381,12 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                         TextFormField(
                           controller: _fullNameController,
                           focusNode: _fullNameFocusNode,
-                          autofocus: true,
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
                             labelText: 'Nome Completo',
                             labelStyle: const TextStyle(color: Colors.white70),
                             filled: true,
-                            fillColor: Colors.white.withValues(alpha: 0.1),
+                            fillColor: AppTheme.inputEditableBackgroundColor,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide.none,
@@ -404,7 +399,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide:
-                                  const BorderSide(color: Color(0xFF22C55E), width: 2),
+                                  BorderSide(color: AppTheme.primaryColor, width: 2),
                             ),
                             errorBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -451,7 +446,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                             hintStyle:
                                 TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                             filled: true,
-                            fillColor: Colors.white.withValues(alpha: 0.1),
+                            fillColor: AppTheme.inputEditableBackgroundColor,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide.none,
@@ -464,7 +459,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide:
-                                  const BorderSide(color: Color(0xFF22C55E), width: 2),
+                                  BorderSide(color: AppTheme.primaryColor, width: 2),
                             ),
                             errorBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -504,7 +499,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                             labelText: 'Nome da Mãe',
                             labelStyle: const TextStyle(color: Colors.white70),
                             filled: true,
-                            fillColor: Colors.white.withValues(alpha: 0.1),
+                            fillColor: AppTheme.inputEditableBackgroundColor,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide.none,
@@ -517,7 +512,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide:
-                                  const BorderSide(color: Color(0xFF22C55E), width: 2),
+                                  BorderSide(color: AppTheme.primaryColor, width: 2),
                             ),
                             errorBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -568,8 +563,8 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _handleNext,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF22C55E),
-                              foregroundColor: const Color(0xFF122118),
+                              backgroundColor: AppTheme.primaryColor,
+                              foregroundColor: AppTheme.backgroundColor,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -582,7 +577,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
                                       valueColor: AlwaysStoppedAnimation<Color>(
-                                          Color(0xFF122118)),
+                                          AppTheme.backgroundColor),
                                     ),
                                   )
                                 : const Text(

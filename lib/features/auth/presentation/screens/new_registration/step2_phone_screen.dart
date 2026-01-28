@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/phone_input_field.dart';
 import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
@@ -175,7 +176,7 @@ class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -275,15 +276,16 @@ class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
                             ),
                           ),
                         ],
-                        const Spacer(),
+                        // Espaço extra entre input e botão - aumenta quando teclado está aberto
+                        SizedBox(height: bottomInset > 0 ? 80 : 40),
                         SizedBox(
                           width: double.infinity,
                           height: 56,
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _handleNext,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF22C55E),
-                              foregroundColor: const Color(0xFF122118),
+                              backgroundColor: AppTheme.primaryColor,
+                              foregroundColor: AppTheme.backgroundColor,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -296,7 +298,7 @@ class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
                                       valueColor: AlwaysStoppedAnimation<Color>(
-                                          Color(0xFF122118)),
+                                          AppTheme.backgroundColor),
                                     ),
                                   )
                                 : const Text(

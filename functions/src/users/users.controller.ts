@@ -86,6 +86,18 @@ export class UsersController {
     return this.usersService.remove(id);
   }
 
+  @Delete(':id/complete')
+  @ApiOperation({ 
+    summary: 'Deletar todos os dados do usuário (hard delete completo)',
+    description: 'Deleta permanentemente: documentos KYC no Storage, conta do Firebase Auth e documento no Firestore. **ATENÇÃO: Operação irreversível!**'
+  })
+  @ApiResponse({ status: 200, description: 'Dados do usuário deletados com sucesso' })
+  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  @ApiResponse({ status: 400, description: 'Erro ao deletar dados do usuário' })
+  deleteUserDataComplete(@Param('id') id: string) {
+    return this.usersService.deleteUserDataComplete(id);
+  }
+
   @Post('sync-firebase-email')
   @ApiOperation({ summary: 'Sincronizar email do Firebase com Firestore' })
   @ApiResponse({ status: 200, description: 'Email sincronizado com sucesso' })

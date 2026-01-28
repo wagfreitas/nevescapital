@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/features/auth/data/services/auth_api_service.dart';
 import 'package:neves_capital/shared/helpers/cpf_helper.dart';
@@ -250,7 +251,7 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -312,6 +313,7 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
                   controller: _cpfController,
                   autofocus: true,
                   keyboardType: TextInputType.number,
+                  keyboardAppearance: Brightness.dark, // Teclado escuro para uniformidade
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) {
                     // Fechar teclado quando usuário pressionar "OK" ou "Done"
@@ -352,7 +354,7 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
                     ),
                     counterText: '',
                     filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.1),
+                    fillColor: AppTheme.inputEditableBackgroundColor,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -365,7 +367,7 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide:
-                          const BorderSide(color: Color(0xFF22C55E), width: 2),
+                          BorderSide(color: AppTheme.primaryColor, width: 2),
                     ),
                     errorBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -423,8 +425,8 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _handleCompleteLogin,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF22C55E),
-                      foregroundColor: const Color(0xFF122118),
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: AppTheme.backgroundColor,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -437,7 +439,7 @@ class _CpfCheckScreenState extends State<CpfCheckScreen> {
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                  Color(0xFF122118)),
+                                  AppTheme.backgroundColor),
                             ),
                           )
                         : const Text(

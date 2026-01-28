@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../payment/presentation/screens/payment_step1_screen.dart';
+import '../../../payment/presentation/screens/payment_step2_screen.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'sales_history_screen.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -56,17 +57,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       
       if (userData['displayName'] != null) {
         final displayName = userData['displayName'] as String;
-        // Pegar os dois primeiros nomes
+        // Pegar apenas o primeiro nome
         final nameParts = displayName.trim().split(' ');
-        final twoFirstNames = nameParts.length >= 2 
-            ? '${nameParts[0]} ${nameParts[1]}'
-            : nameParts[0];
+        final firstName = nameParts.isNotEmpty ? nameParts[0] : 'Usuário';
         
         setState(() {
-          _userDisplayName = twoFirstNames;
+          _userDisplayName = firstName;
           _isLoadingName = false;
         });
-        AppLogger.debug('Nome do usuário carregado: $twoFirstNames');
+        AppLogger.debug('Nome do usuário carregado: $firstName');
       } else {
         AppLogger.warning('DisplayName não encontrado no Firestore');
         setState(() {
@@ -118,10 +117,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Mostrar loading enquanto os dados do usuário estão sendo carregados
     if (_isLoadingName) {
       return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+        child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Loading indicator
               const CircularProgressIndicator(
@@ -134,6 +133,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   fontSize: 16,
                   color: Colors.grey[600],
                 ),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -175,9 +175,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           
           if (user.displayName != null && user.displayName!.isNotEmpty) {
             final nameParts = user.displayName!.trim().split(' ');
-            userName = nameParts.length >= 2 
-                ? '${nameParts[0]} ${nameParts[1]}'
-                : nameParts[0];
+            userName = nameParts.isNotEmpty ? nameParts[0] : 'Usuário';
           } else if (user.email != null) {
             userName = user.email!.split('@').first;
           }
@@ -225,13 +223,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
           context,
           title: 'Nova Venda',
           icon: Icons.credit_card,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const PaymentStep1Screen(),
-              ),
-            );
+          onTap: () async {
+            // Verificar se o usuário já tem estabelecimento e ramo
+            // Se tiver, ir direto para step 2, senão ir para step 1
+            final cpf = await SecureStorageService.getLastCpf();
+            String? storeName;
+            String? businessType;
+            
+            if (cpf != null && cpf.isNotEmpty) {
+              try {
+                final userData = await FirestoreService.getUserByCpf(cpf);
+                if (userData != null) {
+                  storeName = userData['storeName'] as String?;
+                  businessType = userData['businessType'] as String?;
+                }
+              } catch (e) {
+                AppLogger.error('Erro ao verificar dados do estabelecimento', e);
+              }
+            }
+            
+            if (storeName != null && 
+                storeName.isNotEmpty && 
+                businessType != null && 
+                businessType.isNotEmpty) {
+              // Usuário já tem estabelecimento - ir direto para step 2
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PaymentStep2Screen(
+                    nomeEstabelecimento: storeName!,
+                    ramoAtuacao: businessType!,
+                  ),
+                ),
+              );
+            } else {
+              // Usuário não tem estabelecimento - ir para step 1
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PaymentStep1Screen(),
+                ),
+              );
+            }
           },
         ),
         

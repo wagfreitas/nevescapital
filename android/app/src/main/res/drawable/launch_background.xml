@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Modify this file to customize your launch splash screen -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Fundo verde escuro PagPag (#02391E) -->
+    <!-- Fundo verde escuro PagPag (#122118) - mesmo tom das outras telas -->
     <item>
-        <color android:color="#02391E" />
+        <color android:color="#122118" />
     </item>
 
     <!-- Logo PagPag centralizado -->

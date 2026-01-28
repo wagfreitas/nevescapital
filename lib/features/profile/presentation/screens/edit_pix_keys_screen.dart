@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:neves_capital/shared/services/database_service.dart';
 import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
 /// Tela para alterar chaves PIX cadastradas
@@ -224,7 +225,7 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -240,8 +241,8 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
       body: SafeArea(
         child: KeyboardDismissWrapper(
           child: _isLoadingData
-              ? const Center(
-                  child: CircularProgressIndicator(color: Color(0xFF22C55E)),
+              ? Center(
+                  child: CircularProgressIndicator(color: AppTheme.primaryColor),
                 )
               : SingleChildScrollView(
                 padding: const EdgeInsets.all(16.0),
@@ -277,7 +278,7 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: isPrimary 
-                                      ? const Color(0xFF22C55E) 
+                                      ? AppTheme.primaryColor 
                                       : Colors.white.withValues(alpha: 0.2),
                                   width: isPrimary ? 2 : 1,
                                 ),
@@ -312,13 +313,13 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
                                               vertical: 2,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: const Color(0xFF22C55E).withValues(alpha: 0.2),
+                                              color: AppTheme.primaryColor.withValues(alpha: 0.2),
                                               borderRadius: BorderRadius.circular(4),
                                             ),
                                             child: const Text(
                                               'Principal',
                                               style: TextStyle(
-                                                color: Color(0xFF22C55E),
+                                                color: AppTheme.primaryColor,
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w600,
                                               ),
@@ -350,7 +351,7 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
                           hintText: 'Digite a nova chave PIX',
                           hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                           filled: true,
-                          fillColor: Colors.white.withValues(alpha: 0.1),
+                          fillColor: AppTheme.inputEditableBackgroundColor,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide.none,
@@ -361,10 +362,10 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
+                            borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                           ),
                           suffixIcon: IconButton(
-                            icon: const Icon(Icons.check, color: Color(0xFF22C55E)),
+                            icon: Icon(Icons.check, color: AppTheme.primaryColor),
                             onPressed: _isLoading ? null : _addPixKey,
                           ),
                         ),
@@ -398,17 +399,17 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
                               _showAddKeyField = true;
                             });
                           },
-                          icon: const Icon(Icons.add, color: Color(0xFF22C55E)),
+                          icon: Icon(Icons.add, color: AppTheme.primaryColor),
                           label: const Text(
                             'Adicionar chave pix',
                             style: TextStyle(
-                              color: Color(0xFF22C55E),
+                              color: AppTheme.primaryColor,
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFF22C55E), width: 2),
+                            side: BorderSide(color: AppTheme.primaryColor, width: 2),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -440,8 +441,8 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
                                 Navigator.of(context).pop();
                               },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF22C55E),
-                          foregroundColor: const Color(0xFF122118),
+                          backgroundColor: AppTheme.primaryColor,
+                          foregroundColor: AppTheme.backgroundColor,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(25),
                           ),
@@ -453,7 +454,7 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF122118)),
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.backgroundColor),
                                 ),
                               )
                             : const Text(
@@ -506,7 +507,7 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
             const SizedBox(height: 20),
             if (key['is_primary'] != true)
               ListTile(
-                leading: const Icon(Icons.star, color: Color(0xFF22C55E)),
+                leading: Icon(Icons.star, color: AppTheme.primaryColor),
                 title: const Text(
                   'Definir como principal',
                   style: TextStyle(color: Colors.white),

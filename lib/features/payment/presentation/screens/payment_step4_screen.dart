@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
-import 'package:neves_capital/shared/components/custom_text_field.dart';
 import 'package:neves_capital/shared/helpers/card_brand_detector.dart';
+import 'package:neves_capital/shared/helpers/card_brand_image_loader.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
+import '../helpers/payment_step_helper.dart';
 // import 'package:credit_card_scanner/credit_card_scanner.dart'; // TEMPORARIAMENTE DESABILITADO
 import 'payment_step5_screen.dart';
 
@@ -36,12 +38,29 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
   final _cvvController = TextEditingController();
   final _vencimentoController = TextEditingController();
   CardBrand _detectedBrand = CardBrand.unknown;
+  bool _hasAccount = false;
+  bool _isLoadingAccount = true;
 
   @override
   void initState() {
     super.initState();
     // Escutar mudanças no número do cartão para detectar a bandeira
     _numeroCartaoController.addListener(_detectCardBrand);
+    _checkUserAccount();
+  }
+
+  Future<void> _checkUserAccount() async {
+    setState(() {
+      _isLoadingAccount = true;
+    });
+    
+    final hasAccount = await PaymentStepHelper.hasUserAccount();
+    if (mounted) {
+      setState(() {
+        _hasAccount = hasAccount;
+        _isLoadingAccount = false;
+      });
+    }
   }
 
   @override
@@ -109,65 +128,91 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
 
   @override
   Widget build(BuildContext context) {
+    // Calcular passo atual baseado se tem conta ou não
+    final currentStep = PaymentStepHelper.calculateCurrentStep(4, _hasAccount);
+    final totalSteps = PaymentStepHelper.getTotalSteps(_hasAccount);
+    
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Center(
-              child: Text(
-                '4/5',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-          ),
-        ],
-        backgroundColor: Colors.grey[900],
+        backgroundColor: AppTheme.backgroundColor,
         elevation: 0,
       ),
-      body: SafeArea(
-        child: KeyboardDismissWrapper(
-          child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 20),
-
-                // Título
-                const Text(
-                  'DADOS DO CARTÃO DO COMPRADOR',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 40),
+      body: _isLoadingAccount
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+              ),
+            )
+          : SafeArea(
+              child: KeyboardDismissWrapper(
+                child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 24.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Título centralizado (igual às telas de dados pessoais)
+                      const Center(
+                        child: Text(
+                          'Dados do Cartão',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 20),
+                      
+                      // Indicador de progresso (abaixo do título)
+                      PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
+                      const SizedBox(height: 32),
 
                 // BOTÃO DE SCAN TEMPORARIAMENTE REMOVIDO
                 // Conflito de dependências com Firebase
                 // Será reimplementado com solução compatível
 
                 // Nome do Titular
-                CustomTextField(
+                TextFormField(
                   controller: _nomeTitularController,
-                  hintText: 'Nome Completo do Titular',
-                  labelText: 'Nome Completo do Titular',
-                  autofocus: true, // Focar automaticamente ao entrar na tela
-                  textInputAction: TextInputAction.next, // Próximo campo
+                  autofocus: true,
+                  textInputAction: TextInputAction.next,
                   textCapitalization: TextCapitalization.words,
+                  keyboardAppearance: Brightness.dark,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Nome Impresso no Cartão',
+                    labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                    floatingLabelBehavior: FloatingLabelBehavior.auto,
+                    filled: true,
+                    fillColor: AppTheme.inputEditableBackgroundColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.red, width: 2),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.red, width: 2),
+                    ),
+                  ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Insira o nome do titular';
@@ -181,53 +226,58 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                 const SizedBox(height: 20),
 
                 // Número do Cartão
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CustomTextField(
-                      controller: _numeroCartaoController,
-                      hintText: 'Número do Cartão',
-                      labelText: 'Número do Cartão',
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(16),
-                        _CardNumberFormatter(),
-                      ],
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Insira o número do cartão';
-                        }
-                        final digits = value.replaceAll(' ', '');
-                        if (digits.length < 13 || digits.length > 16) {
-                          return 'Número do cartão inválido';
-                        }
-                        return null;
-                      },
-                    ),
-                    // Indicador de bandeira detectada
-                    if (_detectedBrand != CardBrand.unknown) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.credit_card,
-                            size: 20,
-                            color: Colors.green[700],
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Bandeira: ${CardBrandDetector.getBrandName(_detectedBrand)}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.green[700],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                TextFormField(
+                  controller: _numeroCartaoController,
+                  keyboardType: TextInputType.number,
+                  keyboardAppearance: Brightness.dark,
+                  textInputAction: TextInputAction.next,
+                  style: const TextStyle(color: Colors.white),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(19), // 16 dígitos + 3 espaços
+                    _CardNumberFormatter(), // Limita a 16 dígitos
                   ],
+                  decoration: InputDecoration(
+                    labelText: 'Número do Cartão',
+                    labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                    floatingLabelBehavior: FloatingLabelBehavior.auto,
+                    prefixIcon: Icon(Icons.credit_card, color: AppTheme.textSecondary),
+                    suffixIcon: _detectedBrand != CardBrand.unknown
+                        ? _buildCardBrandIcon(_detectedBrand)
+                        : null,
+                    filled: true,
+                    fillColor: AppTheme.inputEditableBackgroundColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.red, width: 2),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.red, width: 2),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Insira o número do cartão';
+                    }
+                    final digits = value.replaceAll(' ', '');
+                    if (digits.length != 16) {
+                      return 'O número do cartão deve ter 16 dígitos';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 20),
 
@@ -237,15 +287,45 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                     // CVV
                     Expanded(
                       flex: 2,
-                      child: CustomTextField(
+                      child: TextFormField(
                         controller: _cvvController,
-                        hintText: 'CVV',
-                        labelText: 'CVV',
                         keyboardType: TextInputType.number,
+                        keyboardAppearance: Brightness.dark,
+                        textInputAction: TextInputAction.next,
+                        style: const TextStyle(color: Colors.white),
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
                           LengthLimitingTextInputFormatter(4),
                         ],
+                        decoration: InputDecoration(
+                          labelText: 'CVV',
+                          labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                          floatingLabelBehavior: FloatingLabelBehavior.auto,
+                          prefixIcon: Icon(Icons.lock, color: AppTheme.textSecondary),
+                          filled: true,
+                          fillColor: AppTheme.inputEditableBackgroundColor,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.red, width: 2),
+                          ),
+                          focusedErrorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.red, width: 2),
+                          ),
+                          counterText: '',
+                        ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Insira o CVV';
@@ -262,16 +342,46 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                     // Data de Vencimento
                     Expanded(
                       flex: 3,
-                      child: CustomTextField(
+                      child: TextFormField(
                         controller: _vencimentoController,
-                        hintText: 'Data de Vencimento',
-                        labelText: 'Data de Vencimento',
                         keyboardType: TextInputType.number,
+                        keyboardAppearance: Brightness.dark,
+                        textInputAction: TextInputAction.done,
+                        style: const TextStyle(color: Colors.white),
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(4),
+                          LengthLimitingTextInputFormatter(5), // MM/AA = 5 caracteres
                           _ExpiryDateFormatter(),
                         ],
+                        decoration: InputDecoration(
+                          labelText: 'Data de Vencimento',
+                          labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                          floatingLabelBehavior: FloatingLabelBehavior.auto,
+                          prefixIcon: Icon(Icons.calendar_today, color: AppTheme.textSecondary),
+                          filled: true,
+                          fillColor: AppTheme.inputEditableBackgroundColor,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.red, width: 2),
+                          ),
+                          focusedErrorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.red, width: 2),
+                          ),
+                          counterText: '',
+                        ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Insira a validade';
@@ -297,26 +407,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                   text: 'Avançar',
                   onPressed: _continuar,
                 ),
-
-                const SizedBox(height: 20),
-
-                // Indicador de progresso
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildProgressDot(true),
-                    _buildProgressLine(),
-                    _buildProgressDot(true),
-                    _buildProgressLine(),
-                    _buildProgressDot(true),
-                    _buildProgressLine(),
-                    _buildProgressDot(true),
-                    _buildProgressLine(),
-                    _buildProgressDot(false),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
                 // Aviso de segurança
                 const Row(
@@ -338,41 +429,104 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
             ),
           ),
         ),
+      ),
+    ),
+    );
+  }
+
+  /// Constrói o ícone da bandeira do cartão para usar como suffixIcon
+  Widget _buildCardBrandIcon(CardBrand brand) {
+    final imageWidget = CardBrandImageLoader.getBrandImage(brand);
+    
+    if (imageWidget == null) {
+      return _buildCardBrandFallback(brand);
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: imageWidget,
+    );
+  }
+
+  /// Fallback para bandeira quando não há imagem disponível
+  Widget _buildCardBrandFallback(CardBrand brand) {
+    String brandText;
+    
+    switch (brand) {
+      case CardBrand.visa:
+        brandText = 'VISA';
+        break;
+      case CardBrand.mastercard:
+        brandText = 'MC';
+        break;
+      case CardBrand.elo:
+        brandText = 'ELO';
+        break;
+      case CardBrand.amex:
+        brandText = 'AMEX';
+        break;
+      case CardBrand.hipercard:
+        brandText = 'HIPER';
+        break;
+      case CardBrand.diners:
+        brandText = 'DINERS';
+        break;
+      case CardBrand.discover:
+        brandText = 'DISC';
+        break;
+      case CardBrand.jcb:
+        brandText = 'JCB';
+        break;
+      default:
+        return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      child: Text(
+        brandText,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
         ),
       ),
     );
   }
 
-  Widget _buildProgressDot(bool isActive) {
-    return Container(
-      width: 12,
-      height: 12,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: isActive ? Theme.of(context).primaryColor : Colors.grey[300],
-      ),
-    );
-  }
-
-  Widget _buildProgressLine() {
-    return Container(
-      width: 40,
-      height: 2,
-      color: Colors.grey[300],
-    );
-  }
 }
 
-/// Formatador para número do cartão (adiciona espaços)
+/// Formatador para número do cartão (adiciona espaços e limita a 16 dígitos)
 class _CardNumberFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
+    // Remove espaços e limita a 16 dígitos
     final text = newValue.text.replaceAll(' ', '');
-    final buffer = StringBuffer();
+    if (text.length > 16) {
+      // Se exceder 16 dígitos, mantém apenas os primeiros 16
+      final limitedText = text.substring(0, 16);
+      final buffer = StringBuffer();
 
+      for (int i = 0; i < limitedText.length; i++) {
+        if (i > 0 && i % 4 == 0) {
+          buffer.write(' ');
+        }
+        buffer.write(limitedText[i]);
+      }
+
+      final formatted = buffer.toString();
+      return TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+    }
+
+    // Formata normalmente se não exceder 16 dígitos
+    final buffer = StringBuffer();
     for (int i = 0; i < text.length; i++) {
       if (i > 0 && i % 4 == 0) {
         buffer.write(' ');

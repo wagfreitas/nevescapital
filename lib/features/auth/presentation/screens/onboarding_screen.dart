@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/features/auth/presentation/screens/phone_login_screen.dart';
 import 'package:neves_capital/features/auth/presentation/screens/unified_cpf_screen.dart';
@@ -8,8 +7,6 @@ import 'package:neves_capital/features/auth/data/services/registration_service.d
 import 'package:neves_capital/features/auth/data/services/local_registration_storage.dart';
 import 'package:neves_capital/features/auth/presentation/helpers/registration_navigator.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
-import 'package:neves_capital/shared/services/biometric_service.dart';
-import 'package:neves_capital/features/home/presentation/screens/main_tab_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final AuthController authController;
@@ -27,200 +24,16 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _hasCheckedResume = false;
-  bool _hasCheckedBiometric = false;
-  bool _isCheckingBiometric = false;
   bool _resumedRegistration = false;
-  bool _isProcessingBiometric = false; // Flag para evitar múltiplas chamadas simultâneas
 
   @override
   void initState() {
     super.initState();
-    // Aguardar um frame para garantir que o AuthController foi totalmente inicializado
+    // Fechar teclado se estiver aberto de alguma tela anterior
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkBiometricAndPendingRegistration();
+      FocusManager.instance.primaryFocus?.unfocus();
+      _checkPendingRegistration();
     });
-  }
-
-  /// Verifica biometria se usuário está logado, depois verifica cadastro pendente
-  Future<void> _checkBiometricAndPendingRegistration() async {
-    // Proteção contra múltiplas chamadas simultâneas
-    if (_isProcessingBiometric) {
-      AppLogger.warning('Verificação de biometria já em andamento - ignorando chamada duplicada');
-      return;
-    }
-    
-    // Aguardar um pouco para garantir que o AuthController foi totalmente inicializado
-    await Future.delayed(const Duration(milliseconds: 150));
-    
-    // Primeiro: se existe cadastro incompleto, retomar antes de qualquer biometria/dashboard
-    await _checkPendingRegistration();
-    if (_resumedRegistration) {
-      AppLogger.info('Cadastro incompleto retomado - biometria/dashboard cancelados');
-      return;
-    }
-
-    // 1. Primeiro verificar DIRETAMENTE no SharedPreferences se o usuário está logado
-    // Isso é mais confiável que confiar apenas no estado do controller
-    AppLogger.info('🔐 [ONBOARDING] Verificando estado de login DIRETAMENTE no SharedPreferences...');
-    
-    bool isLoggedInFromPrefs = false;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      isLoggedInFromPrefs = prefs.getBool('is_logged_in_otp') ?? false;
-      AppLogger.info('🔐 [ONBOARDING] Flag is_logged_in_otp do SharedPreferences: $isLoggedInFromPrefs');
-    } catch (e) {
-      AppLogger.error('Erro ao ler SharedPreferences', e);
-      isLoggedInFromPrefs = false;
-    }
-    
-    // 2. Verificar também o estado do controller (para compatibilidade)
-    AppLogger.info('🔐 [ONBOARDING] Verificando estado do controller:');
-    AppLogger.info('  - isLoggedIn: ${widget.authController.isLoggedIn}');
-    AppLogger.info('  - currentUser: ${widget.authController.currentUser != null}');
-    AppLogger.info('  - isLoading: ${widget.authController.isLoading}');
-    
-    // 3. Se a flag do SharedPreferences for FALSE, FORÇAR o estado do controller também
-    if (!isLoggedInFromPrefs) {
-      AppLogger.info('🔐 [ONBOARDING] Flag é FALSE - forçando limpeza do controller');
-      // Forçar limpeza do estado do controller
-      widget.authController.clearState();
-      // Aguardar um pouco para garantir que o estado foi limpo
-      await Future.delayed(const Duration(milliseconds: 100));
-    }
-    
-    // 4. Usar APENAS a flag do SharedPreferences como fonte da verdade
-    // Se a flag for FALSE, o usuário NÃO está logado, independente do estado do controller
-    bool isLoggedIn = isLoggedInFromPrefs;
-    
-    AppLogger.info('🔐 [ONBOARDING] Estado final verificado:');
-    AppLogger.info('  - isLoggedInFromPrefs (FONTE DA VERDADE): $isLoggedInFromPrefs');
-    AppLogger.info('  - controller.isLoggedIn: ${widget.authController.isLoggedIn}');
-    AppLogger.info('  - isLoggedIn (final, usando apenas SharedPreferences): $isLoggedIn');
-    
-    // IMPORTANTE: Se a flag for FALSE, NÃO fazer nenhuma verificação de biometria ou redirecionamento
-    // Apenas mostrar a tela de onboarding normalmente
-    if (!isLoggedIn) {
-      AppLogger.info('🔐 [ONBOARDING] Flag é FALSE - usuário NÃO está logado. Mostrando tela de onboarding.');
-      return; // Sair da função e mostrar a tela normalmente
-    }
-    
-    // Só continuar com verificações se a flag for TRUE
-    if (isLoggedIn) {
-      final isBiometricAvailable = await BiometricService.isAvailable();
-      
-      if (isBiometricAvailable && !_hasCheckedBiometric && !_isProcessingBiometric) {
-        _isProcessingBiometric = true;
-        _hasCheckedBiometric = true;
-        _isCheckingBiometric = true;
-        
-        AppLogger.info('Usuário logado - solicitando autenticação biométrica...');
-        
-        if (mounted) {
-          setState(() {});
-        }
-
-        // IMPORTANTE (iOS): garantir que a tela de fundo (verde) seja pintada
-        // antes do prompt nativo do Face ID aparecer. Sem isso, o iOS pode
-        // capturar um frame "em branco" como snapshot do app.
-        await WidgetsBinding.instance.endOfFrame;
-        
-        try {
-          // Solicitar biometria (com fallback para senha do dispositivo)
-          // O iOS mostrará opção de usar senha se biometria falhar
-          final authenticated = await BiometricService.authenticate(
-            reason: 'Use sua biometria para acessar o app',
-          );
-          
-          // Manter tela verde escuro até processar resultado
-          if (mounted) {
-            setState(() {
-              _isCheckingBiometric = false;
-            });
-          }
-          
-          // Verificar novamente se ainda está logado após biometria
-          // (pode ter sido feito logout durante a biometria)
-          if (!mounted || !widget.authController.isLoggedIn) {
-            AppLogger.info('Estado de login mudou durante biometria - cancelando redirecionamento');
-            _isProcessingBiometric = false;
-            return;
-          }
-          
-          if (authenticated) {
-            AppLogger.info('✅ Biometria ou senha validada - redirecionando para Dashboard');
-            // Autenticação validada (biometria ou senha) - redirecionar para Dashboard
-            if (mounted) {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => MainTabScreen(
-                    authController: widget.authController,
-                    themeController: widget.themeController ?? ThemeController(),
-                  ),
-                ),
-              );
-            }
-            _isProcessingBiometric = false;
-            return; // Não verificar cadastro pendente se autenticação foi validada
-          } else {
-            AppLogger.warning('❌ Biometria e senha falharam ou foram canceladas - fazendo logout e redirecionando para login');
-            // Se biometria E senha falharam ou foram canceladas, fazer logout para evitar loop
-            // e redirecionar para login
-            if (mounted) {
-              await widget.authController.logout();
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => PhoneLoginScreen(
-                    authController: widget.authController,
-                    themeController: widget.themeController,
-                  ),
-                ),
-              );
-            }
-            _isProcessingBiometric = false;
-            return; // Não verificar cadastro pendente se autenticação falhou
-          }
-        } catch (e) {
-          AppLogger.error('Erro durante autenticação biométrica', e);
-          if (mounted) {
-            setState(() {
-              _isCheckingBiometric = false;
-            });
-            // Em caso de erro, fazer logout para evitar loop
-            await widget.authController.logout();
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) => PhoneLoginScreen(
-                  authController: widget.authController,
-                  themeController: widget.themeController,
-                ),
-              ),
-            );
-          }
-          _isProcessingBiometric = false;
-          return;
-        }
-      } else if (!isBiometricAvailable && isLoggedIn) {
-        // Biometria não disponível mas usuário está logado - ir direto para dashboard
-        // Verificar novamente antes de redirecionar
-        if (widget.authController.isLoggedIn) {
-          AppLogger.info('Usuário logado mas biometria não disponível - redirecionando para Dashboard');
-          if (mounted) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) => MainTabScreen(
-                  authController: widget.authController,
-                  themeController: widget.themeController ?? ThemeController(),
-                ),
-              ),
-            );
-          }
-        }
-        return;
-      }
-    }
-    
-    // 2. Verificar cadastro pendente (apenas se não passou pela biometria)
-    _checkPendingRegistration();
   }
 
 
@@ -349,50 +162,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Mostrar loading enquanto verifica biometria
-    // IMPORTANTE: Esta tela deve permanecer visível durante TODA a autenticação
-    // (biometria + fallback para senha do dispositivo)
-    if (_isCheckingBiometric) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF02391E), // Verde escuro PagPag
-        body: SafeArea(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Logo PagPag centralizado
-                Image.asset(
-                  'assets/icons/PagPag_icon.png',
-                  width: 150,
-                  height: 150,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(height: 40),
-                // Indicador de loading
-                const CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  strokeWidth: 3,
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Aguardando autenticação...',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
+    // Garantir que não há foco ativo ao construir a tela
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    });
     
     return Scaffold(
       // Evita flash branco (asset de fundo pode demorar 1 frame para pintar)
       backgroundColor: const Color(0xFF02391E),
-      body: Container(
+      resizeToAvoidBottomInset: false, // Evitar que o teclado apareça
+      body: GestureDetector(
+        onTap: () {
+          // Fechar teclado ao tocar em qualquer lugar da tela
+          FocusManager.instance.primaryFocus?.unfocus();
+        },
+        child: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
             image: AssetImage('assets/images/fundo.png'),
@@ -517,6 +301,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

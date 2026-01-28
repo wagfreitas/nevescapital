@@ -285,6 +285,7 @@ class NumberTextField extends StatelessWidget {
         controller: controller,
         focusNode: effectiveFocusNode,
         keyboardType: keyboardType,
+        keyboardAppearance: Brightness.dark, // Teclado escuro para uniformidade
         inputFormatters: inputFormatters,
         validator: validator,
         readOnly: readOnly,

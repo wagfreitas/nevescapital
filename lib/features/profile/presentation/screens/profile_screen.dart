@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import 'edit_personal_data_screen.dart';
 import 'edit_store_data_screen.dart';
-import 'edit_pix_keys_screen.dart';
+import 'bank_account_screen.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import '../../../auth/presentation/screens/onboarding_screen.dart';
 import '../../../../core/theme/theme_controller.dart';
@@ -69,7 +70,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 context,
                 icon: Icons.person,
                 title: 'Dados Pessoais',
-                subtitle: 'Email, telefone, endereço',
+                subtitle: 'Email & Endereço',
                 showLeftIcon: true,
                 onTap: () {
                   Navigator.push(
@@ -89,7 +90,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 context,
                 icon: Icons.store,
                 title: 'Dados da Loja',
-                subtitle: 'Nome, ramo de atividade',
+                subtitle: 'Nome & Ramo de Atuação',
                 showLeftIcon: true,
                 onTap: () {
                   Navigator.push(
@@ -107,7 +108,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               
               _buildOptionCard(
                 context,
-                icon: Icons.pix,
+                icon: Icons.account_balance,
                 title: 'Dados Bancários',
                 subtitle: 'Gerenciar Dados Bancários',
                 showLeftIcon: true,
@@ -115,7 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const EditPixKeysScreen(),
+                      builder: (context) => const BankAccountScreen(),
                     ),
                   );
                 },
@@ -271,7 +272,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   padding: const EdgeInsets.only(right: 16),
                   child: Icon(
                     icon,
-                    color: const Color(0xFF22C55E), // Verde vibrante
+                    color: AppTheme.primaryColor, // Verde vibrante
                     size: 32,
                   ),
                 )

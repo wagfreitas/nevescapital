@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_theme.dart';
 
 class SmartTextFormField extends StatefulWidget {
   final TextEditingController controller;
@@ -89,7 +90,7 @@ class _SmartTextFormFieldState extends State<SmartTextFormField> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8.0),
           borderSide: const BorderSide(
-            color: Color(0xFF22C55E),
+            color: AppTheme.primaryColor,
             width: 2,
           ),
         ),

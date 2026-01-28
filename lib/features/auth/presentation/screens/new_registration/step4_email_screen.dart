@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/helpers/email_helper.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
@@ -163,7 +164,7 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -244,7 +245,7 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
                             hintStyle: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.5)),
                             filled: true,
-                            fillColor: Colors.white.withValues(alpha: 0.1),
+                            fillColor: AppTheme.inputEditableBackgroundColor,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide.none,
@@ -257,7 +258,7 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: const BorderSide(
-                                  color: Color(0xFF22C55E), width: 2),
+                                  color: AppTheme.primaryColor, width: 2),
                             ),
                             errorBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -309,8 +310,8 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _handleNext,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF22C55E),
-                              foregroundColor: const Color(0xFF122118),
+                              backgroundColor: AppTheme.primaryColor,
+                              foregroundColor: AppTheme.backgroundColor,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -324,7 +325,7 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
                                       strokeWidth: 2,
                                       valueColor:
                                           AlwaysStoppedAnimation<Color>(
-                                              Color(0xFF122118)),
+                                              AppTheme.backgroundColor),
                                     ),
                                   )
                                 : const Text(

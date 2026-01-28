@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:neves_capital/shared/services/biometric_service.dart';
 import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 
@@ -150,7 +151,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -171,7 +172,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                   child: const Icon(
                     Icons.face,
                     size: 60,
-                    color: Color(0xFF22C55E),
+                    color: AppTheme.primaryColor,
                   ),
                 ),
               ),
@@ -210,8 +211,8 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _handleEnableBiometric,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF22C55E),
-                      foregroundColor: const Color(0xFF122118),
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: AppTheme.backgroundColor,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -223,7 +224,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                             width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF122118)),
+                              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.backgroundColor),
                             ),
                           )
                         : const Text(

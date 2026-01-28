@@ -3,20 +3,21 @@ import 'package:flutter/material.dart';
 /// Tema da aplicação
 class AppTheme {
   // Cores baseadas no Design Concept
-  static const Color primaryColor = Color(0xFF22C55E); // Verde vibrante (#22c55e)
-  static const Color backgroundColor = Color(0xFF122118); // Gradiente verde escuro base
+  static const Color primaryColor = Color(0xFF28CC28); // Verde dos botões (#28CC28)
+  static const Color backgroundColor = Color(0xFF122118); // Fundo verde escuro (#122118)
   static const Color surfaceColor = Color(0xFF1A2B1F); // Superfície verde escura
   static const Color cardColor = Color(0xFF1F2A1F); // Cards com tom verde
   static const Color borderColor = Color(0xFF2A3A2A); // Bordas verdes sutis
-  static const Color accentColor = Color(0xFF22C55E); // Verde vibrante para acentos
+  static const Color accentColor = Color(0xFF28CC28); // Verde dos botões para acentos
   
   // Cores específicas para inputs (verde mais claro que o fundo)
   static const Color inputBackgroundColor = Color(0xFF1A2B1F); // Verde escuro para inputs
+  static const Color inputEditableBackgroundColor = Color(0xFF1A2B1F); // Verde para inputs editáveis (mesmo que surfaceColor)
   
   // Cores comuns
   static const Color errorColor = Color(0xFFEF4444);
   static const Color warningColor = Color(0xFFF59E0B);
-  static const Color successColor = Color(0xFF22C55E);
+  static const Color successColor = Color(0xFF28CC28);
   static const Color destructiveColor = Color(0xFFEF4444);
   
   // Cores de texto
@@ -26,8 +27,8 @@ class AppTheme {
   static const Color textHint = Color(0xFF9CA3AF); // Cinza claro
   
   // Glass effect colors (com tons verdes)
-  static const Color glassBackground = Color(0x1A22C55E); // 10% verde vibrante
-  static const Color glassBorder = Color(0x3322C55E); // 20% verde vibrante
+  static const Color glassBackground = Color(0x1A28CC28); // 10% verde dos botões
+  static const Color glassBorder = Color(0x3328CC28); // 20% verde dos botões
   
   /// Tema baseado no Design Concept: Gradiente verde escuro → preto com acentos verdes vibrantes
   static ThemeData get lightTheme {

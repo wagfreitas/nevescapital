@@ -159,6 +159,7 @@ class _CepInputFieldState extends State<CepInputField> {
             focusNode: _focusNode,
             enabled: widget.enabled,
             keyboardType: TextInputType.number,
+            keyboardAppearance: Brightness.dark, // Teclado escuro para uniformidade
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(9), // xxxxx-xxx = 9 caracteres

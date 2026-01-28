@@ -171,6 +171,7 @@ class _CpfInputFieldState extends State<CpfInputField> {
             autofocus: widget.autofocus,
             enabled: widget.enabled,
             keyboardType: TextInputType.number,
+            keyboardAppearance: Brightness.dark, // Teclado escuro para uniformidade
             textInputAction: TextInputAction.done,
             onFieldSubmitted: (_) {
               // Fechar teclado quando usuário pressionar "OK" ou "Done"

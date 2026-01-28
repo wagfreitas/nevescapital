@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
@@ -151,12 +152,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
       }
     });
 
-    // Abrir teclado automaticamente apenas se não houver valores restaurados
-    if (widget.initialCep == null || widget.initialCep!.isEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _cepFocusNode.requestFocus();
-      });
-    }
+    // Não abrir teclado automaticamente
   }
 
   void _onFieldChanged() {
@@ -333,7 +329,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -415,7 +411,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                   width: 32,
                                   height: 4,
                                   decoration: BoxDecoration(
-                                    color: Color(0xFF22C55E),
+                                    color: AppTheme.primaryColor,
                                     borderRadius: BorderRadius.circular(2),
                                   ),
                                 ),
@@ -441,87 +437,76 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                           ),
                           const SizedBox(height: 40),
                           // CEP
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'CEP',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: _cepController,
-                                focusNode: _cepFocusNode,
-                                keyboardType: TextInputType.number,
-                                textInputAction: TextInputAction.done,
-                                onFieldSubmitted: (_) {
-                                  // Fechar teclado quando usuário pressionar "OK" ou "Done"
-                                  _cepFocusNode.unfocus();
-                                },
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                  LengthLimitingTextInputFormatter(9), // xxxxx-xxx
-                                ],
-                                style: const TextStyle(color: Colors.white),
-                                onChanged: (value) {
-                                  // Formatar CEP enquanto digita
-                                  final cleanCep = CepHelper.cleanCep(value);
-                                  if (cleanCep.length <= 8) {
-                                    final formatted = CepHelper.formatCep(cleanCep);
-                                    if (_cepController.text != formatted) {
-                                      _cepController.value = TextEditingValue(
-                                        text: formatted,
-                                        selection: TextSelection.collapsed(offset: formatted.length),
-                                      );
+                          TextFormField(
+                            controller: _cepController,
+                            focusNode: _cepFocusNode,
+                            keyboardType: TextInputType.number,
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) {
+                              // Fechar teclado quando usuário pressionar "OK" ou "Done"
+                              _cepFocusNode.unfocus();
+                            },
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(9), // xxxxx-xxx
+                            ],
+                            style: const TextStyle(color: Colors.white),
+                            onChanged: (value) {
+                              // Formatar CEP enquanto digita
+                              final cleanCep = CepHelper.cleanCep(value);
+                              if (cleanCep.length <= 8) {
+                                final formatted = CepHelper.formatCep(cleanCep);
+                                if (_cepController.text != formatted) {
+                                  _cepController.value = TextEditingValue(
+                                    text: formatted,
+                                    selection: TextSelection.collapsed(offset: formatted.length),
+                                  );
+                                }
+                              }
+                              
+                              // Buscar CEP automaticamente quando tiver 8 dígitos
+                              if (cleanCep.length == 8 && cleanCep != _lastSearchedCep) {
+                                // Cancelar timer anterior se existir
+                                _cepSearchTimer?.cancel();
+                                
+                                // Aguardar 500ms após parar de digitar antes de buscar (debounce)
+                                _cepSearchTimer = Timer(const Duration(milliseconds: 500), () {
+                                  if (mounted) {
+                                    final currentCep = CepHelper.getCepNumbers(_cepController.text);
+                                    if (currentCep.length == 8 && currentCep != _lastSearchedCep) {
+                                      _searchCep();
                                     }
                                   }
-                                  
-                                  // Buscar CEP automaticamente quando tiver 8 dígitos
-                                  if (cleanCep.length == 8 && cleanCep != _lastSearchedCep) {
-                                    // Cancelar timer anterior se existir
-                                    _cepSearchTimer?.cancel();
-                                    
-                                    // Aguardar 500ms após parar de digitar antes de buscar (debounce)
-                                    _cepSearchTimer = Timer(const Duration(milliseconds: 500), () {
-                                      if (mounted) {
-                                        final currentCep = CepHelper.getCepNumbers(_cepController.text);
-                                        if (currentCep.length == 8 && currentCep != _lastSearchedCep) {
-                                          _searchCep();
-                                        }
-                                      }
-                                    });
-                                  }
-                                },
-                                decoration: InputDecoration(
-                                  hintText: '00000-000',
-                                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-                                  filled: true,
-                                  fillColor: Colors.white.withValues(alpha: 0.1),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
-                                  ),
-                                  errorBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: Colors.red, width: 2),
-                                  ),
-                                  prefixIcon: const Icon(Icons.location_on, color: Colors.white70),
-                                ),
-                                validator: CepHelper.validateCep,
+                                });
+                              }
+                            },
+                            decoration: InputDecoration(
+                              labelText: 'CEP',
+                              labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                              hintText: '00000-000',
+                              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                              floatingLabelBehavior: FloatingLabelBehavior.auto,
+                              filled: true,
+                              fillColor: AppTheme.inputEditableBackgroundColor,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
                               ),
-                            ],
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Colors.red, width: 2),
+                              ),
+                              prefixIcon: const Icon(Icons.location_on, color: Colors.white70),
+                            ),
+                            validator: CepHelper.validateCep,
                           ),
                           if (_isSearchingCep) ...[
                             const SizedBox(height: 8),
@@ -532,7 +517,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                   height: 16,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF22C55E)),
+                                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
                                   ),
                                 ),
                                 SizedBox(width: 8),
@@ -569,8 +554,8 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide:
-                                    const BorderSide(color: Color(0xFF22C55E), width: 2),
+                                borderSide: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.1)),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -605,7 +590,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                     labelText: 'Nº',
                                     labelStyle: const TextStyle(color: Colors.white70),
                                     filled: true,
-                                    fillColor: Colors.white.withValues(alpha: 0.1),
+                                    fillColor: AppTheme.inputEditableBackgroundColor,
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide.none,
@@ -618,7 +603,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide:
-                                          const BorderSide(color: Color(0xFF22C55E), width: 2),
+                                          BorderSide(color: AppTheme.primaryColor, width: 2),
                                     ),
                                     errorBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -646,7 +631,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                     labelText: 'Complemento',
                                     labelStyle: const TextStyle(color: Colors.white70),
                                     filled: true,
-                                    fillColor: Colors.white.withValues(alpha: 0.1),
+                                    fillColor: AppTheme.inputEditableBackgroundColor,
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide.none,
@@ -659,7 +644,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide:
-                                          const BorderSide(color: Color(0xFF22C55E), width: 2),
+                                          BorderSide(color: AppTheme.primaryColor, width: 2),
                                     ),
                                     errorBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -694,8 +679,8 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide:
-                                    const BorderSide(color: Color(0xFF22C55E), width: 2),
+                                borderSide: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.1)),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -738,8 +723,8 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                     ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
-                                      borderSide:
-                                          const BorderSide(color: Color(0xFF22C55E), width: 2),
+                                      borderSide: BorderSide(
+                                          color: Colors.white.withValues(alpha: 0.1)),
                                     ),
                                     errorBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -783,8 +768,8 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                     ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
-                                      borderSide:
-                                          const BorderSide(color: Color(0xFF22C55E), width: 2),
+                                      borderSide: BorderSide(
+                                          color: Colors.white.withValues(alpha: 0.1)),
                                     ),
                                     errorBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -834,8 +819,8 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : _handleNext,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF22C55E),
-                                foregroundColor: const Color(0xFF122118),
+                                backgroundColor: AppTheme.primaryColor,
+                                foregroundColor: AppTheme.backgroundColor,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -848,7 +833,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
                                         valueColor: AlwaysStoppedAnimation<Color>(
-                                            Color(0xFF122118)),
+                                            AppTheme.backgroundColor),
                                       ),
                                     )
                                   : const Text(

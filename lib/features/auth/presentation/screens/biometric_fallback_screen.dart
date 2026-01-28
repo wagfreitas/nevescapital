@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/shared/components/cpf_input_field.dart';
@@ -153,7 +154,7 @@ class _BiometricFallbackScreenState extends State<BiometricFallbackScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -262,7 +263,7 @@ class _BiometricFallbackScreenState extends State<BiometricFallbackScreen> {
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
+                              borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                             ),
                             errorBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -273,7 +274,7 @@ class _BiometricFallbackScreenState extends State<BiometricFallbackScreen> {
                               borderSide: const BorderSide(color: Colors.red, width: 2),
                             ),
                             filled: true,
-                            fillColor: Colors.white.withValues(alpha: 0.1),
+                            fillColor: AppTheme.inputEditableBackgroundColor,
                           ),
                           textCapitalization: TextCapitalization.words,
                           validator: (value) {

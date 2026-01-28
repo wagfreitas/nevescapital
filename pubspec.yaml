@@ -36,7 +36,7 @@ dependencies:
   # Dependências para Clean Architecture
   shared_preferences: ^2.2.2
   flutter_secure_storage: ^9.0.0  # MASVS-STORAGE: Armazenamento seguro
-  intl: ^0.20.2
+  intl: ^0.18.1  # Compatível com flutter_credit_card_detector
   connectivity_plus: ^6.0.5
   http: ^1.1.2
   flutter_svg: ^2.0.9
@@ -71,6 +71,10 @@ dependencies:
   # Dependências para segurança
   flutter_dotenv: ^5.1.0  # Variáveis de ambiente seguras
   logger: ^2.0.2  # Logger configurável para substituir prints
+  
+  # Dependência para seleção de país com bandeiras
+  country_picker: ^2.0.26
+  flutter_credit_card_detector: 2.3.0
 
   # Botão OK no teclado iOS: implementado nativamente em Swift (KeyboardDoneAccessory.swift)
   
@@ -104,6 +108,7 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/fonts/
+    - assets/bandeiras_images/
     - .env
 
   # An image asset can refer to one or more resolution-specific "variants", see
@@ -136,19 +141,19 @@ flutter:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/icons/PagPag.png"
+  image_path: "assets/icons/logo_ios_filled.png"
   image_path_ios: "assets/icons/logo_ios_filled.png"
   min_sdk_android: 19
   remove_alpha_ios: true
   web:
     generate: true
-    image_path: "assets/icons/PagPag.png"
+    image_path: "assets/icons/logo_ios_filled.png"
     background_color: "#hexcode"
     theme_color: "#hexcode"
   windows:
     generate: true
-    image_path: "assets/icons/PagPag.png"
+    image_path: "assets/icons/logo_ios_filled.png"
     icon_size: 48
   macos:
     generate: true
-    image_path: "assets/icons/PagPag.png"
+    image_path: "assets/icons/logo_ios_filled.png"

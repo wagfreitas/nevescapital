@@ -6,7 +6,9 @@ import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/features/auth/presentation/screens/login_otp/login_step3_otp_screen.dart';
+import 'package:neves_capital/features/auth/presentation/screens/onboarding_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
@@ -39,20 +41,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
     super.dispose();
   }
 
-  // 🎭 MODO FAKE OTP - DESABILITADO PARA PRODUÇÃO
-  // Não usar em produção - apenas para desenvolvimento local
-  static const bool _useFakeOtp = false;
-  static const String _fakeVerificationId = 'fake-verification-id-123';
-  
-  // Lista de números de teste do Firebase (para validação)
-  // IMPORTANTE: O número deve estar no formato E.164 SEM espaços no Firebase Console
-  // Exemplo: +5511989630454 (não +55 11 98963-0454)
-  static const List<String> _testPhoneNumbers = [
-    '+5511999999999',
-    '+5511987654321',
-    '+5511123456789',
-    '+5511989630454', // Número do usuário atual
-  ];
 
   Future<void> _handleNext() async {
     if (!_formKey.currentState!.validate()) return;
@@ -63,11 +51,11 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
     });
 
     try {
-      // Obter telefone limpo (apenas números, com DDI 55 se não tiver)
+      // Obter telefone limpo (já inclui código do país do PhoneInputField)
       String phone = PhoneHelper.getPhoneNumbers(_phoneController.text);
 
-      // Validar se o telefone tem pelo menos 10 dígitos (sem DDI)
-      if (phone.length < 10) {
+      // Validar se o telefone tem pelo menos o código do país + 10 dígitos
+      if (phone.length < 12) { // Mínimo: código do país (2-3 dígitos) + 10 dígitos
         setState(() {
           _isLoading = false;
           _errorMessage = 'Telefone inválido. Digite um número válido.';
@@ -75,12 +63,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
         return;
       }
 
-      // Garantir DDI 55 (Brasil)
-      if (!phone.startsWith('55')) {
-        phone = '55$phone';
-      }
-
-      // Formatar para E.164 (+55...)
+      // Formatar para E.164 (+código do país + número)
       final formattedPhone = '+$phone';
 
       AppLogger.info('🚀 Iniciando login Firebase');
@@ -88,50 +71,8 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
       AppLogger.info('📱 Telefone limpo: $phone');
       AppLogger.info('📱 Telefone formatado (E.164): $formattedPhone');
       AppLogger.info('📱 Comprimento: ${formattedPhone.length} caracteres');
-      
-      // Verificar se é número de teste conhecido
-      if (_testPhoneNumbers.contains(formattedPhone)) {
-        AppLogger.info('✅ Número de teste detectado');
-      } else {
-        AppLogger.warning('⚠️ Número não está na lista de testes do Firebase');
-        AppLogger.warning('💡 Configure este número em: Firebase Console > Authentication > Phone > Test phone numbers');
-      }
 
-      // 🎭 MODO FAKE: Simular envio de OTP
-      if (_useFakeOtp) {
-        AppLogger.info('🎭 MODO FAKE OTP ATIVADO - Código: 123456');
-
-        // Simular delay de rede
-        await Future.delayed(const Duration(milliseconds: 800));
-
-        if (!mounted) return;
-
-        setState(() {
-          _isLoading = false;
-        });
-
-        // Navegar para tela de OTP com dados fake
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => LoginStep3OtpScreen(
-              authController: widget.authController,
-              themeController: widget.themeController,
-            ),
-            settings: RouteSettings(
-              arguments: {
-                'phone': phone,
-                'verificationId': _fakeVerificationId,
-                'maskedPhone': PhoneHelper.maskPhoneLast4(phone),
-                'isFakeMode': true,
-              },
-            ),
-          ),
-        );
-        return;
-      }
-
-      // MODO REAL: Firebase Phone Auth
+      // Firebase Phone Auth
       await FirebaseAuth.instance.verifyPhoneNumber(
         phoneNumber: formattedPhone,
         verificationCompleted: (PhoneAuthCredential credential) async {
@@ -162,9 +103,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
           }
         },
         verificationFailed: (FirebaseAuthException e) {
-          AppLogger.error('❌ Falha na verificação: ${e.code} - ${e.message}');
-          AppLogger.error('📱 Telefone formatado: $formattedPhone');
-          AppLogger.error('📱 Telefone original: ${_phoneController.text}');
           
           if (mounted) {
             setState(() {
@@ -175,8 +113,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                 _errorMessage = 'Muitas tentativas. Aguarde alguns minutos.';
               } else if (e.code == 'internal-error') {
                 // Erro interno pode ter várias causas
-                final normalizedPhone = formattedPhone.replaceAll(' ', '').replaceAll('-', '').replaceAll('(', '').replaceAll(')', '');
-                
                 // Detectar plataforma para dar instruções específicas
                 final isIOS = !kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS || Platform.isIOS);
                 
@@ -187,9 +123,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                     '   ${isIOS ? "Project Settings > Cloud Messaging > APNs authentication key" : "Project Settings > Your apps > Android > SHA certificate fingerprints"}\n'
                     '   ${isIOS ? "Faça upload do arquivo .p8 da Apple Developer" : "SHA-1 Debug: 33:2A:B5:0C:B5:9B:A9:C1:F2:8D:02:13:AE:01:67:56:AE:11:CB:16"}\n\n'
                     '2. Verifique Phone Auth habilitado:\n'
-                    '   Authentication > Sign-in method > Phone > Enable\n\n'
-                    '3. Número de teste (se usar):\n'
-                    '   $normalizedPhone com código 123456';
+                    '   Authentication > Sign-in method > Phone > Enable';
               } else if (e.code == 'missing-phone-number') {
                 _errorMessage = 'Número de telefone não fornecido.';
               } else if (e.code == 'quota-exceeded') {
@@ -255,7 +189,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -266,10 +200,18 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
             // Evita crash: não dar pop enquanto teclado está aberto.
             if (FocusManager.instance.primaryFocus != null) {
               FocusScope.of(context).unfocus();
-              return;
             }
             if (!context.mounted) return;
-            await Navigator.of(context).maybePop();
+            // Voltar para a tela de onboarding
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => OnboardingScreen(
+                  authController: widget.authController ?? AuthController(),
+                  themeController: widget.themeController,
+                ),
+              ),
+            );
           },
         ),
       ),
@@ -358,24 +300,14 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                             },
                           ),
                         ),
-                        if (_useFakeOtp) ...[
-                          const SizedBox(height: 16),
-                          TextButton.icon(
-                            onPressed: () {
-                              _phoneController.text = '11989630454';
-                            },
-                            icon:
-                                const Icon(Icons.flash_on, color: Colors.orange),
-                            label: const Text(
-                              'Auto-preencher teste',
-                              style: TextStyle(color: Colors.orange),
-                            ),
-                          ),
-                        ],
+                        // Espaço extra entre input e botão - aumenta quando teclado está aberto
+                        SizedBox(height: MediaQuery.of(context).viewInsets.bottom > 0 ? 80 : 40),
                       ],
                     ),
                   ),
                 ),
+                // Padding adicional quando teclado está aberto
+                SizedBox(height: MediaQuery.of(context).viewInsets.bottom > 0 ? 16 : 0),
                 SizedBox(
                   width: double.infinity,
                   height: 56,

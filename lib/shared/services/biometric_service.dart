@@ -33,42 +33,55 @@ class BiometricService {
     }
   }
 
-  /// Realiza autenticação biométrica
+  /// Realiza autenticação biométrica ou com senha do dispositivo
   static Future<bool> authenticate({
     String reason = 'Use sua biometria para fazer login',
+    bool allowDevicePassword = true, // Permitir usar senha do dispositivo mesmo sem biometria
   }) async {
     try {
       // Verificar disponibilidade
       final bool canCheck = await _localAuth.canCheckBiometrics;
       final bool isDeviceSupported = await _localAuth.isDeviceSupported();
       
-      if (!canCheck || !isDeviceSupported) {
-        AppLogger.warning('Biometria não disponível');
-        return false;
-      }
-
       // Verificar quais tipos de biometria estão disponíveis
       final List<BiometricType> availableBiometrics = await _localAuth.getAvailableBiometrics();
       AppLogger.debug('Biometrias disponíveis: ${availableBiometrics.length}');
+      AppLogger.debug('canCheck: $canCheck, isDeviceSupported: $isDeviceSupported');
       
-      if (availableBiometrics.isEmpty) {
-        AppLogger.warning('Nenhum tipo de biometria disponível');
+      // IMPORTANTE: Mesmo sem biometria disponível, tentar autenticação se allowDevicePassword = true
+      // O iOS/Android mostrará a opção de senha do dispositivo quando biometricOnly = false
+      if ((!canCheck || !isDeviceSupported || availableBiometrics.isEmpty) && !allowDevicePassword) {
+        AppLogger.warning('Biometria não disponível e senha do dispositivo não permitida');
         return false;
       }
 
-      // Realizar autenticação com parâmetros otimizados para iOS
-      // biometricOnly: false permite fallback para senha do dispositivo
+      // Se não há biometria disponível mas allowDevicePassword = true, forçar biometricOnly = false
+      // Isso garante que o Android mostre o prompt de senha mesmo sem biometria
+      final bool hasBiometrics = availableBiometrics.isNotEmpty;
+      
+      // IMPORTANTE: No iOS, quando allowDevicePassword = true, sempre usar biometricOnly = false
+      // para que o sistema ofereça imediatamente a opção de senha quando o Face ID falhar
+      // No Android, se não há biometria e allowDevicePassword = true, sempre usar biometricOnly = false
+      final bool shouldUseBiometricOnly = hasBiometrics && !allowDevicePassword;
+      
+      // Se allowDevicePassword = true, sempre permitir fallback para senha (biometricOnly = false)
+      // Isso garante que no iOS a opção de senha apareça imediatamente após falha do Face ID
+      final bool finalBiometricOnly = (hasBiometrics && !allowDevicePassword) ? true : false;
+      
+      // Realizar autenticação com parâmetros otimizados
+      // biometricOnly: controla se permite fallback para senha do dispositivo
+      AppLogger.info('Tentando autenticação (biometricOnly: $finalBiometricOnly, hasBiometrics: $hasBiometrics, allowDevicePassword: $allowDevicePassword)...');
       final bool didAuthenticate = await _localAuth.authenticate(
         localizedReason: reason,
-        options: const AuthenticationOptions(
-          biometricOnly: false, // Permitir fallback para senha do dispositivo
-          stickyAuth: false, // Sempre solicitar autenticação (não reutilizar autenticação anterior)
-          useErrorDialogs: true, // Mostrar diálogos de erro nativos do iOS
-          sensitiveTransaction: false, // Transação não é extremamente sensível
+        options: AuthenticationOptions(
+          biometricOnly: finalBiometricOnly, // Se não há biometria, sempre false para mostrar senha
+          stickyAuth: false, // Sempre solicitar autenticação
+          useErrorDialogs: true, // Mostrar diálogos de erro nativos
+          sensitiveTransaction: false,
         ),
       );
 
-      AppLogger.debug('Autenticação biométrica: $didAuthenticate');
+      AppLogger.debug('Resultado da autenticação: $didAuthenticate');
       return didAuthenticate;
     } on PlatformException catch (e) {
       // Tratamento específico de erros da plataforma
@@ -76,8 +89,51 @@ class BiometricService {
       
       if (e.code == 'NotAvailable') {
         AppLogger.warning('Biometria não disponível no dispositivo');
+        // Se permitir senha do dispositivo, tentar novamente com fallback
+        if (allowDevicePassword) {
+          AppLogger.info('Biometria não disponível, mas permitindo senha do dispositivo - tentando novamente...');
+          try {
+            final bool didAuthenticate = await _localAuth.authenticate(
+              localizedReason: reason,
+              options: const AuthenticationOptions(
+                biometricOnly: false, // Permitir senha
+                stickyAuth: false,
+                useErrorDialogs: false,
+                sensitiveTransaction: false,
+              ),
+            );
+            AppLogger.info('Resultado da segunda tentativa: $didAuthenticate');
+            return didAuthenticate;
+          } catch (retryError) {
+            AppLogger.error('Erro ao tentar autenticação com senha do dispositivo', retryError);
+            return false;
+          }
+        }
+        // Se não permitir senha, retornar false
+        return false;
       } else if (e.code == 'NotEnrolled') {
         AppLogger.warning('Biometria não configurada no dispositivo');
+        // Se permitir senha do dispositivo, tentar novamente
+        if (allowDevicePassword) {
+          AppLogger.info('Biometria não configurada, mas permitindo senha do dispositivo - tentando novamente...');
+          try {
+            final bool didAuthenticate = await _localAuth.authenticate(
+              localizedReason: reason,
+              options: const AuthenticationOptions(
+                biometricOnly: false,
+                stickyAuth: false,
+                useErrorDialogs: false,
+                sensitiveTransaction: false,
+              ),
+            );
+            return didAuthenticate;
+          } catch (retryError) {
+            AppLogger.error('Erro ao tentar autenticação com senha', retryError);
+            return false;
+          }
+        }
+        // Se não permitir senha, retornar false
+        return false;
       } else if (e.code == 'LockedOut') {
         AppLogger.warning('Biometria bloqueada (muitas tentativas falhadas)');
       } else if (e.code == 'PermanentlyLockedOut') {
@@ -86,6 +142,27 @@ class BiometricService {
         AppLogger.info('Usuário cancelou a autenticação');
       } else if (e.code == 'AuthenticationFailed') {
         AppLogger.warning('Autenticação falhou (Face ID/Touch ID não reconhecido)');
+        // Se permitir senha do dispositivo e a biometria falhou, tentar novamente com fallback para senha
+        // Isso garante que no iOS a opção de senha apareça imediatamente após falha do Face ID
+        if (allowDevicePassword) {
+          AppLogger.info('Biometria falhou, mas permitindo senha do dispositivo - tentando novamente com fallback...');
+          try {
+            final bool didAuthenticate = await _localAuth.authenticate(
+              localizedReason: reason,
+              options: const AuthenticationOptions(
+                biometricOnly: false, // Permitir senha imediatamente
+                stickyAuth: false,
+                useErrorDialogs: false, // Não mostrar diálogo de erro, já que vamos mostrar senha
+                sensitiveTransaction: false,
+              ),
+            );
+            AppLogger.info('Resultado da tentativa com fallback para senha: $didAuthenticate');
+            return didAuthenticate;
+          } catch (retryError) {
+            AppLogger.error('Erro ao tentar autenticação com senha do dispositivo após falha biométrica', retryError);
+            return false;
+          }
+        }
       }
       
       return false;
@@ -121,9 +198,11 @@ class BiometricService {
     final bool touchIdAvailable = await isTouchIdAvailable();
 
     if (faceIdAvailable) {
-      return 'Usar Face ID';
+      // No iOS será "Face ID", no Android será "Reconhecimento Facial"
+      return 'Usar Biometria Facial';
     } else if (touchIdAvailable) {
-      return 'Usar Touch ID';
+      // No iOS será "Touch ID", no Android será "Impressão Digital"
+      return 'Usar Biometria';
     } else {
       return 'Usar Biometria';
     }

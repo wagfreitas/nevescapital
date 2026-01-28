@@ -5,8 +5,8 @@ import 'package:neves_capital/shared/helpers/cep_helper.dart';
 import 'package:neves_capital/shared/services/cep_service.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
-import 'package:neves_capital/shared/components/number_keyboard_toolbar.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
 
 class PersonalDataScreen extends StatefulWidget {
@@ -43,6 +43,16 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
   String? _errorMessage;
   Timer? _cepSearchTimer;
   String _lastSearchedCep = '';
+  
+  // Valores originais para rastrear mudanças (apenas no modo de edição)
+  String _originalCep = '';
+  String _originalNumber = '';
+  String _originalComplement = '';
+  String _originalStreet = '';
+  String _originalNeighborhood = '';
+  String _originalCity = '';
+  String _originalState = '';
+  bool _hasChanges = false;
 
   @override
   void initState() {
@@ -53,6 +63,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
       final cep = widget.loginData['cep'] ?? '';
       if (cep.isNotEmpty) {
         _cepController.text = CepHelper.formatCep(cep);
+        _originalCep = CepHelper.getCepNumbers(cep);
       }
       _streetController.text = widget.loginData['street'] ?? '';
       _neighborhoodController.text = widget.loginData['neighborhood'] ?? '';
@@ -60,6 +71,24 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
       _stateController.text = widget.loginData['state'] ?? '';
       _numberController.text = widget.loginData['number'] ?? '';
       _complementController.text = widget.loginData['complement'] ?? '';
+      
+      // Armazenar valores originais
+      _originalCep = CepHelper.getCepNumbers(_cepController.text);
+      _originalStreet = _streetController.text.trim();
+      _originalNeighborhood = _neighborhoodController.text.trim();
+      _originalCity = _cityController.text.trim();
+      _originalState = _stateController.text.trim();
+      _originalNumber = _numberController.text.trim();
+      _originalComplement = _complementController.text.trim();
+      
+      // Adicionar listeners para rastrear mudanças
+      _cepController.addListener(_checkForChanges);
+      _numberController.addListener(_checkForChanges);
+      _complementController.addListener(_checkForChanges);
+      _streetController.addListener(_checkForChanges);
+      _neighborhoodController.addListener(_checkForChanges);
+      _cityController.addListener(_checkForChanges);
+      _stateController.addListener(_checkForChanges);
     }
 
     // Listener para buscar CEP quando perder o foco (fallback)
@@ -84,6 +113,15 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
   @override
   void dispose() {
     _cepSearchTimer?.cancel();
+    if (widget.isEditMode) {
+      _cepController.removeListener(_checkForChanges);
+      _numberController.removeListener(_checkForChanges);
+      _complementController.removeListener(_checkForChanges);
+      _streetController.removeListener(_checkForChanges);
+      _neighborhoodController.removeListener(_checkForChanges);
+      _cityController.removeListener(_checkForChanges);
+      _stateController.removeListener(_checkForChanges);
+    }
     _cepController.dispose();
     _streetController.dispose();
     _neighborhoodController.dispose();
@@ -95,6 +133,33 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
     _numberFocusNode.dispose();
     _complementFocusNode.dispose();
     super.dispose();
+  }
+  
+  /// Verificar se houve mudanças nos campos
+  void _checkForChanges() {
+    if (!widget.isEditMode) return;
+    
+    final currentCep = CepHelper.getCepNumbers(_cepController.text);
+    final currentStreet = _streetController.text.trim();
+    final currentNeighborhood = _neighborhoodController.text.trim();
+    final currentCity = _cityController.text.trim();
+    final currentState = _stateController.text.trim();
+    final currentNumber = _numberController.text.trim();
+    final currentComplement = _complementController.text.trim();
+    
+    final hasChanges = currentCep != _originalCep ||
+        currentStreet != _originalStreet ||
+        currentNeighborhood != _originalNeighborhood ||
+        currentCity != _originalCity ||
+        currentState != _originalState ||
+        currentNumber != _originalNumber ||
+        currentComplement != _originalComplement;
+    
+    if (_hasChanges != hasChanges) {
+      setState(() {
+        _hasChanges = hasChanges;
+      });
+    }
   }
 
   Future<void> _searchCep() async {
@@ -113,7 +178,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
     try {
       final addressData = await CepService.getAddressByCep(cep);
       
-      if (addressData != null && mounted) {
+        if (addressData != null && mounted) {
         setState(() {
           _streetController.text = addressData['street'] ?? '';
           _neighborhoodController.text = addressData['neighborhood'] ?? '';
@@ -121,6 +186,10 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
           _stateController.text = addressData['state'] ?? '';
           _lastSearchedCep = cep; // Marcar como buscado
         });
+        // Verificar mudanças após atualizar campos via CEP
+        if (widget.isEditMode) {
+          _checkForChanges();
+        }
         
         // Mover foco para o campo de número apenas se o campo de CEP ainda estiver em foco
         if (_cepFocusNode.hasFocus) {
@@ -150,7 +219,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -162,138 +231,92 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
       ),
       body: SafeArea(
         child: KeyboardDismissWrapper(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-              return SingleChildScrollView(
-                reverse: true,
-                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: EdgeInsets.only(
-                  left: 24.0,
-                  right: 24.0,
-                  bottom: bottomInset + 32.0,
-                ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: Form(
-                    key: _formKey,
-                    child: IntrinsicHeight(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 40),
-                          const Text(
-                            'Informações Pessoais',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                      const Center(
+                        child: Text(
+                          'Endereço',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
-                          const SizedBox(height: 12),
-                          Center(
-                            child: Container(
-                              width: 32,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: Color(0xFF22C55E),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                      // CEP
+                      TextFormField(
+                        controller: _cepController,
+                        focusNode: _cepFocusNode,
+                        keyboardType: TextInputType.number,
+                        keyboardAppearance: Brightness.dark, // Teclado escuro para uniformidade
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(9), // xxxxx-xxx
+                        ],
+                        style: const TextStyle(color: Colors.white),
+                        onChanged: (value) {
+                          // Formatar CEP enquanto digita
+                          final cleanCep = CepHelper.cleanCep(value);
+                          if (cleanCep.length <= 8) {
+                            final formatted = CepHelper.formatCep(cleanCep);
+                            if (_cepController.text != formatted) {
+                              _cepController.value = TextEditingValue(
+                                text: formatted,
+                                selection: TextSelection.collapsed(offset: formatted.length),
+                              );
+                            }
+                          }
+                          
+                          // Buscar CEP automaticamente quando tiver 8 dígitos
+                          if (cleanCep.length == 8 && cleanCep != _lastSearchedCep) {
+                            // Cancelar timer anterior se existir
+                            _cepSearchTimer?.cancel();
+                            
+                            // Aguardar 500ms após parar de digitar antes de buscar (debounce)
+                            _cepSearchTimer = Timer(const Duration(milliseconds: 500), () {
+                              if (mounted) {
+                                final currentCep = CepHelper.getCepNumbers(_cepController.text);
+                                if (currentCep.length == 8 && currentCep != _lastSearchedCep) {
+                                  _searchCep();
+                                }
+                              }
+                            });
+                          }
+                          _checkForChanges(); // Trigger change detection
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'CEP',
+                          labelStyle: const TextStyle(color: Colors.white70),
+                          filled: true,
+                          fillColor: AppTheme.inputEditableBackgroundColor,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
                           ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Informe seu Endereço:',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.white70,
-                            ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                           ),
-                          const SizedBox(height: 40),
-                          // CEP
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'CEP',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              NumberKeyboardToolbar(
-                                focusNode: _cepFocusNode,
-                                doneText: 'OK',
-                                toolbarColor: const Color(0xFF122118), // Cor do fundo do body da aplicação
-                                buttonColor: const Color(0xFF007AFF),
-                                child: TextFormField(
-                                  controller: _cepController,
-                                  focusNode: _cepFocusNode,
-                                  keyboardType: TextInputType.number,
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.digitsOnly,
-                                    LengthLimitingTextInputFormatter(9), // xxxxx-xxx
-                                  ],
-                                  style: const TextStyle(color: Colors.white),
-                                onChanged: (value) {
-                                  // Formatar CEP enquanto digita
-                                  final cleanCep = CepHelper.cleanCep(value);
-                                  if (cleanCep.length <= 8) {
-                                    final formatted = CepHelper.formatCep(cleanCep);
-                                    if (_cepController.text != formatted) {
-                                      _cepController.value = TextEditingValue(
-                                        text: formatted,
-                                        selection: TextSelection.collapsed(offset: formatted.length),
-                                      );
-                                    }
-                                  }
-                                  
-                                  // Buscar CEP automaticamente quando tiver 8 dígitos
-                                  if (cleanCep.length == 8 && cleanCep != _lastSearchedCep) {
-                                    // Cancelar timer anterior se existir
-                                    _cepSearchTimer?.cancel();
-                                    
-                                    // Aguardar 500ms após parar de digitar antes de buscar (debounce)
-                                    _cepSearchTimer = Timer(const Duration(milliseconds: 500), () {
-                                      if (mounted) {
-                                        final currentCep = CepHelper.getCepNumbers(_cepController.text);
-                                        if (currentCep.length == 8 && currentCep != _lastSearchedCep) {
-                                          _searchCep();
-                                        }
-                                      }
-                                    });
-                                  }
-                                },
-                                decoration: InputDecoration(
-                                  hintText: '00000-000',
-                                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-                                  filled: true,
-                                  fillColor: Colors.white.withValues(alpha: 0.1),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
-                                  ),
-                                  errorBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: Colors.red, width: 2),
-                                  ),
-                                    prefixIcon: const Icon(Icons.location_on, color: Colors.white70),
-                                  ),
-                                  validator: CepHelper.validateCep,
-                                ),
-                              ),
-                            ],
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                           ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.red, width: 2),
+                          ),
+                          prefixIcon: const Icon(Icons.location_on, color: Colors.white70),
+                        ),
+                        validator: CepHelper.validateCep,
+                      ),
                           if (_isSearchingCep) ...[
                             const SizedBox(height: 8),
                             const Row(
@@ -303,7 +326,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                                   height: 16,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF22C55E)),
+                                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
                                   ),
                                 ),
                                 SizedBox(width: 8),
@@ -340,14 +363,14 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide:
-                                    const BorderSide(color: Color(0xFF22C55E), width: 2),
+                                borderSide: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.1)),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: const BorderSide(color: Colors.red, width: 2),
                               ),
-                              prefixIcon: const Icon(Icons.home, color: Colors.white60),
+                              prefixIcon: const Icon(Icons.home, color: Colors.white70),
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
@@ -362,48 +385,44 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                             children: [
                               Expanded(
                                 flex: 2,
-                                child: NumberKeyboardToolbar(
+                                child: TextFormField(
+                                  controller: _numberController,
                                   focusNode: _numberFocusNode,
-                                  doneText: 'OK',
-                                  toolbarColor: const Color(0xFF122118), // Cor do fundo do body da aplicação
-                                  buttonColor: const Color(0xFF007AFF),
-                                  child: TextFormField(
-                                    controller: _numberController,
-                                    focusNode: _numberFocusNode,
-                                    keyboardType: TextInputType.number,
-                                    style: const TextStyle(color: Colors.white),
-                                    decoration: InputDecoration(
-                                      labelText: 'Nº',
-                                      labelStyle: const TextStyle(color: Colors.white70),
-                                      filled: true,
-                                      fillColor: Colors.white.withValues(alpha: 0.1),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide(
-                                            color: Colors.white.withValues(alpha: 0.2)),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide:
-                                            const BorderSide(color: Color(0xFF22C55E), width: 2),
-                                      ),
-                                      errorBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: const BorderSide(color: Colors.red, width: 2),
-                                      ),
-                                      prefixIcon: const Icon(Icons.numbers, color: Colors.white70),
+                                  keyboardType: TextInputType.number,
+                                  keyboardAppearance: Brightness.dark, // Teclado escuro para uniformidade
+                                  style: const TextStyle(color: Colors.white),
+                                  onChanged: (_) => _checkForChanges(), // Trigger change detection
+                                  decoration: InputDecoration(
+                                    labelText: 'Nº',
+                                    labelStyle: const TextStyle(color: Colors.white70),
+                                    filled: true,
+                                    fillColor: AppTheme.inputEditableBackgroundColor,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide.none,
                                     ),
-                                    validator: (value) {
-                                      if (value == null || value.trim().isEmpty) {
-                                        return 'Digite o número';
-                                      }
-                                      return null;
-                                    },
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                          color: Colors.white.withValues(alpha: 0.2)),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide:
+                                          BorderSide(color: AppTheme.primaryColor, width: 2),
+                                    ),
+                                    errorBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(color: Colors.red, width: 2),
+                                    ),
+                                    prefixIcon: const Icon(Icons.numbers, color: Colors.white70),
                                   ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Digite o número';
+                                    }
+                                    return null;
+                                  },
                                 ),
                               ),
                               const SizedBox(width: 16),
@@ -417,10 +436,8 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                                   decoration: InputDecoration(
                                     labelText: 'Complemento',
                                     labelStyle: const TextStyle(color: Colors.white70),
-                                    hintText: 'Complemento',
-                                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                                     filled: true,
-                                    fillColor: Colors.white.withValues(alpha: 0.1),
+                                    fillColor: AppTheme.inputEditableBackgroundColor,
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide.none,
@@ -433,7 +450,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide:
-                                          const BorderSide(color: Color(0xFF22C55E), width: 2),
+                                          BorderSide(color: AppTheme.primaryColor, width: 2),
                                     ),
                                     errorBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -468,14 +485,14 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide:
-                                    const BorderSide(color: Color(0xFF22C55E), width: 2),
+                                borderSide: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.1)),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: const BorderSide(color: Colors.red, width: 2),
                               ),
-                              prefixIcon: const Icon(Icons.location_city, color: Colors.white60),
+                              prefixIcon: const Icon(Icons.location_city, color: Colors.white70),
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
@@ -512,14 +529,14 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                                     ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
-                                      borderSide:
-                                          const BorderSide(color: Color(0xFF22C55E), width: 2),
+                                      borderSide: BorderSide(
+                                          color: Colors.white.withValues(alpha: 0.1)),
                                     ),
                                     errorBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: const BorderSide(color: Colors.red, width: 2),
                                     ),
-                                    prefixIcon: const Icon(Icons.map, color: Colors.white60),
+                                    prefixIcon: const Icon(Icons.map, color: Colors.white70),
                                     counterText: '',
                                   ),
                                   validator: (value) {
@@ -557,14 +574,14 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                                     ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
-                                      borderSide:
-                                          const BorderSide(color: Color(0xFF22C55E), width: 2),
+                                      borderSide: BorderSide(
+                                          color: Colors.white.withValues(alpha: 0.1)),
                                     ),
                                     errorBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: const BorderSide(color: Colors.red, width: 2),
                                     ),
-                                    prefixIcon: const Icon(Icons.location_city, color: Colors.white60),
+                                    prefixIcon: const Icon(Icons.location_city, color: Colors.white70),
                                   ),
                                   validator: (value) {
                                     if (value == null || value.trim().isEmpty) {
@@ -603,21 +620,17 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                           ],
                           const SizedBox(height: 32),
                           CustomButton(
-                            text: widget.isEditMode ? 'Salvar Alterações' : 'Finalizar Cadastro',
-                            onPressed: _isLoading ? null : _handleContinue,
+                            text: widget.isEditMode ? 'Confirmar' : 'Finalizar Cadastro',
+                            onPressed: (_isLoading || (widget.isEditMode && !_hasChanges)) ? null : _handleContinue,
                             isLoading: _isLoading,
                           ),
-                          const SizedBox(height: 40),
-                        ],
-                      ),
-                    ),
+                      const SizedBox(height: 40),
+                    ],
                   ),
                 ),
-              );
-            },
+              ),
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -657,6 +670,16 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
         );
 
         if (success && mounted) {
+          // Atualizar valores originais após salvar
+          _originalCep = CepHelper.getCepNumbers(_cepController.text);
+          _originalStreet = _streetController.text.trim();
+          _originalNeighborhood = _neighborhoodController.text.trim();
+          _originalCity = _cityController.text.trim();
+          _originalState = _stateController.text.trim();
+          _originalNumber = _numberController.text.trim();
+          _originalComplement = _complementController.text.trim();
+          _hasChanges = false;
+          
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Endereço atualizado com sucesso!'),

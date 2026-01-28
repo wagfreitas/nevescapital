@@ -22,7 +22,7 @@ class KeyboardDismissWrapper extends StatelessWidget {
         // Fechar teclado ao tocar em qualquer lugar
         FocusScope.of(context).unfocus();
       },
-      behavior: HitTestBehavior.opaque,
+      behavior: HitTestBehavior.translucent, // Permite que toques passem, mas captura áreas vazias
       child: child,
     );
   }
@@ -49,7 +49,7 @@ class KeyboardDismissField extends StatelessWidget {
         // Fechar teclado ao tocar em qualquer lugar
         FocusScope.of(context).unfocus();
       },
-      behavior: HitTestBehavior.opaque,
+      behavior: HitTestBehavior.translucent, // Permite que toques passem, mas captura áreas vazias
       child: child,
     );
   }

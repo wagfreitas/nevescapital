@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "124871515546",
-    "project_id": "pagpagapp",
-    "storage_bucket": "pagpagapp.firebasestorage.app"
+    "project_number": "1065108873797",
+    "project_id": "apppagpag",
+    "storage_bucket": "apppagpag.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:124871515546:android:0f98d17e8a104e71b1ee23",
+        "mobilesdk_app_id": "1:1065108873797:android:67b62dae94308ba310792c",
         "android_client_info": {
-          "package_name": "com.example.neves_capital"
+          "package_name": "com.pagpag.app"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDGzzXDRzQj7RbiZJQfvwZEpnO0vHzSMsk"
+          "current_key": "AIzaSyC2NyLDzCjntVz2QOe5SNhG7p9B75MUXrk"
         }
       ],
       "services": {

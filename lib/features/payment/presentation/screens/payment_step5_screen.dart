@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/components/custom_loading.dart';
 import 'package:neves_capital/shared/helpers/format_helpers.dart';
 import 'package:neves_capital/shared/helpers/card_brand_detector.dart';
-import 'package:neves_capital/features/payment/data/services/pagarme_service.dart';
-import 'payment_result_screen.dart';
+import 'package:neves_capital/shared/helpers/card_brand_image_loader.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
+// TODO: Reativar quando implementar retorno do gateway:
+// import 'package:neves_capital/features/payment/data/services/pagarme_service.dart';
+import 'package:neves_capital/shared/services/firestore_service.dart';
+import 'package:neves_capital/shared/services/secure_storage_service.dart';
+import 'package:neves_capital/shared/data/brazilian_banks.dart';
+import 'package:neves_capital/core/utils/app_logger.dart';
+import '../helpers/payment_step_helper.dart';
+import 'sale_completion_screen.dart';
+// import 'payment_result_screen.dart'; // TODO: Reativar quando implementar retorno do gateway
 
 /// Tela 5: Resumo da operação
 class PaymentStep5Screen extends StatefulWidget {
@@ -38,6 +46,87 @@ class PaymentStep5Screen extends StatefulWidget {
 
 class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
   bool _isProcessing = false;
+  bool _hasAccount = false;
+  bool _isLoadingAccount = true;
+  bool _isLoadingBankData = true;
+  
+  // Dados bancários
+  String? _bankName;
+  String? _bankCode;
+  String? _branch;
+  String? _account;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkUserAccount();
+    _loadBankAccountData();
+  }
+
+  Future<void> _checkUserAccount() async {
+    final hasAccount = await PaymentStepHelper.hasUserAccount();
+    setState(() {
+      _hasAccount = hasAccount;
+      _isLoadingAccount = false;
+    });
+  }
+
+  /// Carregar dados bancários do usuário
+  Future<void> _loadBankAccountData() async {
+    try {
+      // 1. Buscar CPF do SecureStorage
+      final cpf = await SecureStorageService.getLastCpf();
+      if (cpf == null || cpf.isEmpty) {
+        AppLogger.warning('CPF não encontrado - dados bancários não serão carregados');
+        setState(() {
+          _isLoadingBankData = false;
+        });
+        return;
+      }
+
+      // 2. Buscar dados do usuário no Firestore
+      final userData = await FirestoreService.getUserByCpf(cpf);
+      if (userData == null || userData['id'] == null) {
+        AppLogger.warning('Usuário não encontrado - dados bancários não serão carregados');
+        setState(() {
+          _isLoadingBankData = false;
+        });
+        return;
+      }
+
+      final userId = userData['id'] as String;
+
+      // 3. Buscar dados bancários
+      final bankData = await FirestoreService.getBankAccount(userId);
+      
+      if (bankData != null && mounted) {
+        final bankCode = bankData['bankCode'] as String?;
+        if (bankCode != null) {
+          final bank = BrazilianBanks.findByCode(bankCode);
+          if (bank != null) {
+            setState(() {
+              _bankCode = bankCode;
+              _bankName = bank.name;
+              _branch = bankData['branch'] as String? ?? '';
+              _account = bankData['account'] as String? ?? '';
+            });
+          }
+        }
+        
+        AppLogger.info('✅ Dados bancários carregados com sucesso no resumo da venda');
+      } else {
+        AppLogger.info('Dados bancários não encontrados');
+      }
+    } catch (e) {
+      AppLogger.error('Erro ao carregar dados bancários no resumo da venda', e);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingBankData = false;
+        });
+      }
+    }
+  }
 
   Future<void> _concluirVenda() async {
     setState(() {
@@ -45,33 +134,73 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
     });
 
     try {
-      final pagarmeService = PagarmeService();
-      
-      // Processar pagamento
-      final resultado = await pagarmeService.processarPagamentoCartao(
-        nomeEstabelecimento: widget.nomeEstabelecimento,
+      // 1. Buscar userId do usuário atual
+      final cpf = await SecureStorageService.getLastCpf();
+      if (cpf == null || cpf.isEmpty) {
+        throw Exception('CPF não encontrado. Faça login novamente.');
+      }
+
+      final userData = await FirestoreService.getUserByCpf(cpf);
+      if (userData == null || userData['id'] == null) {
+        throw Exception('Usuário não encontrado.');
+      }
+
+      final userId = userData['id'] as String;
+
+      // 2. Detectar bandeira e obter últimos 4 dígitos do cartão
+      final detectedBrand = CardBrandDetector.detectBrand(widget.numeroCartao);
+      final cardBrand = CardBrandDetector.getBrandName(detectedBrand);
+      final digitsOnly = widget.numeroCartao.replaceAll(RegExp(r'[^\d]'), '');
+      final cardLastFour = digitsOnly.length >= 4 
+          ? digitsOnly.substring(digitsOnly.length - 4)
+          : '';
+      final cardNumberDisplay = '•••• $cardLastFour';
+
+      // 3. Salvar venda no Firestore
+      final saleId = await FirestoreService.saveSale(
+        userId: userId,
         valorCentavos: widget.valorCentavos,
-        nomeTitular: widget.nomeTitular,
-        numeroCartao: widget.numeroCartao,
-        cvv: widget.cvv,
-        vencimento: widget.vencimento,
+        nomeEstabelecimento: widget.nomeEstabelecimento,
+        ramoAtuacao: widget.ramoAtuacao,
+        cardBrand: cardBrand,
+        cardLastFour: cardLastFour,
+        cardNumber: cardNumberDisplay,
+        status: 'completed',
       );
+
+      if (saleId == null) {
+        throw Exception('Erro ao salvar venda');
+      }
+
+      AppLogger.info('✅ Venda cadastrada com sucesso: $saleId');
+
+      // TODO: Processar pagamento com gateway quando implementar retorno
+      // final pagarmeService = PagarmeService();
+      // final resultado = await pagarmeService.processarPagamentoCartao(...);
 
       if (!mounted) return;
 
-      // Navegar para tela de resultado
+      // 4. Navegar para tela de conclusão da venda
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => PaymentResultScreen(
-            sucesso: resultado['success'] ?? false,
-            mensagem: resultado['message'] ?? 'Erro desconhecido',
-            transactionId: resultado['transactionId'],
-            valorCentavos: widget.valorCentavos,
-            nomeEstabelecimento: widget.nomeEstabelecimento,
-          ),
+          builder: (context) => const SaleCompletionScreen(),
         ),
       );
+      
+      // TODO: Quando implementar retorno do gateway, usar PaymentResultScreen
+      // Navigator.pushReplacement(
+      //   context,
+      //   MaterialPageRoute(
+      //     builder: (context) => PaymentResultScreen(
+      //       sucesso: resultado['success'] ?? false,
+      //       mensagem: resultado['message'] ?? 'Erro desconhecido',
+      //       transactionId: resultado['transactionId'],
+      //       valorCentavos: widget.valorCentavos,
+      //       nomeEstabelecimento: widget.nomeEstabelecimento,
+      //     ),
+      //   ),
+      // );
     } catch (e) {
       setState(() {
         _isProcessing = false;
@@ -94,9 +223,12 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
     final valorLiquido = (widget.valorCentavos * 0.97) / 100;
     final valorLiquidoFormatado = FormatHelpers.formatCurrency(valorLiquido);
     
+    // Calcular passo atual baseado se tem conta ou não
+    final currentStep = PaymentStepHelper.calculateCurrentStep(5, _hasAccount);
+    final totalSteps = PaymentStepHelper.getTotalSteps(_hasAccount);
+    
     // Detectar bandeira do cartão
     final detectedBrand = CardBrandDetector.detectBrand(widget.numeroCartao);
-    final bandeiraCartao = CardBrandDetector.getBrandName(detectedBrand);
 
     return Scaffold(
       appBar: AppBar(
@@ -104,22 +236,7 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Center(
-              child: Text(
-                '5/5',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-          ),
-        ],
-        backgroundColor: Colors.grey[900],
+        backgroundColor: AppTheme.backgroundColor,
         elevation: 0,
       ),
       body: _isProcessing
@@ -147,106 +264,177 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
                 ],
               ),
             )
-          : SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 20),
-                    
-                    // Título
-                    const Text(
-                      'RESUMO DA VENDA',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 40),
+          : (_isLoadingAccount || _isLoadingBankData)
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                  ),
+                )
+              : SafeArea(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Título centralizado (igual às telas de dados pessoais)
+                        const Center(
+                          child: Text(
+                            'Resumo da Venda',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 20),
+                        
+                        // Indicador de progresso (abaixo do título)
+                        PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
+                        const SizedBox(height: 32),
 
                     // Card de resumo
                     Card(
                       elevation: 2,
+                      color: AppTheme.cardColor,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(20.0),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             // Valor da Venda
-                            _buildInfoRow(
-                              'VALOR DA VENDA',
-                              valorFormatado,
-                              isHighlight: true,
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'VALOR DA VENDA',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  readOnly: true,
+                                  initialValue: valorFormatado,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: AppTheme.primaryColor,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: AppTheme.inputEditableBackgroundColor,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const Divider(height: 32),
+                            const SizedBox(height: 8),
                             
-                            // Valor Líquido (calculado como 97% do valor)
-                            _buildInfoRow(
-                              'VALOR LÍQUIDO',
-                              valorLiquidoFormatado,
-                              isHighlight: false,
+                            // Valor Líquido (texto simples abaixo do campo)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Valor Líquido: $valorLiquidoFormatado',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                ),
+                              ),
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 32),
                             
                             // Meio de Pagamento
-                            _buildInfoRow(
-                              'MEIO DE PAGAMENTO',
-                              'XXXX $bandeiraCartao',
-                              isHighlight: false,
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'MEIO DE PAGAMENTO',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.inputEditableBackgroundColor,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.2),
+                                    ),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        _getCardDisplay(widget.numeroCartao),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      if (CardBrandImageLoader.getBrandImage(detectedBrand) != null)
+                                        SizedBox(
+                                          width: 40,
+                                          height: 24,
+                                          child: CardBrandImageLoader.getBrandImage(detectedBrand),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            
+                            // Título DADOS BANCÁRIOS à esquerda
+                            const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'DADOS BANCÁRIOS',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
                             const SizedBox(height: 16),
                             
-                            // Chave Pix
-                            _buildInfoRow(
-                              'CHAVE PIX',
-                              widget.chavePix,
-                              isHighlight: false,
-                            ),
+                            // Dados Bancários
+                            _buildBankAccountInfo(),
                           ],
                         ),
                       ),
                     ),
                     
-                    const Spacer(),
+                    const SizedBox(height: 40),
 
-                    // Botão Concluir Venda
+                    // Botão Avançar
                     CustomButton(
-                      text: 'Concluir Venda',
+                      text: 'Avançar',
                       onPressed: _concluirVenda,
-                    ),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Indicador de progresso
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildProgressDot(true),
-                        _buildProgressLine(),
-                        _buildProgressDot(true),
-                        _buildProgressLine(),
-                        _buildProgressDot(true),
-                        _buildProgressLine(),
-                        _buildProgressDot(true),
-                      ],
-                    ),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Aviso
-                    const Text(
-                      'Ao concluir, o pagamento será processado imediatamente',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                      ),
-                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
@@ -255,47 +443,138 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value, {bool isHighlight = false}) {
+  /// Obter exibição do cartão no formato: "•••• YYYY"
+  /// onde •••• são 4 bolinhas e YYYY são os últimos 4 dígitos
+  String _getCardDisplay(String numeroCartao) {
+    // Remove espaços e caracteres não numéricos
+    final digitsOnly = numeroCartao.replaceAll(RegExp(r'[^\d]'), '');
+    
+    // Se tiver pelo menos 4 dígitos, mostra os últimos 4
+    if (digitsOnly.length >= 4) {
+      final ultimosDigitos = digitsOnly.substring(digitsOnly.length - 4);
+      return '•••• $ultimosDigitos';
+    }
+    
+    // Caso contrário, mostra apenas as bolinhas
+    return '••••';
+  }
+
+  /// Construir widget para exibir dados bancários
+  Widget _buildBankAccountInfo() {
+    if (_bankName == null || _branch == null || _account == null) {
+      return const SizedBox.shrink();
+    }
+
+    // Formatar nome do banco com código: "001 - BANCO DO BRASIL S.A."
+    final bankDisplayName = _bankCode != null 
+        ? '$_bankCode - ${_bankName!.toUpperCase()}'
+        : _bankName!.toUpperCase();
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          label,
+        // Campo Banco
+        TextFormField(
+          readOnly: true,
+          initialValue: bankDisplayName,
           style: const TextStyle(
-            fontSize: 12,
-            color: Colors.white70,
-            fontWeight: FontWeight.w500,
+            color: Colors.white,
+            fontSize: 16,
+          ),
+          decoration: InputDecoration(
+            labelText: 'Banco',
+            labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+            floatingLabelBehavior: FloatingLabelBehavior.auto,
+            prefixIcon: const Icon(
+              Icons.account_balance,
+              color: AppTheme.textSecondary,
+              size: 24,
+            ),
+            filled: true,
+            fillColor: AppTheme.inputEditableBackgroundColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+            ),
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: isHighlight ? 24 : 16,
-            fontWeight: isHighlight ? FontWeight.bold : FontWeight.w600,
-            color: isHighlight ? Theme.of(context).primaryColor : Colors.white,
+        const SizedBox(height: 16),
+        // Campo Conta
+        TextFormField(
+          readOnly: true,
+          initialValue: _account,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+          ),
+          decoration: InputDecoration(
+            labelText: 'Conta com Dígito',
+            labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+            floatingLabelBehavior: FloatingLabelBehavior.auto,
+            prefixIcon: const Icon(
+              Icons.account_balance_wallet,
+              color: AppTheme.textSecondary,
+              size: 24,
+            ),
+            filled: true,
+            fillColor: AppTheme.inputEditableBackgroundColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Campo Agência
+        TextFormField(
+          readOnly: true,
+          initialValue: _branch,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+          ),
+          decoration: InputDecoration(
+            labelText: 'Agência',
+            labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+            floatingLabelBehavior: FloatingLabelBehavior.auto,
+            prefixIcon: const Icon(
+              Icons.location_on,
+              color: AppTheme.textSecondary,
+              size: 24,
+            ),
+            filled: true,
+            fillColor: AppTheme.inputEditableBackgroundColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+            ),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildProgressDot(bool isActive) {
-    return Container(
-      width: 12,
-      height: 12,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: isActive ? Theme.of(context).primaryColor : Colors.grey[300],
-      ),
-    );
-  }
-
-  Widget _buildProgressLine() {
-    return Container(
-      width: 40,
-      height: 2,
-      color: Colors.grey[300],
     );
   }
 

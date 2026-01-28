@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/features/auth/presentation/screens/cpf_check_screen.dart';
@@ -50,14 +51,41 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
   @override
   void initState() {
     super.initState();
-    // Receber dados das telas anteriores
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final args =
-          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-      _phone = args?['phone'] as String?;
-      _formattedPhone = args?['formattedPhone'] as String?;
-      _resendToken = args?['resendToken'] as int?;
-      _isFakeMode = args?['isFakeMode'] as bool? ?? false;
+    
+    // Listener para habilitar/desabilitar botão
+    _otpController.addListener(() {
+      final hasFullCode = _otpController.text.trim().length == _otpLength;
+      if (hasFullCode != _isOtpComplete) {
+        setState(() {
+          _isOtpComplete = hasFullCode;
+        });
+      }
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Inicializar argumentos quando o contexto estiver disponível
+    _initializeFromArguments();
+  }
+
+  void _initializeFromArguments() {
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final phone = args?['phone'] as String?;
+    final formattedPhone = args?['formattedPhone'] as String?;
+    final resendToken = args?['resendToken'] as int?;
+    final isFakeMode = args?['isFakeMode'] as bool? ?? false;
+
+    // Só atualizar se os valores mudaram
+    if (phone != _phone || formattedPhone != _formattedPhone || isFakeMode != _isFakeMode) {
+      setState(() {
+        _phone = phone;
+        _formattedPhone = formattedPhone;
+        _resendToken = resendToken;
+        _isFakeMode = isFakeMode;
+      });
 
       if (_isFakeMode) {
         AppLogger.info('🎭 MODO FAKE OTP - Use o código: $_fakeOtpCode');
@@ -68,20 +96,12 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
       AppLogger.debug('📱 ResendToken: ${_resendToken != null ? "disponível" : "não disponível"}');
 
       // Solicitar foco após receber os dados
-      if (mounted && !_otpFocusNode.hasFocus) {
-        _otpFocusNode.requestFocus();
-      }
-    });
-
-    // Listener para habilitar/desabilitar botão
-    _otpController.addListener(() {
-      final hasFullCode = _otpController.text.trim().length == _otpLength;
-      if (hasFullCode != _isOtpComplete) {
-        setState(() {
-          _isOtpComplete = hasFullCode;
-        });
-      }
-    });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_otpFocusNode.hasFocus) {
+          _otpFocusNode.requestFocus();
+        }
+      });
+    }
   }
 
   @override
@@ -565,7 +585,7 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -573,14 +593,21 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () async {
-            // Não dá pop com teclado aberto (evita crash de layout).
+            // Fechar teclado se estiver aberto
             if (FocusManager.instance.primaryFocus != null) {
               FocusScope.of(context).unfocus();
-              return;
+              // Aguardar um momento para o teclado fechar antes de navegar
+              await Future.delayed(const Duration(milliseconds: 200));
             }
 
+            if (!context.mounted) return;
+
+            // Tentar voltar na pilha de navegação
             final didPop = await Navigator.of(context).maybePop();
-            if (!didPop && context.mounted) _redirectToOnboarding();
+            if (!didPop && context.mounted) {
+              // Se não conseguiu voltar, redireciona para onboarding
+              _redirectToOnboarding();
+            }
           },
         ),
       ),
@@ -677,7 +704,7 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
                         ),
                         counterText: '',
                         filled: true,
-                        fillColor: Colors.white.withValues(alpha: 0.1),
+                        fillColor: AppTheme.inputEditableBackgroundColor,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
@@ -690,7 +717,7 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: const BorderSide(
-                              color: Color(0xFF22C55E), width: 2),
+                              color: AppTheme.primaryColor, width: 2),
                         ),
                         errorBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -741,8 +768,8 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
                         onPressed:
                             (_isLoading || !_isOtpComplete) ? null : _handleVerifyOtp,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF22C55E),
-                          foregroundColor: const Color(0xFF122118),
+                          backgroundColor: AppTheme.primaryColor,
+                          foregroundColor: AppTheme.backgroundColor,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -755,7 +782,7 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                   valueColor: AlwaysStoppedAnimation<Color>(
-                                      Color(0xFF122118)),
+                                      AppTheme.backgroundColor),
                                 ),
                               )
                             : const Text(
@@ -782,7 +809,7 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
                               child: const Text(
                                 'Reenviar código',
                                 style: TextStyle(
-                                  color: Color(0xFF22C55E),
+                                  color: AppTheme.primaryColor,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                 ),

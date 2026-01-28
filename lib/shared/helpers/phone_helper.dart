@@ -17,6 +17,17 @@ class PhoneHelper {
     return cleanPhoneValue;
   }
 
+  /// Remove o código do país específico se presente
+  static String removeCountryCodeByCode(String phone, String countryCode) {
+    final cleanPhoneValue = cleanPhone(phone);
+    
+    if (cleanPhoneValue.startsWith(countryCode)) {
+      return cleanPhoneValue.substring(countryCode.length);
+    }
+    
+    return cleanPhoneValue;
+  }
+
   /// Formata telefone no padrão (xx)xxxxx-xxxx
   /// Remove automaticamente o código do país (55) se presente
   static String formatPhone(String phone) {

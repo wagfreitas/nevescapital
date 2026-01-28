@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:neves_capital/shared/services/database_service.dart';
+import 'package:neves_capital/shared/services/firestore_service.dart';
 import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
 /// Tela para alterar dados da loja (Nome e Ramo)
@@ -27,16 +28,26 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
   bool _isLoadingData = true;
   String? _userId;
   String? _selectedBusinessType;
+  
+  // Valores originais para rastrear mudanças
+  String _originalStoreName = '';
+  String? _originalBusinessType;
+  bool _hasChanges = false;
 
-  // Lista de ramos de atividade (mesma do payment_step1_screen)
+  // Lista de ramos de atividade
   final List<Map<String, String>> _businessTypes = [
-    {'value': 'varejo', 'label': 'Varejo'},
-    {'value': 'atacado', 'label': 'Atacado'},
-    {'value': 'servicos', 'label': 'Serviços'},
-    {'value': 'restaurante', 'label': 'Restaurante'},
-    {'value': 'farmacia', 'label': 'Farmácia'},
-    {'value': 'posto', 'label': 'Posto de Combustível'},
-    {'value': 'outros', 'label': 'Outros'},
+    {'value': 'alimentos_bebidas_vr', 'label': 'Alimentos e Bebidas (Aceita VR)'},
+    {'value': 'acougues_peixarias_va', 'label': 'Açougues e Peixarias (Aceita VA)'},
+    {'value': 'beleza_cuidados', 'label': 'Beleza e Cuidados Pessoais'},
+    {'value': 'construcao_reparos', 'label': 'Construção e Reparos'},
+    {'value': 'lazer_eventos', 'label': 'Lazer e Eventos'},
+    {'value': 'moda_acessorios', 'label': 'Moda e Acessórios'},
+    {'value': 'petshop_veterinario', 'label': 'Petshop e Veterinário'},
+    {'value': 'saude_bem_estar', 'label': 'Saúde e Bem-Estar'},
+    {'value': 'servicos_gerais', 'label': 'Serviços Gerais'},
+    {'value': 'tecnologia_informatica', 'label': 'Tecnologia e Informática'},
+    {'value': 'transporte_entregas', 'label': 'Transporte e Entregas'},
+    {'value': 'outros_produtos_servicos', 'label': 'Outros Produtos e Serviços'},
   ];
 
   @override
@@ -47,11 +58,25 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
 
   @override
   void dispose() {
+    _storeNameController.removeListener(_checkForChanges);
     _storeNameController.dispose();
     super.dispose();
   }
+  
+  /// Verificar se houve mudanças nos campos
+  void _checkForChanges() {
+    final currentStoreName = _storeNameController.text.trim();
+    final hasChanges = currentStoreName != _originalStoreName ||
+        _selectedBusinessType != _originalBusinessType;
+    
+    if (_hasChanges != hasChanges) {
+      setState(() {
+        _hasChanges = hasChanges;
+      });
+    }
+  }
 
-  /// Carregar dados da loja do PostgreSQL
+  /// Carregar dados da loja do Firestore
   Future<void> _loadStoreData() async {
     setState(() {
       _isLoadingData = true;
@@ -64,22 +89,44 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
         throw Exception('CPF não encontrado. Faça login novamente.');
       }
 
-      final userData = await DatabaseService.getUserByCpf(cpf);
+      // 2. Buscar dados do usuário no Firestore
+      final userData = await FirestoreService.getUserByCpf(cpf);
       if (userData == null || userData['id'] == null) {
         throw Exception('Usuário não encontrado.');
       }
 
       _userId = userData['id'] as String;
 
-      // 2. Buscar dados da loja
-      final storeData = await DatabaseService.getStoreData(_userId!);
+      // 3. Carregar dados da loja do documento do usuário
+      AppLogger.debug('Carregando dados da loja...');
+      AppLogger.debug('storeName: ${userData['storeName']}');
+      AppLogger.debug('businessType: ${userData['businessType']}');
       
-      if (storeData != null) {
-        setState(() {
-          _storeNameController.text = storeData['store_name'] ?? '';
-          _selectedBusinessType = storeData['business_type'];
-        });
+      // Validar se o businessType existe na lista atual
+      final loadedBusinessType = userData['businessType'] as String?;
+      final validBusinessType = loadedBusinessType != null &&
+          _businessTypes.any((type) => type['value'] == loadedBusinessType)
+          ? loadedBusinessType
+          : null;
+      
+      if (loadedBusinessType != null && validBusinessType == null) {
+        AppLogger.warning('BusinessType "$loadedBusinessType" não existe mais na lista. Resetando para null.');
       }
+      
+      setState(() {
+        _storeNameController.text = userData['storeName'] ?? '';
+        _selectedBusinessType = validBusinessType;
+        
+        // Armazenar valores originais
+        _originalStoreName = _storeNameController.text.trim();
+        _originalBusinessType = _selectedBusinessType;
+        _hasChanges = false;
+      });
+      
+      // Adicionar listeners para rastrear mudanças
+      _storeNameController.addListener(_checkForChanges);
+      
+      AppLogger.info('Dados da loja carregados: ${_storeNameController.text}, $_selectedBusinessType');
     } catch (e) {
       AppLogger.error('Erro ao carregar dados da loja', e);
       if (mounted) {
@@ -97,7 +144,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
     }
   }
 
-  /// Salvar dados da loja
+  /// Salvar dados da loja no Firestore
   Future<void> _saveStoreData() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -116,7 +163,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
     });
 
     try {
-      final success = await DatabaseService.saveStoreData(
+      final success = await FirestoreService.updateUser(
         userId: _userId!,
         storeName: _storeNameController.text.trim(),
         businessType: _selectedBusinessType!,
@@ -125,6 +172,11 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
       if (!mounted) return;
 
       if (success) {
+        // Atualizar valores originais após salvar
+        _originalStoreName = _storeNameController.text.trim();
+        _originalBusinessType = _selectedBusinessType;
+        _hasChanges = false;
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Dados da loja salvos com sucesso!'),
@@ -132,6 +184,8 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
           ),
         );
         Navigator.of(context).pop();
+      } else {
+        throw Exception('Erro ao salvar dados da loja');
       }
     } catch (e) {
       if (!mounted) return;
@@ -153,7 +207,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -161,45 +215,55 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
-          'Voltar para Vendas',
-          style: TextStyle(color: Colors.white, fontSize: 16),
-        ),
       ),
       body: SafeArea(
         child: KeyboardDismissWrapper(
           child: _isLoadingData
-              ? const Center(
-                  child: CircularProgressIndicator(color: Color(0xFF22C55E)),
+              ? Center(
+                  child: CircularProgressIndicator(color: AppTheme.primaryColor),
                 )
               : SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Altere seus dados cadastrais:',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                      // Título centralizado
+                      const Center(
+                        child: Text(
+                          'Dados da Loja',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 24.0),
                       
-                      // Nome da loja (read-only conforme wireframe)
+                      const SizedBox(height: 32),
+                      
+                      // Nome da loja
                       TextFormField(
                         controller: _storeNameController,
-                        autofocus: true, // Focar automaticamente ao entrar na tela
+                        autofocus: false, // Não focar automaticamente
                         textInputAction: TextInputAction.next,
-                        style: const TextStyle(color: Colors.white),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16.0,
+                          fontWeight: FontWeight.normal,
+                          height: 1.0,
+                          letterSpacing: 0.0,
+                        ),
+                        onChanged: (value) => _checkForChanges(),
                         decoration: InputDecoration(
-                          labelText: 'Nome da Loja escolhido anteriormente',
-                          labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                          labelText: 'Nome da Loja',
+                          labelStyle: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 16,
+                          ),
                           filled: true,
-                          fillColor: Colors.white.withValues(alpha: 0.1),
+                          fillColor: AppTheme.inputEditableBackgroundColor,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide.none,
@@ -210,7 +274,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
+                            borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                           ),
                         ),
                         validator: (value) {
@@ -226,14 +290,54 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                       const SizedBox(height: 24.0),
                       
                       // Ramo de atividade (dropdown)
-                      DropdownButtonFormField<String>(
-                        initialValue: _selectedBusinessType,
-                        style: const TextStyle(color: Colors.white),
+                      DefaultTextStyle(
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16.0,
+                          fontWeight: FontWeight.normal,
+                          height: 1.0,
+                          letterSpacing: 0.0,
+                        ),
+                        child: DropdownButtonFormField<String>(
+                          initialValue: _selectedBusinessType,
+                          isExpanded: true,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16.0,
+                            fontWeight: FontWeight.normal,
+                            height: 1.0,
+                            letterSpacing: 0.0,
+                            inherit: false,
+                          ),
+                          selectedItemBuilder: (BuildContext context) {
+                            return _businessTypes.map((type) {
+                              return DefaultTextStyle(
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16.0,
+                                  fontWeight: FontWeight.normal,
+                                  height: 1.0,
+                                  letterSpacing: 0.0,
+                                ),
+                                child: Text(
+                                  type['label']!,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList();
+                          },
                         decoration: InputDecoration(
-                          labelText: 'Nome do Ramo escolhido',
-                          labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                          labelText: 'Ramos de Atuação',
+                          labelStyle: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 16,
+                          ),
+                          hintStyle: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                          ),
                           filled: true,
-                          fillColor: Colors.white.withValues(alpha: 0.1),
+                          fillColor: AppTheme.inputEditableBackgroundColor,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide.none,
@@ -244,7 +348,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
+                            borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                           ),
                         ),
                         dropdownColor: const Color(0xFF1a2d21),
@@ -254,7 +358,10 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                             value: type['value'],
                             child: Text(
                               type['label']!,
-                              style: const TextStyle(color: Colors.white),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
                             ),
                           );
                         }).toList(),
@@ -262,6 +369,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                           setState(() {
                             _selectedBusinessType = value;
                           });
+                          _checkForChanges();
                         },
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -269,6 +377,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                           }
                           return null;
                         },
+                        ),
                       ),
                       const SizedBox(height: 40.0),
                       
@@ -276,10 +385,10 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: _isLoading ? null : _saveStoreData,
+                          onPressed: (_isLoading || !_hasChanges) ? null : _saveStoreData,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF22C55E),
-                            foregroundColor: const Color(0xFF122118),
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: AppTheme.backgroundColor,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(25),
                             ),
@@ -291,7 +400,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                                   width: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF122118)),
+                                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.backgroundColor),
                                   ),
                                 )
                               : const Text(

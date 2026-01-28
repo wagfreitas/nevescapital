@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:neves_capital/shared/components/custom_text_field.dart';
-import 'package:neves_capital/shared/components/phone_input_field.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
-import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
 import 'package:neves_capital/shared/services/auth_service.dart';
 import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/features/auth/presentation/screens/personal_data_screen.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
-/// Tela para alterar dados pessoais (Email, Telefone, Endereço)
+/// Tela para alterar dados pessoais (Email, Endereço)
 /// Conforme wireframe fornecido
 class EditPersonalDataScreen extends StatefulWidget {
   final AuthController authController;
@@ -28,9 +26,8 @@ class EditPersonalDataScreen extends StatefulWidget {
 class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
   final _emailFocusNode = FocusNode();
-  final _phoneFocusNode = FocusNode();
   
   bool _isLoading = false;
   bool _isLoadingData = true;
@@ -39,42 +36,33 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
   
   // Valores originais para comparar mudanças
   String _originalEmail = '';
-  String _originalPhone = '';
   bool _hasChanges = false; // Flag para habilitar/desabilitar botão
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
-    // Adicionar listeners para detectar mudanças
+    // Adicionar listener para detectar mudanças
     _emailController.addListener(_checkForChanges);
-    _phoneController.addListener(_checkForChanges);
   }
 
   @override
   void dispose() {
     _emailController.removeListener(_checkForChanges);
-    _phoneController.removeListener(_checkForChanges);
     _emailController.dispose();
-    _phoneController.dispose();
+    _addressController.dispose();
     _emailFocusNode.dispose();
-    _phoneFocusNode.dispose();
     super.dispose();
   }
   
-  /// Verificar se houve alterações nos campos de email ou telefone
+  /// Verificar se houve alterações no campo de email
   void _checkForChanges() {
     final currentEmail = _emailController.text.trim();
-    final currentPhone = PhoneHelper.getPhoneNumbers(_phoneController.text);
-    
     final emailChanged = currentEmail != _originalEmail;
-    final phoneChanged = currentPhone != _originalPhone;
     
-    final hasChanges = emailChanged || phoneChanged;
-    
-    if (hasChanges != _hasChanges) {
+    if (emailChanged != _hasChanges) {
       setState(() {
-        _hasChanges = hasChanges;
+        _hasChanges = emailChanged;
       });
     }
   }
@@ -105,19 +93,17 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
       if (userData != null && userData['id'] != null) {
         // ✅ Encontrou dados - guardar em variável de estado
         final email = userData['email'] ?? '';
-        final phone = userData['phone'] ?? '';
         
         setState(() {
-          _userData = userData; // Guarda todos os dados (email, telefone, endereço)
+          _userData = userData; // Guarda todos os dados (email, endereço)
           _userId = userData['id'] as String; // ID do documento Firestore
           
           // Preencher campos na tela
           _emailController.text = email;
-          _phoneController.text = phone;
+          _addressController.text = _buildAddressDisplayText();
           
           // Guardar valores originais para comparar mudanças
           _originalEmail = email;
-          _originalPhone = phone;
           _hasChanges = false; // Inicialmente sem mudanças
         });
         
@@ -225,7 +211,7 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
     };
   }
 
-  /// Salvar alterações de email e telefone
+  /// Salvar alterações de email
   /// Fluxo conforme requisitos:
   /// 1. Buscar dados do usuário usando CPF (como no login)
   /// 2. Atualizar dados criptografados no Firestore
@@ -262,24 +248,20 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
       
       final userIdFirestore = userDataAtual['id'] as String;
       final emailAtualFirestore = userDataAtual['email'] as String? ?? '';
-      final telefoneAtualFirestore = userDataAtual['phone'] as String? ?? '';
       
       AppLogger.debug('Dados atuais carregados');
       AppLogger.debug('Document ID Firestore presente: ${userIdFirestore.isNotEmpty}');
       
       // 3. Obter valores dos campos editados
       final novoEmail = _emailController.text.trim();
-      final novoTelefone = PhoneHelper.getPhoneNumbers(_phoneController.text);
       
       // 4. Verificar o que mudou
       final emailMudou = novoEmail != emailAtualFirestore && novoEmail.isNotEmpty;
-      final telefoneMudou = novoTelefone != telefoneAtualFirestore && novoTelefone.isNotEmpty;
       
       AppLogger.debug('Verificando mudanças...');
       AppLogger.debug('Email mudou: $emailMudou');
-      AppLogger.debug('Telefone mudou: $telefoneMudou');
       
-      if (!emailMudou && !telefoneMudou) {
+      if (!emailMudou) {
         // Se não houver alterações, apenas mostrar mensagem informativa e retornar
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -293,47 +275,15 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
         return;
       }
       
-      // CASO 1: Email NÃO mudou - Atualizar apenas telefone no Firestore
-      if (!emailMudou && telefoneMudou) {
-        AppLogger.debug('Email não mudou - Atualizando apenas telefone no Firestore');
-        
-        final success = await FirestoreService.updateUser(
-          userId: userIdFirestore,
-          phone: novoTelefone,
-        );
-        
-        if (!success) {
-          throw Exception('Erro ao atualizar telefone no servidor');
-        }
-        
-        AppLogger.info('Telefone atualizado com sucesso no Firestore');
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Dados atualizados com sucesso!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-
-          await Future.delayed(const Duration(seconds: 1));
-          if (mounted) {
-            await _loadUserData(); // Recarregar dados (vai resetar _hasChanges)
-          }
-        }
-        return;
-      }
-      
-      // CASO 2: Email mudou - Atualizar no Firestore E no Firebase Auth, depois deslogar
+      // Email mudou - Atualizar no Firestore E no Firebase Auth, depois deslogar
       if (emailMudou) {
         AppLogger.debug('Email mudou - Iniciando atualização completa');
         
-        // 2.1. Atualizar dados no Firestore (email criptografado + telefone se mudou)
+        // 2.1. Atualizar dados no Firestore (email criptografado)
         AppLogger.debug('Passo 1: Atualizando dados no Firestore');
         final successFirestore = await FirestoreService.updateUser(
           userId: userIdFirestore,
           email: novoEmail,
-          phone: telefoneMudou ? novoTelefone : null,
         );
         
         if (!successFirestore) {
@@ -409,21 +359,14 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[900],
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
-          'Dados Pessoais',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-          ),
-        ),
-        backgroundColor: Colors.grey[900],
-        elevation: 0,
       ),
       body: _isLoadingData
           ? const Center(
@@ -435,34 +378,54 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
                 children: [
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24.0),
+                      padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 24.0),
                       child: Form(
                         key: _formKey,
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const SizedBox(height: 20),
-                            
-                            // Título
-                            const Text(
-                              'Altere seus dados cadastrais:',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
+                            // Título centralizado
+                            const Center(
+                              child: Text(
+                                'Dados Pessoais',
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                             
                             const SizedBox(height: 32),
                             
                             // Campo Email
-                            CustomTextField(
+                            TextFormField(
                               controller: _emailController,
-                              hintText: 'Email',
-                              labelText: 'Email',
-                              autofocus: false,
                               focusNode: _emailFocusNode,
                               keyboardType: TextInputType.emailAddress,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: 'Email',
+                                labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                                filled: true,
+                                fillColor: AppTheme.inputEditableBackgroundColor,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                                ),
+                                errorBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: Colors.red, width: 2),
+                                ),
+                              ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return 'Email é obrigatório';
@@ -476,74 +439,52 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
                             
                             const SizedBox(height: 20),
                             
-                            // Campo Telefone
-                            PhoneInputField(
-                              controller: _phoneController,
-                              focusNode: _phoneFocusNode,
-                              hintText: 'Digite seu telefone',
-                              autofocus: false,
-                              validator: PhoneHelper.validatePhone,
-                            ),
-                            
-                            const SizedBox(height: 20),
-                            
                             // Campo Endereço (clicável)
-                            GestureDetector(
+                            TextFormField(
+                              readOnly: true,
                               onTap: _navigateToAddressEdit,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
+                              controller: _addressController,
+                              maxLines: 2,
+                              textAlign: TextAlign.left,
+                              textAlignVertical: TextAlignVertical.top,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                height: 1.0,
+                                letterSpacing: 0.0,
+                                wordSpacing: 0.0,
+                              ),
+                              decoration: InputDecoration(
+                                labelText: 'Endereço',
+                                labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                                floatingLabelBehavior: FloatingLabelBehavior.auto,
+                                prefixIcon: const Icon(
+                                  Icons.location_on,
+                                  color: AppTheme.textSecondary,
+                                  size: 24,
+                                ),
+                                suffixIcon: const Icon(
+                                  Icons.arrow_forward_ios,
+                                  color: Colors.grey,
+                                  size: 16,
+                                ),
+                                filled: true,
+                                fillColor: AppTheme.inputEditableBackgroundColor,
+                                contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 16,
-                                  vertical: 16,
+                                  vertical: 12,
                                 ),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey[700]!),
+                                border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  color: Colors.grey[800],
+                                  borderSide: BorderSide.none,
                                 ),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.location_on,
-                                      color: Color(0xFF4ADE80),
-                                      size: 24,
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Endereço',
-                                            style: TextStyle(
-                                              color: Colors.grey[400],
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            _userData != null && 
-                                            (_userData!['address'] != null || _userData!['street'] != null)
-                                                ? _buildAddressDisplayText()
-                                                : 'Clique para editar endereço',
-                                            style: TextStyle(
-                                              color: _userData != null && 
-                                              (_userData!['address'] != null || _userData!['street'] != null)
-                                                  ? Colors.white
-                                                  : Colors.grey[500],
-                                              fontSize: 16,
-                                            ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const Icon(
-                                      Icons.arrow_forward_ios,
-                                      color: Colors.grey,
-                                      size: 16,
-                                    ),
-                                  ],
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                                 ),
                               ),
                             ),

@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/data/brazilian_banks.dart';
+import 'package:neves_capital/shared/services/firestore_service.dart';
+import 'package:neves_capital/shared/services/secure_storage_service.dart';
+import 'package:neves_capital/core/utils/app_logger.dart';
+import '../helpers/payment_step_helper.dart';
 import 'payment_step4_screen.dart';
 
-/// Tela 3: Escolher chave Pix - Conforme wireframe
+/// Tela 3: Dados Bancários - Conforme wireframe
 class PaymentStep3Screen extends StatefulWidget {
   final String nomeEstabelecimento;
   final String ramoAtuacao;
@@ -20,25 +27,239 @@ class PaymentStep3Screen extends StatefulWidget {
 }
 
 class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
-  String? _chavePixSelecionada;
+  final _formKey = GlobalKey<FormState>();
+  final _bankController = TextEditingController();
+  final _branchController = TextEditingController();
+  final _accountController = TextEditingController();
   
-  // Mock de chaves cadastradas - Em produção, virá do backend
-  final List<String> _chavesCadastradas = [
-    'Chave Pix Cadastrada 1',
-    'Chave Pix Cadastrada 2',
-  ];
+  BrazilianBank? _selectedBank;
+  bool _hasAccount = false;
+  bool _isLoadingAccount = true;
+  bool _isLoadingBankData = true;
+  bool _isSaving = false;
+  
+  // Armazenar dados originais para comparar alterações
+  String? _originalBankCode;
+  String? _originalBranch;
+  String? _originalAccount;
 
-  void _continuar() {
-    if (_chavePixSelecionada == null || _chavePixSelecionada!.isEmpty) {
+  @override
+  void initState() {
+    super.initState();
+    _checkUserAccount();
+    _loadBankAccountData();
+  }
+
+  Future<void> _checkUserAccount() async {
+    final hasAccount = await PaymentStepHelper.hasUserAccount();
+    setState(() {
+      _hasAccount = hasAccount;
+      _isLoadingAccount = false;
+    });
+  }
+
+  /// Carregar dados bancários existentes (se houver)
+  Future<void> _loadBankAccountData() async {
+    setState(() {
+      _isLoadingBankData = true;
+    });
+
+    try {
+      // 1. Buscar CPF do SecureStorage
+      final cpf = await SecureStorageService.getLastCpf();
+      if (cpf == null || cpf.isEmpty) {
+        AppLogger.warning('CPF não encontrado - dados bancários não serão carregados');
+        setState(() {
+          _isLoadingBankData = false;
+        });
+        return;
+      }
+
+      // 2. Buscar dados do usuário no Firestore
+      final userData = await FirestoreService.getUserByCpf(cpf);
+      if (userData == null || userData['id'] == null) {
+        AppLogger.warning('Usuário não encontrado - dados bancários não serão carregados');
+        setState(() {
+          _isLoadingBankData = false;
+        });
+        return;
+      }
+
+      final userId = userData['id'] as String;
+
+      // 3. Buscar dados bancários
+      final bankData = await FirestoreService.getBankAccount(userId);
+      
+      if (bankData != null && mounted) {
+        // Preencher campos com dados existentes
+        final bankCode = bankData['bankCode'] as String?;
+        if (bankCode != null) {
+          _selectedBank = BrazilianBanks.findByCode(bankCode);
+          if (_selectedBank != null) {
+            _bankController.text = _selectedBank!.displayName;
+          }
+        }
+        
+        final branch = bankData['branch'] as String? ?? '';
+        final account = bankData['account'] as String? ?? '';
+        
+        _branchController.text = branch;
+        _accountController.text = account;
+        
+        // Armazenar dados originais para comparação
+        setState(() {
+          _originalBankCode = bankCode;
+          _originalBranch = branch;
+          _originalAccount = account;
+        });
+        
+        AppLogger.info('✅ Dados bancários carregados com sucesso no fluxo de pagamento');
+      } else {
+        AppLogger.info('Dados bancários não encontrados - usuário precisará preencher');
+        setState(() {
+          _originalBankCode = null;
+          _originalBranch = null;
+          _originalAccount = null;
+        });
+      }
+    } catch (e) {
+      AppLogger.error('Erro ao carregar dados bancários no fluxo de pagamento', e);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingBankData = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _bankController.dispose();
+    _branchController.dispose();
+    _accountController.dispose();
+    super.dispose();
+  }
+
+  void _openBankSearch() {
+    showDialog(
+      context: context,
+      builder: (context) => _BankSearchDialog(
+        onBankSelected: (bank) {
+          setState(() {
+            _selectedBank = bank;
+            _bankController.text = bank.displayName;
+          });
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
+  Future<void> _continuar() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (_selectedBank == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Por favor, selecione uma chave PIX'),
+          content: Text('Por favor, selecione um banco'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
+    // Verificar se houve alterações nos dados bancários
+    final currentBankCode = _selectedBank!.code;
+    final currentBranch = _branchController.text.trim();
+    final currentAccount = _accountController.text.trim();
+    
+    final hasChanges = _originalBankCode != currentBankCode ||
+        _originalBranch != currentBranch ||
+        _originalAccount != currentAccount;
+
+    // Se houver alterações, salvar na collection de user
+    if (hasChanges) {
+      setState(() {
+        _isSaving = true;
+      });
+
+      try {
+        // 1. Buscar CPF do SecureStorage
+        final cpf = await SecureStorageService.getLastCpf();
+        if (cpf == null || cpf.isEmpty) {
+          throw Exception('CPF não encontrado. Faça login novamente.');
+        }
+
+        // 2. Buscar dados do usuário no Firestore para obter userId
+        final userData = await FirestoreService.getUserByCpf(cpf);
+        if (userData == null || userData['id'] == null) {
+          throw Exception('Usuário não encontrado.');
+        }
+
+        final userId = userData['id'] as String;
+
+        // 3. Salvar dados bancários atualizados
+        final success = await FirestoreService.saveBankAccount(
+          userId: userId,
+          bankCode: currentBankCode,
+          bankName: _selectedBank!.name,
+          branch: currentBranch,
+          branchDigit: null,
+          account: currentAccount,
+          accountDigit: null,
+        );
+
+        if (!mounted) return;
+
+        if (!success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erro ao salvar dados bancários. Tente novamente.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() {
+            _isSaving = false;
+          });
+          return;
+        }
+
+        AppLogger.info('✅ Dados bancários atualizados com sucesso no fluxo de vendas');
+        
+        // Atualizar dados originais após salvar
+        setState(() {
+          _originalBankCode = currentBankCode;
+          _originalBranch = currentBranch;
+          _originalAccount = currentAccount;
+        });
+      } catch (e) {
+        AppLogger.error('Erro ao salvar dados bancários no fluxo de vendas', e);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erro ao salvar dados: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() {
+            _isSaving = false;
+          });
+        }
+        return;
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isSaving = false;
+          });
+        }
+      }
+    }
+
+    // Navegar para próxima tela
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -46,8 +267,8 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
           nomeEstabelecimento: widget.nomeEstabelecimento,
           ramoAtuacao: widget.ramoAtuacao,
           valorCentavos: widget.valorCentavos,
-          chavePix: _chavePixSelecionada!,
-          tipoChavePix: 'cadastrada',
+          chavePix: '', // Não usado mais, mas mantido para compatibilidade
+          tipoChavePix: 'conta_bancaria',
         ),
       ),
     );
@@ -55,168 +276,386 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
 
   @override
   Widget build(BuildContext context) {
+    // Calcular passo atual baseado se tem conta ou não
+    final currentStep = PaymentStepHelper.calculateCurrentStep(3, _hasAccount);
+    final totalSteps = PaymentStepHelper.getTotalSteps(_hasAccount);
+    
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Center(
-              child: Text(
-                '3/5',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-          ),
-        ],
-        backgroundColor: Colors.grey[900],
+        backgroundColor: AppTheme.backgroundColor,
         elevation: 0,
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 20),
-              
-              // Título
-              const Text(
-                'Em qual chave PIX deseja receber a sua venda de hoje?',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-                textAlign: TextAlign.center,
+      body: (_isLoadingBankData || _isLoadingAccount)
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
               ),
-              const SizedBox(height: 40),
-
-              // Botões de chaves cadastradas
-              ...List.generate(_chavesCadastradas.length, (index) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: _buildChavePixButton(_chavesCadastradas[index]),
-                );
-              }),
-              
-              const SizedBox(height: 16),
-              
-              // Botão para cadastrar nova chave
-              OutlinedButton.icon(
-                onPressed: () {
-                  // TODO: Navegar para tela de cadastro de chave PIX
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Funcionalidade em desenvolvimento'),
+            )
+          : SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 24.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                // Título centralizado
+                const Center(
+                  child: Text(
+                    'Dados Bancários',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
-                  );
-                },
-                icon: const Icon(Icons.add_circle_outline),
-                label: const Text('Cadastre uma Nova Chave Pix'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  side: BorderSide(color: Theme.of(context).primaryColor),
+                  ),
                 ),
-              ),
-              
-              const SizedBox(height: 40),
+                
+                const SizedBox(height: 20),
+                
+                // Indicador de progresso com barras
+                PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
+                const SizedBox(height: 32),
 
-              // Botão Avançar
-              CustomButton(
-                text: 'Avançar',
-                onPressed: _continuar,
-              ),
-              
-              const SizedBox(height: 20),
-              
-              // Indicador de progresso
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildProgressDot(true),
-                  _buildProgressLine(),
-                  _buildProgressDot(true),
-                  _buildProgressLine(),
-                  _buildProgressDot(true),
-                  _buildProgressLine(),
-                  _buildProgressDot(false),
-                  _buildProgressLine(),
-                  _buildProgressDot(false),
-                ],
-              ),
-            ],
+                // Texto de instrução
+                const Text(
+                  'Confirme a conta em que receberá a venda:',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white70,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Campo: Banco
+                GestureDetector(
+                  onTap: _openBankSearch,
+                  child: _buildBankField(),
+                ),
+                const SizedBox(height: 24),
+
+                // Campo: Agência
+                _buildTextField(
+                  label: 'Agência',
+                  controller: _branchController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  prefixIcon: Icons.location_on,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Informe sua Agência';
+                    }
+                    if (value.length != 4) {
+                      return 'Agência deve ter 4 dígitos';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                // Campo: Conta com dígito
+                _buildTextField(
+                  label: 'Conta com Dígito',
+                  controller: _accountController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 20,
+                  prefixIcon: Icons.account_balance_wallet,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Informe sua Conta com Dígito';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 32),
+
+                // Aviso sobre regras de preenchimento
+                _buildRulesWarning(),
+                
+                const SizedBox(height: 24),
+
+                // Botão Avançar
+                CustomButton(
+                  text: _isSaving ? 'Salvando...' : 'Avançar',
+                  onPressed: _isSaving ? null : _continuar,
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildChavePixButton(String chavePix) {
-    final isSelected = _chavePixSelecionada == chavePix;
-    
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _chavePixSelecionada = chavePix;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: isSelected ? Theme.of(context).primaryColor : Colors.grey[300]!,
-            width: isSelected ? 2 : 1,
-          ),
-          borderRadius: BorderRadius.circular(12),
-          color: isSelected ? Theme.of(context).primaryColor.withValues(alpha: 0.1) : Colors.transparent,
+  /// Construir aviso de regras de preenchimento
+  Widget _buildRulesWarning() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.inputEditableBackgroundColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.2),
         ),
-        child: Row(
-          children: [
-            Icon(
-              isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-              color: isSelected ? Theme.of(context).primaryColor : Colors.grey[600],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.white,
+              size: 48,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                chavePix,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  color: isSelected ? Theme.of(context).primaryColor : Colors.black87,
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'ATENÇÃO',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
+                const SizedBox(height: 4),
+                const Text(
+                  'A conta bancária para recebimento das vendas deve ser de titularidade do vendedor.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white,
+                    height: 1.2,
+                    letterSpacing: 0.0,
+                    wordSpacing: 0.0,
+                  ),
+                  textAlign: TextAlign.justify,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBankField() {
+    return TextFormField(
+      controller: _bankController,
+      readOnly: true,
+      onTap: _openBankSearch,
+      maxLines: null,
+      minLines: 1,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 16,
+      ),
+      decoration: InputDecoration(
+        labelText: 'Banco',
+        labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+        floatingLabelBehavior: FloatingLabelBehavior.auto,
+        prefixIcon: const Icon(
+          Icons.account_balance,
+          color: AppTheme.textSecondary,
+        ),
+        suffixIcon: const Icon(
+          Icons.arrow_drop_down,
+          color: AppTheme.textSecondary,
+        ),
+        filled: true,
+        fillColor: AppTheme.inputEditableBackgroundColor,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required String label,
+    required TextEditingController controller,
+    required TextInputType keyboardType,
+    required int maxLength,
+    required IconData prefixIcon,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      keyboardAppearance: Brightness.dark,
+      maxLength: maxLength,
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+      ],
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 16,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+        floatingLabelBehavior: FloatingLabelBehavior.auto,
+        prefixIcon: Icon(prefixIcon, color: AppTheme.textSecondary),
+        filled: true,
+        fillColor: AppTheme.inputEditableBackgroundColor,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: Colors.white.withValues(alpha: 0.2),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: AppTheme.primaryColor,
+            width: 2,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: Colors.red,
+            width: 2,
+          ),
+        ),
+        counterText: '',
+      ),
+      validator: validator,
+    );
+  }
+}
+
+/// Dialog para busca de bancos
+class _BankSearchDialog extends StatefulWidget {
+  final Function(BrazilianBank) onBankSelected;
+
+  const _BankSearchDialog({required this.onBankSelected});
+
+  @override
+  State<_BankSearchDialog> createState() => _BankSearchDialogState();
+}
+
+class _BankSearchDialogState extends State<_BankSearchDialog> {
+  final _searchController = TextEditingController();
+  List<BrazilianBank> _filteredBanks = BrazilianBanks.getAllBanks();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_filterBanks);
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_filterBanks);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterBanks() {
+    final query = _searchController.text.trim();
+    setState(() {
+      _filteredBanks = BrazilianBanks.search(query);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFF1A2B1F),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        constraints: const BoxConstraints(maxHeight: 600),
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Text(
+                    'Selecione o Banco',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            // Search field
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: _searchController,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Buscar banco...',
+                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                  prefixIcon: Icon(Icons.search, color: AppTheme.textSecondary),
+                  filled: true,
+                  fillColor: AppTheme.inputEditableBackgroundColor,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // List
+            Expanded(
+              child: ListView.builder(
+                itemCount: _filteredBanks.length,
+                itemBuilder: (context, index) {
+                  final bank = _filteredBanks[index];
+                  return ListTile(
+                    title: Text(
+                      bank.displayName,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    onTap: () {
+                      widget.onBankSelected(bank);
+                    },
+                  );
+                },
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildProgressDot(bool isActive) {
-    return Container(
-      width: 12,
-      height: 12,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: isActive ? Theme.of(context).primaryColor : Colors.grey[300],
-      ),
-    );
-  }
-
-  Widget _buildProgressLine() {
-    return Container(
-      width: 40,
-      height: 2,
-      color: Colors.grey[300],
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:neves_capital/shared/components/cpf_input_field.dart';
 import 'package:neves_capital/shared/helpers/cpf_helper.dart';
 import 'package:neves_capital/features/auth/presentation/screens/reset_password_otp_screen.dart';
 import 'package:neves_capital/core/config/feature_flags.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -33,7 +34,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118), // bg-[#122118]
+      backgroundColor: AppTheme.backgroundColor, // bg-[#122118]
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -110,27 +111,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF22C55E).withValues(alpha: 0.1),
+        color: AppTheme.primaryColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: const Color(0xFF22C55E),
+          color: AppTheme.primaryColor,
           width: 1,
         ),
       ),
       child: Column(
         children: [
-          const Icon(
+          Icon(
             Icons.check_circle,
-            color: Color(0xFF22C55E),
+            color: AppTheme.primaryColor,
             size: 48,
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Email enviado!',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF22C55E),
+              color: AppTheme.primaryColor,
             ),
             textAlign: TextAlign.center,
           ),
@@ -147,8 +148,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF22C55E),
-              foregroundColor: const Color(0xFF122118),
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: AppTheme.backgroundColor,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(25),
               ),
@@ -218,8 +219,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               icon: const Icon(Icons.phone_android, size: 20),
               label: const Text('WhatsApp/SMS'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF22C55E),
-                foregroundColor: const Color(0xFF122118),
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: AppTheme.backgroundColor,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(25),
                 ),
@@ -238,7 +239,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             label: const Text('Email'),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
-              side: const BorderSide(color: Color(0xFF22C55E), width: 2),
+              side: BorderSide(color: AppTheme.primaryColor, width: 2),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(25),
               ),

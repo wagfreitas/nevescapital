@@ -1,8 +1,8 @@
-package com.example.neves_capital
+package com.pagpag.app
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
-import com.nevescapital.pagpag.SecurityPlugin
+import com.pagpag.app.SecurityPlugin
 
 class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -11,3 +11,4 @@ class MainActivity : FlutterActivity() {
         flutterEngine.plugins.add(SecurityPlugin())
     }
 }
+

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/cpf_input_field.dart';
 import 'package:neves_capital/shared/helpers/cpf_helper.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
@@ -12,6 +13,7 @@ import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'package:neves_capital/features/home/presentation/screens/main_tab_screen.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
+import 'package:neves_capital/features/auth/presentation/screens/phone_login_screen.dart';
 
 /// Tela Unificada: Insira seu CPF
 /// Verifica se o CPF existe e direciona automaticamente para:
@@ -228,7 +230,7 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -238,6 +240,16 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
           onPressed: () {
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
+            } else {
+              // Se não há tela anterior, navegar para a tela de login
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => PhoneLoginScreen(
+                    authController: widget.authController,
+                    themeController: widget.themeController,
+                  ),
+                ),
+              );
             }
           },
         ),

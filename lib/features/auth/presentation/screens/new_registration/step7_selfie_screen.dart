@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
@@ -232,7 +233,7 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -343,7 +344,7 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
                   onPressed: _takeSelfie,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
-                    side: const BorderSide(color: Color(0xFF22C55E), width: 2),
+                    side: BorderSide(color: AppTheme.primaryColor, width: 2),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -353,7 +354,7 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
                     children: [
                       Icon(
                         _selfieFile == null ? Icons.camera_alt : Icons.refresh,
-                        color: const Color(0xFF22C55E),
+                        color: AppTheme.primaryColor,
                       ),
                       const SizedBox(width: 8),
                       Text(
@@ -401,8 +402,8 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
                   onPressed:
                       _isLoading || _selfieFile == null ? null : _handleNext,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF22C55E),
-                    foregroundColor: const Color(0xFF122118),
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: AppTheme.backgroundColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -415,7 +416,7 @@ class _Step7SelfieScreenState extends State<Step7SelfieScreen> {
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                                Color(0xFF122118)),
+                                AppTheme.backgroundColor),
                           ),
                         )
                       : const Text(

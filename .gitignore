@@ -56,3 +56,9 @@ app.*.map.json
 .env
 *.env
 !.env.example
+
+# Android - Keystore e configurações de assinatura
+android/key.properties
+*.jks
+*.keystore
+upload-keystore.jks

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/shared/services/database_service.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
@@ -104,7 +105,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -200,19 +201,19 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF22C55E).withValues(alpha: 0.1),
+        color: AppTheme.primaryColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF22C55E), width: 1),
+        border: Border.all(color: AppTheme.primaryColor, width: 1),
       ),
-      child: const Row(
+      child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 24),
-          SizedBox(width: 8),
+          Icon(Icons.check_circle, color: AppTheme.primaryColor, size: 24),
+          const SizedBox(width: 8),
           Text(
             'Senha alterada com sucesso!',
             style: TextStyle(
-              color: Color(0xFF22C55E),
+              color: AppTheme.primaryColor,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
@@ -293,8 +294,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             child: ElevatedButton(
               onPressed: _isLoading ? null : _changePassword,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF22C55E),
-                foregroundColor: const Color(0xFF122118),
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: AppTheme.backgroundColor,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(25),
                 ),
@@ -307,7 +308,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         valueColor:
-                            AlwaysStoppedAnimation<Color>(Color(0xFF122118)),
+                            AlwaysStoppedAnimation<Color>(AppTheme.backgroundColor),
                       ),
                     )
                   : const Text(
@@ -339,7 +340,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         labelText: label,
         labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.1),
+        fillColor: AppTheme.inputEditableBackgroundColor,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -350,7 +351,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF22C55E), width: 2),
+          borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
         ),
         suffixIcon: IconButton(
           icon: Icon(

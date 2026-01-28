@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/registration_lifecycle_observer.dart';
@@ -445,7 +446,7 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -542,7 +543,7 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
                               width: 32,
                               height: 4,
                               decoration: BoxDecoration(
-                                color: Color(0xFF22C55E),
+                                color: AppTheme.primaryColor,
                                 borderRadius: BorderRadius.circular(2),
                               ),
                             ),
@@ -642,7 +643,7 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
                           ),
                         ),
                         child: DropdownButtonFormField<String>(
-                          value: _incomeRange,
+                          initialValue: _incomeRange,
                           decoration: InputDecoration(
                             hintText: 'Opções',
                             hintStyle:
@@ -713,8 +714,8 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _handleNext,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF22C55E),
-                            foregroundColor: const Color(0xFF122118),
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: AppTheme.backgroundColor,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -727,7 +728,7 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     valueColor: AlwaysStoppedAnimation<Color>(
-                                        Color(0xFF122118)),
+                                        AppTheme.backgroundColor),
                                   ),
                                 )
                               : const Text(
@@ -765,12 +766,12 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
         height: 56,
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF22C55E)
+              ? AppTheme.primaryColor
               : Colors.white.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFF22C55E)
+                ? AppTheme.primaryColor
                 : Colors.white.withValues(alpha: 0.2),
             width: isSelected ? 2 : 1,
           ),
@@ -779,7 +780,7 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
           child: Text(
             label,
             style: TextStyle(
-              color: isSelected ? const Color(0xFF122118) : Colors.white,
+              color: isSelected ? AppTheme.backgroundColor : Colors.white,
               fontSize: 16,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
             ),
@@ -845,10 +846,10 @@ class _OccupationSearchScreenState extends State<_OccupationSearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF122118),
+        backgroundColor: AppTheme.backgroundColor,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -884,29 +885,29 @@ class _OccupationSearchScreenState extends State<_OccupationSearchScreen> {
         ),
       ),
       body: Container(
-        color: const Color(0xFF122118),
-        child: ListView.builder(
+      color: AppTheme.backgroundColor,
+      child: ListView.builder(
           itemCount: _filteredOccupations.length,
-          itemBuilder: (context, index) {
+        itemBuilder: (context, index) {
             final occupation = _filteredOccupations[index];
             final isSelected = occupation == widget.selectedOccupation;
 
-            return ListTile(
-              title: Text(
-                occupation,
-                style: TextStyle(
-                  color: isSelected ? const Color(0xFF22C55E) : Colors.white,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                ),
+          return ListTile(
+            title: Text(
+              occupation,
+              style: TextStyle(
+                color: isSelected ? AppTheme.primaryColor : Colors.white,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
               ),
-              trailing: isSelected
-                  ? const Icon(Icons.check, color: Color(0xFF22C55E))
-                  : null,
-              onTap: () {
+            ),
+            trailing: isSelected
+                ? Icon(Icons.check, color: AppTheme.primaryColor)
+                : null,
+            onTap: () {
                 Navigator.pop(context, occupation);
-              },
-            );
-          },
+            },
+          );
+        },
         ),
       ),
     );

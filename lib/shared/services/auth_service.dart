@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:neves_capital/core/utils/app_logger.dart';
 
 /// Serviço para gerenciar autenticação Firebase
 class AuthService {
@@ -109,6 +110,28 @@ class AuthService {
     } catch (e) {
       // Se não for FirebaseAuthException, pode ser problema de tipo ou reautenticação necessária
       throw Exception('Erro ao atualizar email. Pode ser necessário reautenticar: $e');
+    }
+  }
+
+  /// Deletar conta do usuário atual do Firebase Auth
+  ///
+  /// **ATENÇÃO:** Esta operação é irreversível e requer que o usuário esteja autenticado.
+  /// O usuário deve ter feito login recentemente (pode ser necessário reautenticação).
+  static Future<void> deleteCurrentUser() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw Exception('Usuário não autenticado');
+    }
+    
+    try {
+      await user.delete();
+      AppLogger.info('Conta do Firebase Auth deletada com sucesso');
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      AppLogger.error('Erro ao deletar conta do Firebase Auth: ${e.code}');
+      throw Exception(_handleAuthException(e));
+    } catch (e) {
+      AppLogger.error('Erro inesperado ao deletar conta do Firebase Auth', e);
+      rethrow;
     }
   }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
@@ -8,7 +9,6 @@ import 'core/theme/theme_controller.dart';
 import 'core/config/env_service.dart';
 import 'core/utils/app_logger.dart';
 import 'features/auth/presentation/controllers/auth_controller.dart';
-import 'features/auth/presentation/screens/onboarding_screen.dart';
 import 'features/auth/data/services/local_registration_storage.dart';
 import 'features/auth/data/services/registration_service.dart';
 import 'features/auth/domain/entities/registration_progress.dart';
@@ -18,6 +18,12 @@ import 'shared/screens/splash_screen.dart';
 void main() async {
   // Garantir que o binding está inicializado primeiro
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Bloquear rotação de tela - manter apenas portrait (em pé)
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
 
   // Tratamento de erros global - configurar ANTES de qualquer outra coisa
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -56,99 +62,80 @@ void main() async {
     return true;
   };
 
-  try {
-    // Carregar variáveis de ambiente (não crítico se falhar)
-    try {
-      await EnvService.load();
-    } catch (e) {
-      debugPrint('Aviso: Erro ao carregar .env: $e');
-    }
+  // Executar runApp IMEDIATAMENTE para não bloquear o Dart VM Service
+  debugPrint('🚀 [MAIN] Chamando runApp()...');
+  runApp(const NevesCapitalApp());
+  debugPrint('✅ [MAIN] runApp() concluído');
 
-    // Validar chaves obrigatórias (não crítico, apenas aviso)
+  // Inicializações em background (não bloqueiam o app)
+  _initializeAppInBackground();
+}
+
+/// Inicializa componentes do app em background (não bloqueia o startup)
+void _initializeAppInBackground() {
+  // Executar em background sem bloquear
+  Future.microtask(() async {
     try {
-      if (!EnvService.validateRequiredKeys()) {
-        debugPrint('Aviso: Algumas variáveis de ambiente não estão configuradas');
+      // Carregar variáveis de ambiente (não crítico se falhar)
+      try {
+        await EnvService.load();
+      } catch (e) {
+        debugPrint('Aviso: Erro ao carregar .env: $e');
       }
-    } catch (e) {
-      debugPrint('Aviso: Erro ao validar chaves: $e');
-    }
 
-    // Inicializar Firebase (evitar duplicação)
-    try {
-      if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
-        ).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            throw TimeoutException('Firebase initialization timeout');
-          },
+      // Validar chaves obrigatórias (não crítico, apenas aviso)
+      try {
+        if (!EnvService.validateRequiredKeys()) {
+          debugPrint('Aviso: Algumas variáveis de ambiente não estão configuradas');
+        }
+      } catch (e) {
+        debugPrint('Aviso: Erro ao validar chaves: $e');
+      }
+
+      // Inicializar Firebase (evitar duplicação) - com timeout mais curto
+      try {
+        if (Firebase.apps.isEmpty) {
+          await Firebase.initializeApp(
+            options: DefaultFirebaseOptions.currentPlatform,
+          ).timeout(
+            const Duration(seconds: 5),
+          );
+        }
+      } on TimeoutException {
+        debugPrint('Firebase initialization timeout - continuando sem Firebase');
+      } catch (e) {
+        debugPrint('Erro ao inicializar Firebase: $e');
+        // Continuar mesmo se Firebase falhar - o app pode funcionar parcialmente
+      }
+
+      // Inicializar keyboard accessory nativo (iOS) - não crítico
+      try {
+        await KeyboardAccessoryService.instance.initialize().timeout(
+          const Duration(seconds: 2),
         );
+        // Configurar com o tema do app - cor que combina com o teclado numérico
+        await KeyboardAccessoryService.instance.configure(
+          buttonText: 'OK',
+          buttonColor: '#007AFF', // Azul iOS padrão
+          toolbarColor: '#D1D1D6', // Cinza que combina com o teclado numérico (sem bordas arredondadas)
+        ).timeout(
+          const Duration(seconds: 1),
+        );
+        await KeyboardAccessoryService.instance.enable().timeout(
+          const Duration(seconds: 1),
+        );
+        debugPrint('✅ Keyboard accessory inicializado e ativado');
+      } on TimeoutException {
+        debugPrint('Keyboard accessory timeout - continuando');
+      } catch (e) {
+        debugPrint('Aviso: Erro ao inicializar keyboard accessory: $e');
       }
+
+      AppLogger.info('App inicializado com sucesso');
     } catch (e) {
-      debugPrint('Erro ao inicializar Firebase: $e');
-      // Continuar mesmo se Firebase falhar - o app pode funcionar parcialmente
+      debugPrint('Erro na inicialização em background: $e');
     }
-
-    // Inicializar keyboard accessory nativo (iOS)
-    try {
-      await KeyboardAccessoryService.instance.initialize();
-      // Configurar com o tema do app - cor que combina com o teclado numérico
-      await KeyboardAccessoryService.instance.configure(
-        buttonText: 'OK',
-        buttonColor: '#007AFF', // Azul iOS padrão
-        toolbarColor: '#D1D1D6', // Cinza que combina com o teclado numérico (sem bordas arredondadas)
-      );
-      await KeyboardAccessoryService.instance.enable();
-      debugPrint('✅ Keyboard accessory inicializado e ativado');
-    } catch (e) {
-      debugPrint('Aviso: Erro ao inicializar keyboard accessory: $e');
-    }
-
-    AppLogger.info('App inicializado com sucesso');
-
-    runApp(const NevesCapitalApp());
-  } catch (e, stackTrace) {
-    // Último recurso: tentar rodar o app mesmo com erro
-    debugPrint('Erro fatal na inicialização: $e');
-    debugPrint('Stack trace: $stackTrace');
-    
-    try {
-      AppLogger.error('Erro fatal na inicialização do app', e, stackTrace);
-    } catch (_) {
-      // Se até o logger falhar, continuar
-    }
-    
-    // Em caso de erro fatal, ainda tentamos rodar o app com uma tela de erro
-    runApp(
-      MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                const SizedBox(height: 16),
-                const Text(
-                  'Erro ao inicializar aplicativo',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    e.toString(),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  });
 }
 
 class NevesCapitalApp extends StatefulWidget {
@@ -190,22 +177,43 @@ class _NevesCapitalAppState extends State<NevesCapitalApp> {
   @override
   void dispose() {
     _themeController.dispose();
+    // Restaurar orientações quando o app for fechado
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('🎨 [THEME] Construindo NevesCapitalApp - isThemeInitialized: $_isThemeInitialized');
     // Mostrar loading enquanto tema não está inicializado
     if (!_isThemeInitialized) {
+      debugPrint('🎨 [THEME] Mostrando SplashScreen enquanto tema carrega');
       return MaterialApp(
         title: 'Pag Pag',
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         home: const SplashScreen(),
         debugShowCheckedModeBanner: false,
+        // Builder global para fechar teclado ao tocar em qualquer parte do body
+        builder: (context, child) {
+          return GestureDetector(
+            onTap: () {
+              // Fechar teclado ao tocar em qualquer área vazia
+              FocusScope.of(context).unfocus();
+            },
+            behavior: HitTestBehavior.translucent,
+            child: child ?? const SizedBox.shrink(),
+          );
+        },
       );
     }
 
+    debugPrint('🎨 [THEME] Tema inicializado, mostrando AppWrapper');
     return ListenableBuilder(
       listenable: _themeController,
       builder: (context, child) {
@@ -216,6 +224,17 @@ class _NevesCapitalAppState extends State<NevesCapitalApp> {
           themeMode: _themeController.themeMode,
           home: AppWrapper(themeController: _themeController),
           debugShowCheckedModeBanner: false,
+          // Builder global para fechar teclado ao tocar em qualquer parte do body
+          builder: (context, child) {
+            return GestureDetector(
+              onTap: () {
+                // Fechar teclado ao tocar em qualquer área vazia
+                FocusScope.of(context).unfocus();
+              },
+              behavior: HitTestBehavior.translucent,
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
         );
       },
     );
@@ -248,14 +267,17 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
     try {
       _authController = AuthController();
       AppLogger.info('🔐 [MAIN] Iniciando AuthController.initialize()...');
-      // Adicionar timeout para evitar travamento
+      // Reduzir timeout para 5 segundos e continuar mesmo se falhar
       await _authController!.initialize().timeout(
-        const Duration(seconds: 15),
+        const Duration(seconds: 5),
         onTimeout: () {
-          AppLogger.warning('AuthController initialization timeout');
-          throw TimeoutException('AuthController initialization timeout');
+          AppLogger.warning('AuthController initialization timeout - continuando sem inicialização completa');
+          // Não lançar exceção, apenas continuar
         },
-      );
+      ).catchError((error) {
+        AppLogger.warning('AuthController initialization error - continuando: $error');
+        // Continuar mesmo com erro
+      });
       AppLogger.info('🔐 [MAIN] AuthController inicializado com sucesso');
       AppLogger.info('🔐 [MAIN] Estado após inicialização:');
       AppLogger.info('  - isLoggedIn: ${_authController!.isLoggedIn}');
@@ -362,11 +384,10 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
         AppLogger.debug(
             'AppWrapper reconstruindo - isLoggedIn: ${_authController!.isLoggedIn}');
 
-        // SEMPRE passar pelo OnboardingScreen primeiro
-        // O OnboardingScreen verifica biometria se usuário está logado
-        // e redireciona para Dashboard apenas após validação biométrica
-        AppLogger.debug('Navegando para OnboardingScreen (verificação de biometria e cadastro pendente)');
-        return OnboardingScreen(
+        // SEMPRE passar pelo SplashScreen primeiro
+        // O SplashScreen verifica isLoggedIn e gerencia o fluxo de biometria
+        AppLogger.debug('Navegando para SplashScreen (verificação de login e biometria)');
+        return SplashScreen(
           authController: _authController!,
           themeController: widget.themeController,
         );

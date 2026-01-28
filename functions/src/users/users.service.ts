@@ -305,6 +305,105 @@ export class UsersService {
   }
 
   /**
+   * Deletar todos os dados de um usuário (hard delete completo)
+   * 
+   * Esta função realiza uma limpeza completa dos dados do usuário:
+   * 1. Deleta todos os arquivos do Storage (documentos KYC)
+   * 2. Deleta a conta de autenticação do Firebase Auth (se existir)
+   * 3. Deleta o documento do usuário na collection `users` do Firestore
+   * 
+   * **ATENÇÃO:** Esta operação é irreversível!
+   */
+  async deleteUserDataComplete(userId: string) {
+    try {
+      console.log(`🗑️ [UsersService] Iniciando limpeza completa dos dados do usuário: ${userId}`);
+
+      // 1. Buscar o documento do usuário para obter informações (como ownerUid)
+      const userRef = this.db.collection('users').doc(userId);
+      const userDoc = await userRef.get();
+
+      if (!userDoc.exists) {
+        throw new NotFoundException('Usuário não encontrado no Firestore');
+      }
+
+      const userData = userDoc.data()!;
+      const ownerUid = userData['ownerUid'] as string | undefined;
+
+      console.log(`📄 [UsersService] Documento encontrado. ownerUid: ${ownerUid || 'não vinculado'}`);
+
+      const results = {
+        storageDeleted: false,
+        authDeleted: false,
+        firestoreDeleted: false,
+      };
+
+      // 2. Deletar arquivos do Storage (documentos KYC)
+      try {
+        console.log('📦 [UsersService] Deletando arquivos do Storage...');
+        const bucket = admin.storage().bucket();
+        const folderPath = `users/${userId}/kyc`;
+        
+        const [files] = await bucket.getFiles({ prefix: folderPath });
+        
+        if (files.length > 0) {
+          await Promise.all(files.map(file => file.delete()));
+          console.log(`✅ [UsersService] ${files.length} arquivo(s) do Storage deletado(s)`);
+        } else {
+          console.log('ℹ️ [UsersService] Nenhum arquivo encontrado no Storage');
+        }
+        results.storageDeleted = true;
+      } catch (error) {
+        console.warn(`⚠️ [UsersService] Erro ao deletar arquivos do Storage (continuando): ${error.message}`);
+        // Continua mesmo se falhar, pois pode não haver arquivos
+      }
+
+      // 3. Deletar conta do Firebase Auth (se existir)
+      if (ownerUid) {
+        try {
+          console.log(`🔐 [UsersService] Deletando conta do Firebase Auth (UID: ${ownerUid})...`);
+          await admin.auth().deleteUser(ownerUid);
+          console.log('✅ [UsersService] Conta do Firebase Auth deletada');
+          results.authDeleted = true;
+        } catch (error: any) {
+          // Se o usuário não existir no Auth, não é um erro crítico
+          if (error.code === 'auth/user-not-found') {
+            console.log('ℹ️ [UsersService] Usuário não encontrado no Firebase Auth (pode já ter sido deletado)');
+          } else {
+            console.warn(`⚠️ [UsersService] Erro ao deletar conta do Firebase Auth (continuando): ${error.message}`);
+          }
+        }
+      } else {
+        console.log('ℹ️ [UsersService] Usuário não possui conta no Firebase Auth (ownerUid não encontrado)');
+      }
+
+      // 4. Deletar documento do Firestore
+      try {
+        console.log('🗄️ [UsersService] Deletando documento do Firestore...');
+        await userRef.delete();
+        console.log('✅ [UsersService] Documento do Firestore deletado');
+        results.firestoreDeleted = true;
+      } catch (error) {
+        console.error(`❌ [UsersService] Erro ao deletar documento do Firestore: ${error.message}`);
+        throw new BadRequestException(`Erro ao deletar documento do Firestore: ${error.message}`);
+      }
+
+      console.log('✅ [UsersService] Limpeza completa dos dados do usuário concluída com sucesso');
+
+      return {
+        success: true,
+        message: 'Dados do usuário deletados com sucesso',
+        details: results,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error(`❌ [UsersService] Erro durante limpeza dos dados do usuário: ${error.message}`);
+      throw new BadRequestException(`Erro ao deletar dados do usuário: ${error.message}`);
+    }
+  }
+
+  /**
    * Verificar senha (delegado para Firebase Auth)
    */
   async verifyPassword(verifyPasswordDto: any) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/helpers/format_helpers.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 
 /// Tela 5: Resultado do pagamento
 class PaymentResultScreen extends StatelessWidget {
@@ -29,7 +30,7 @@ class PaymentResultScreen extends StatelessWidget {
     AppLogger.debug('PaymentResultScreen - valorFormatado: $valorFormatado');
 
     return Scaffold(
-      backgroundColor: Colors.grey[900],
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         title: const Text(
           'Resultado da Venda',
@@ -40,7 +41,7 @@ class PaymentResultScreen extends StatelessWidget {
           ),
         ),
         centerTitle: true,
-        backgroundColor: Colors.grey[900],
+        backgroundColor: AppTheme.backgroundColor,
         elevation: 0,
         automaticallyImplyLeading: false,
       ),
@@ -87,7 +88,7 @@ class PaymentResultScreen extends StatelessWidget {
                 // Card com detalhes
                 Card(
                   elevation: 2,
-                  color: Colors.grey[800],
+                  color: AppTheme.cardColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),

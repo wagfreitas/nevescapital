@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
@@ -280,7 +281,7 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF122118),
+      backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -351,7 +352,7 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
                             ),
                             counterText: '',
                             filled: true,
-                            fillColor: Colors.white.withValues(alpha: 0.1),
+                            fillColor: AppTheme.inputEditableBackgroundColor,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide.none,
@@ -364,7 +365,7 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: const BorderSide(
-                                  color: Color(0xFF22C55E), width: 2),
+                                  color: AppTheme.primaryColor, width: 2),
                             ),
                             errorBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -416,8 +417,8 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
                                 ? null
                                 : _handleVerifyOtp,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF22C55E),
-                              foregroundColor: const Color(0xFF122118),
+                              backgroundColor: AppTheme.primaryColor,
+                              foregroundColor: AppTheme.backgroundColor,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -430,7 +431,7 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
                                       valueColor: AlwaysStoppedAnimation<Color>(
-                                          Color(0xFF122118)),
+                                          AppTheme.backgroundColor),
                                     ),
                                   )
                                 : const Text(
@@ -460,7 +461,7 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
                               child: const Text(
                                 'Reenviar código',
                                 style: TextStyle(
-                                  color: Color(0xFF22C55E),
+                                  color: AppTheme.primaryColor,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                 ),

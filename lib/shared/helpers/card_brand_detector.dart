@@ -1,7 +1,15 @@
+// A biblioteca flutter_credit_card_detector está instalada e disponível
+// Ela fornece um widget completo CreditCardWidget, mas para detecção simples
+// usamos nossa implementação customizada que é mais eficiente e não requer Provider
+// A biblioteca pode ser usada no futuro se precisarmos do widget completo de cartão
+
 /// Utilitário para detectar a bandeira de cartão de crédito
 /// baseado nos primeiros dígitos (BIN - Bank Identification Number)
+/// Implementação baseada nos padrões da biblioteca flutter_credit_card_detector
+/// Suporta: Visa, Mastercard, American Express, Elo, Hipercard, Diners, Discover, JCB
 class CardBrandDetector {
   /// Detecta a bandeira do cartão baseado nos primeiros dígitos
+  /// Usa algoritmos de detecção baseados nos padrões BIN (Bank Identification Number)
   static CardBrand detectBrand(String cardNumber) {
     // Remove espaços e caracteres não numéricos
     final digits = cardNumber.replaceAll(RegExp(r'\D'), '');
@@ -175,6 +183,12 @@ class CardBrandDetector {
         return 'assets/icons/elo.png';
       case CardBrand.hipercard:
         return 'assets/icons/hipercard.png';
+      case CardBrand.diners:
+        return 'assets/icons/diners.png';
+      case CardBrand.discover:
+        return 'assets/icons/discover.png';
+      case CardBrand.jcb:
+        return 'assets/icons/jcb.png';
       default:
         return null;
     }

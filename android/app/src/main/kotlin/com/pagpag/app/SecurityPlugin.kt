@@ -1,4 +1,4 @@
-package com.nevescapital.pagpag
+package com.pagpag.app
 
 import android.app.Activity
 import android.os.Build
@@ -23,7 +23,7 @@ class SecurityPlugin: FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAw
     private var activity: Activity? = null
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
-        channel = MethodChannel(flutterPluginBinding.binaryMessenger, "com.nevescapital.pagpag/security")
+        channel = MethodChannel(flutterPluginBinding.binaryMessenger, "com.pagpag.app/security")
         channel.setMethodCallHandler(this)
     }
 
