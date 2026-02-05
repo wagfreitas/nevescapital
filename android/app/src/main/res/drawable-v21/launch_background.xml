@@ -6,10 +6,10 @@
         <color android:color="#122118" />
     </item>
 
-    <!-- Logo PagPag centralizado -->
+    <!-- Logo Pag Pag centralizado (mesmo ícone do launcher / iOS) -->
     <item>
         <bitmap
             android:gravity="center"
-            android:src="@mipmap/ic_launcher" />
+            android:src="@mipmap/launcher_icon" />
     </item>
 </layer-list>

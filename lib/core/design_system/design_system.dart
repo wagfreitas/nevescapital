@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
-/// Design System da aplicação Neves Capital
+/// Design System da aplicação Pag Pag
 /// 
 /// Define padrões consistentes para botões, cards, espaçamentos e outros elementos
 class DesignSystem {

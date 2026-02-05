@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
@@ -199,6 +200,17 @@ class _NevesCapitalAppState extends State<NevesCapitalApp> {
         darkTheme: AppTheme.darkTheme,
         home: const SplashScreen(),
         debugShowCheckedModeBanner: false,
+        // Localização pt-BR para DatePicker, TimePicker, etc.
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('pt', 'BR'),
+          Locale('en', 'US'),
+        ],
+        locale: const Locale('pt', 'BR'),
         // Builder global para fechar teclado ao tocar em qualquer parte do body
         builder: (context, child) {
           return GestureDetector(
@@ -224,6 +236,17 @@ class _NevesCapitalAppState extends State<NevesCapitalApp> {
           themeMode: _themeController.themeMode,
           home: AppWrapper(themeController: _themeController),
           debugShowCheckedModeBanner: false,
+          // Localização pt-BR para DatePicker, TimePicker, etc.
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('pt', 'BR'),
+            Locale('en', 'US'),
+          ],
+          locale: const Locale('pt', 'BR'),
           // Builder global para fechar teclado ao tocar em qualquer parte do body
           builder: (context, child) {
             return GestureDetector(

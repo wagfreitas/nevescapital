@@ -17,6 +17,8 @@ class CardBrandImageLoader {
         return 'assets/bandeiras_images/Elo.svg';
       case CardBrand.hipercard:
         return 'assets/bandeiras_images/Hipercard.svg';
+      case CardBrand.hiper:
+        return 'assets/bandeiras_images/Hiper.svg';
       case CardBrand.diners:
         return 'assets/bandeiras_images/Diners_Club.svg';
       case CardBrand.discover:

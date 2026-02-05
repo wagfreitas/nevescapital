@@ -7,7 +7,6 @@ import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/shared/helpers/card_brand_detector.dart';
 import 'package:neves_capital/shared/helpers/card_brand_image_loader.dart';
 import 'package:neves_capital/shared/helpers/format_helpers.dart';
-import 'package:neves_capital/shared/components/bottom_tab_bar.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
@@ -27,7 +26,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
   double? _minSaleValue;
-  double? _minNetValue;
+  double? _maxSaleValue;
 
   @override
   void initState() {
@@ -94,6 +93,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           'amount': sale['valorCentavos'] ?? 0,
           'gross_amount': sale['valorCentavos'] ?? 0,
           'net_amount': sale['valorLiquidoCentavos'] ?? 0,
+          'bank_code': sale['bankCode'],
+          'branch': sale['branch'],
+          'account': sale['account'],
         };
       }).toList();
 
@@ -167,6 +169,21 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 )
               : Column(
                   children: [
+                    // Título no corpo (sem padding no alto)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24),
+                      child: Center(
+                        child: Text(
+                          'Histórico',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
                     // Botão Filtros
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -246,17 +263,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     ),
                   ],
                 ),
-      bottomNavigationBar: BottomTabBar(
-        isVendasActive: true,
-        onVendasTap: () {
-          Navigator.of(context).pop();
-        },
-        onContaTap: () {
-          // Navegar para tela de conta se necessário
-          // Por enquanto, apenas volta
-          Navigator.of(context).pop();
-        },
-      ),
     );
   }
 
@@ -267,6 +273,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     final cardBrand = transaction['card_brand'] ?? '';
     final saleAmount = transaction['amount'] ?? transaction['gross_amount'] ?? 0.0;
     final netAmount = transaction['net_amount'] ?? (saleAmount * 0.97);
+    final bankCode = transaction['bank_code']?.toString().trim();
+    final branch = transaction['branch']?.toString().trim();
+    final account = transaction['account']?.toString().trim();
     
     // Formatar valores
     final saleAmountFormatted = FormatHelpers.formatCurrency(saleAmount / 100);
@@ -275,13 +284,13 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     // Formatar data e horário
     final dateTime = _formatDateTime(saleDate);
     
-    // Detectar bandeira do cartão
+    // Detectar bandeira: priorizar nome salvo no Firestore (card_brand)
     CardBrand detectedBrand = CardBrand.unknown;
-    if (cardNumber.isNotEmpty) {
+    if (cardBrand.toString().trim().isNotEmpty) {
+      detectedBrand = _detectBrandFromString(cardBrand.toString().trim());
+    }
+    if (detectedBrand == CardBrand.unknown && cardNumber.isNotEmpty) {
       detectedBrand = CardBrandDetector.detectBrand(cardNumber);
-    } else if (cardBrand.isNotEmpty) {
-      // Tentar detectar pela string da bandeira
-      detectedBrand = _detectBrandFromString(cardBrand);
     }
     
     // Obter últimos 4 dígitos
@@ -301,16 +310,21 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Data e Horário
-          Text(
-            'Data e Horário: $dateTime',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.white,
+          Text.rich(
+            TextSpan(
+              style: const TextStyle(fontSize: 14, color: Colors.white),
+              children: [
+                const TextSpan(
+                  text: 'Data e Horário: ',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                TextSpan(text: dateTime),
+              ],
             ),
           ),
           const SizedBox(height: 12),
           
-          // Cartão Utilizado
+          // Cartão Utilizado: •••• 1234 [bandeira]
           Row(
             children: [
               const Text(
@@ -318,6 +332,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.white,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
               Text(
@@ -327,38 +342,84 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   color: Colors.white,
                 ),
               ),
-              const SizedBox(width: 8),
-              if (CardBrandImageLoader.getBrandImage(detectedBrand) != null)
+              const SizedBox(width: 6),
+              if (detectedBrand != CardBrand.unknown)
                 SizedBox(
                   width: 32,
                   height: 20,
-                  child: CardBrandImageLoader.getBrandImage(detectedBrand),
+                  child: CardBrandImageLoader.getBrandImage(detectedBrand) ?? Text(
+                    CardBrandDetector.getBrandName(detectedBrand),
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                  ),
+                )
+              else if (cardBrand.toString().trim().isNotEmpty)
+                Text(
+                  cardBrand.toString().trim(),
+                  style: const TextStyle(fontSize: 12, color: Colors.white70),
                 ),
             ],
           ),
           const SizedBox(height: 12),
           
           // Valor da Venda
-          Text(
-            'Valor da Venda: $saleAmountFormatted',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.white,
+          Text.rich(
+            TextSpan(
+              style: const TextStyle(fontSize: 14, color: Colors.white),
+              children: [
+                const TextSpan(
+                  text: 'Valor da Venda: ',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                TextSpan(text: saleAmountFormatted),
+              ],
             ),
           ),
           const SizedBox(height: 12),
           
           // Valor Líquido
-          Text(
-            'Valor Líquido: $netAmountFormatted',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.white,
+          Text.rich(
+            TextSpan(
+              style: const TextStyle(fontSize: 14, color: Colors.white),
+              children: [
+                const TextSpan(
+                  text: 'Valor Líquido: ',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                TextSpan(text: netAmountFormatted),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Conta de Destino: Código do Banco/agência/conta com dígito
+          Text.rich(
+            TextSpan(
+              style: const TextStyle(fontSize: 14, color: Colors.white),
+              children: [
+                const TextSpan(
+                  text: 'Conta de Destino: ',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                TextSpan(
+                  text: _formatContaDestino(bankCode, branch, account),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  /// Formata conta de destino no padrão: código/agência/conta com dígito (ex: 439/0001/56367-9)
+  String _formatContaDestino(String? bankCode, String? branch, String? account) {
+    if (bankCode == null && branch == null && account == null) return '—';
+    if ((bankCode ?? '').isEmpty && (branch ?? '').isEmpty && (account ?? '').isEmpty) {
+      return '—';
+    }
+    final code = bankCode?.trim() ?? '—';
+    final ag = branch?.trim() ?? '—';
+    final acc = account?.trim() ?? '—';
+    return '$code/$ag/$acc';
   }
 
   String _formatDateTime(String? dateString) {
@@ -399,6 +460,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     if (brandLower.contains('amex') || brandLower.contains('american express')) return CardBrand.amex;
     if (brandLower.contains('elo')) return CardBrand.elo;
     if (brandLower.contains('hipercard')) return CardBrand.hipercard;
+    if (brandLower.contains('hiper')) return CardBrand.hiper;
     if (brandLower.contains('diners')) return CardBrand.diners;
     if (brandLower.contains('discover')) return CardBrand.discover;
     if (brandLower.contains('jcb')) return CardBrand.jcb;
@@ -410,7 +472,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     DateTime? tempStartDate = _startDate;
     DateTime? tempEndDate = _endDate;
     double? tempMinSaleValue = _minSaleValue;
-    double? tempMinNetValue = _minNetValue;
+    double? tempMaxSaleValue = _maxSaleValue;
     
     final startDateController = TextEditingController(
       text: tempStartDate != null ? FormatHelpers.date(tempStartDate) : '',
@@ -421,8 +483,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     final saleValueController = TextEditingController(
       text: tempMinSaleValue != null ? FormatHelpers.formatCurrency(tempMinSaleValue) : '',
     );
-    final netValueController = TextEditingController(
-      text: tempMinNetValue != null ? FormatHelpers.formatCurrency(tempMinNetValue) : '',
+    final maxSaleValueController = TextEditingController(
+      text: tempMaxSaleValue != null ? FormatHelpers.formatCurrency(tempMaxSaleValue) : '',
     );
 
     showDialog(
@@ -440,10 +502,12 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           ),
           padding: const EdgeInsets.all(24),
           child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+            child: StatefulBuilder(
+              builder: (context, setDialogState) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                 // Título
                 const Text(
                   'Filtros',
@@ -456,9 +520,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 ),
                 const SizedBox(height: 24),
                 
-                // Data exata ou período
+                // Período da Venda (date picker ao tocar)
                 const Text(
-                  'Data exata ou período da venda:',
+                  'Período da Venda',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.white,
@@ -466,129 +530,162 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: startDateController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(10),
-                          _DateInputFormatter(),
-                        ],
-                        decoration: InputDecoration(
-                          hintText: 'DD/MM/AAAA',
-                          hintStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                          ),
-                          filled: true,
-                          fillColor: AppTheme.inputEditableBackgroundColor,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.2),
+                    // Data inicial (De)
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: tempStartDate ?? DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                          locale: const Locale('pt', 'BR'),
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: ColorScheme.dark(
+                                  primary: AppTheme.primaryColor,
+                                  onPrimary: Colors.white,
+                                  surface: AppTheme.cardColor,
+                                  onSurface: Colors.white,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (picked != null && context.mounted) {
+                          startDateController.text = FormatHelpers.date(picked);
+                          tempStartDate = picked;
+                          setDialogState(() {});
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: IgnorePointer(
+                        child: TextFormField(
+                          controller: startDateController,
+                          readOnly: true,
+                          decoration: InputDecoration(
+                            labelText: 'De',
+                            hintText: 'dd/mm/aaaa',
+                            hintStyle: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.5),
+                            ),
+                            filled: true,
+                            fillColor: AppTheme.inputEditableBackgroundColor,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.white.withValues(alpha: 0.2),
+                              ),
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.calendar_today,
+                              color: Colors.white70,
+                              size: 20,
                             ),
                           ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: AppTheme.primaryColor,
-                              width: 2,
-                            ),
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.calendar_today,
-                            color: Colors.white70,
-                            size: 20,
-                          ),
+                          style: const TextStyle(color: Colors.white),
                         ),
-                        style: const TextStyle(color: Colors.white),
-                        onChanged: (value) {
-                          if (value.length == 10) {
-                            final parsed = _parseDate(value);
-                            if (parsed != null) {
-                              tempStartDate = parsed;
-                            }
-                          } else {
-                            tempStartDate = null;
-                          }
-                        },
                       ),
                     ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text(
-                        'a',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: TextFormField(
-                        controller: endDateController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(10),
-                          _DateInputFormatter(),
-                        ],
-                        decoration: InputDecoration(
-                          hintText: 'DD/MM/AAAA',
-                          hintStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                          ),
-                          filled: true,
-                          fillColor: AppTheme.inputEditableBackgroundColor,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.2),
+                    const SizedBox(height: 12),
+                    // Data final (Até)
+                    InkWell(
+                      onTap: () async {
+                        final initial = tempEndDate ?? tempStartDate ?? DateTime.now();
+                        final first = tempStartDate ?? DateTime(2020);
+                        final now = DateTime.now();
+                        final plus12 = tempStartDate != null
+                            ? DateTime(
+                                tempStartDate!.year + 1,
+                                tempStartDate!.month,
+                                tempStartDate!.day,
+                              )
+                            : now;
+                        final last = (tempStartDate != null && plus12.isBefore(now))
+                            ? plus12
+                            : now;
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: initial,
+                          firstDate: first,
+                          lastDate: last,
+                          locale: const Locale('pt', 'BR'),
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: ColorScheme.dark(
+                                  primary: AppTheme.primaryColor,
+                                  onPrimary: Colors.white,
+                                  surface: AppTheme.cardColor,
+                                  onSurface: Colors.white,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (picked != null && context.mounted) {
+                          endDateController.text = FormatHelpers.date(picked);
+                          tempEndDate = picked;
+                          setDialogState(() {});
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: IgnorePointer(
+                        child: TextFormField(
+                          controller: endDateController,
+                          readOnly: true,
+                          decoration: InputDecoration(
+                            labelText: 'Até',
+                            hintText: 'dd/mm/aaaa',
+                            hintStyle: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.5),
+                            ),
+                            filled: true,
+                            fillColor: AppTheme.inputEditableBackgroundColor,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.white.withValues(alpha: 0.2),
+                              ),
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.calendar_today,
+                              color: Colors.white70,
+                              size: 20,
                             ),
                           ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: AppTheme.primaryColor,
-                              width: 2,
-                            ),
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.calendar_today,
-                            color: Colors.white70,
-                            size: 20,
-                          ),
+                          style: const TextStyle(color: Colors.white),
                         ),
-                        style: const TextStyle(color: Colors.white),
-                        onChanged: (value) {
-                          if (value.length == 10) {
-                            final parsed = _parseDate(value);
-                            if (parsed != null) {
-                              tempEndDate = parsed;
-                            }
-                          } else {
-                            tempEndDate = null;
-                          }
-                        },
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  'Busque em intervalos de até 12 meses.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.6),
+                  ),
+                ),
                 const SizedBox(height: 20),
                 
-                // Valor da Venda
+                // Valor Mínimo da Venda
                 const Text(
-                  'Valor da Venda:',
+                  'Valor Mínimo da Venda:',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.white,
@@ -651,9 +748,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 ),
                 const SizedBox(height: 20),
                 
-                // Valor Líquido da Venda
+                // Valor Máximo da Venda
                 const Text(
-                  'Valor Líquido da Venda:',
+                  'Valor Máximo da Venda:',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.white,
@@ -662,7 +759,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
-                  controller: netValueController,
+                  controller: maxSaleValueController,
                   keyboardType: TextInputType.number,
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
@@ -701,16 +798,15 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   style: const TextStyle(color: Colors.white),
                   onChanged: (value) {
                     if (value.isNotEmpty) {
-                      // Extrair apenas dígitos e converter para centavos
                       final digitsOnly = value.replaceAll(RegExp(r'[^\d]'), '');
                       if (digitsOnly.isNotEmpty) {
                         final intValue = int.parse(digitsOnly);
-                        tempMinNetValue = intValue / 100; // Converter centavos para reais
+                        tempMaxSaleValue = intValue / 100;
                       } else {
-                        tempMinNetValue = null;
+                        tempMaxSaleValue = null;
                       }
                     } else {
-                      tempMinNetValue = null;
+                      tempMaxSaleValue = null;
                     }
                   },
                 ),
@@ -722,28 +818,24 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   children: [
                     TextButton(
                       onPressed: () {
-                        // Limpar controllers
+                        // Limpar todos os filtros e fechar a tela de pesquisa
                         startDateController.clear();
                         endDateController.clear();
                         saleValueController.clear();
-                        netValueController.clear();
+                        maxSaleValueController.clear();
                         
                         setState(() {
                           _startDate = null;
                           _endDate = null;
                           _minSaleValue = null;
-                          _minNetValue = null;
+                          _maxSaleValue = null;
                         });
                         
-                        // Aplicar filtros após limpar
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _applyFilters();
-                        });
-                        
+                        _applyFilters();
                         Navigator.of(context).pop();
                       },
                       child: const Text(
-                        'Limpar',
+                        'Cancelar',
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: 14,
@@ -791,29 +883,24 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                           tempMinSaleValue = null;
                         }
                         
-                        // Valor líquido
-                        if (netValueController.text.isNotEmpty) {
-                          final digitsOnly = netValueController.text.replaceAll(RegExp(r'[^\d]'), '');
-                          AppLogger.debug('  - Texto do campo valor líquido: ${netValueController.text}');
-                          AppLogger.debug('  - Dígitos extraídos: $digitsOnly');
+                        // Valor máximo da venda
+                        if (maxSaleValueController.text.isNotEmpty) {
+                          final digitsOnly = maxSaleValueController.text.replaceAll(RegExp(r'[^\d]'), '');
                           if (digitsOnly.isNotEmpty) {
                             final intValue = int.parse(digitsOnly);
-                            tempMinNetValue = intValue / 100;
-                            AppLogger.debug('  - Valor calculado (centavos): $intValue');
-                            AppLogger.debug('  - Valor em reais: $tempMinNetValue');
+                            tempMaxSaleValue = intValue / 100;
                           } else {
-                            tempMinNetValue = null;
+                            tempMaxSaleValue = null;
                           }
                         } else {
-                          tempMinNetValue = null;
+                          tempMaxSaleValue = null;
                         }
                         
-                        // Atualizar valores antes de aplicar filtros
                         setState(() {
                           _startDate = tempStartDate;
                           _endDate = tempEndDate;
                           _minSaleValue = tempMinSaleValue;
-                          _minNetValue = tempMinNetValue;
+                          _maxSaleValue = tempMaxSaleValue;
                         });
                         
                         // Aplicar filtros após atualizar estado
@@ -844,7 +931,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     ),
                   ],
                 ),
-              ],
+                ],
+                );
+              },
             ),
           ),
         ),
@@ -857,7 +946,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     AppLogger.debug('  - Data início: $_startDate');
     AppLogger.debug('  - Data fim: $_endDate');
     AppLogger.debug('  - Valor mínimo venda: $_minSaleValue');
-    AppLogger.debug('  - Valor mínimo líquido: $_minNetValue');
+    AppLogger.debug('  - Valor máximo venda: $_maxSaleValue');
     AppLogger.debug('  - Total de transações: ${_transactions.length}');
     
     setState(() {
@@ -912,59 +1001,36 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           }
         }
         
-        // Filtro de valor da venda (filtro por igualdade com tolerância)
+        // Filtro valor mínimo da venda: amount >= _minSaleValue
         if (_minSaleValue != null && _minSaleValue! > 0) {
           final saleAmount = transaction['amount'] ?? transaction['gross_amount'] ?? 0.0;
-          // Converter para reais (valores vêm em centavos do Firestore)
           double amountInReais;
           if (saleAmount is int) {
             amountInReais = saleAmount / 100.0;
           } else if (saleAmount is double) {
-            // Se já estiver em reais, usar diretamente
             amountInReais = saleAmount;
           } else {
             amountInReais = 0.0;
           }
-          
-          AppLogger.debug('  - Transação ID: ${transaction['id']}');
-          AppLogger.debug('  - Valor original: $saleAmount (tipo: ${saleAmount.runtimeType})');
-          AppLogger.debug('  - Valor em reais: $amountInReais');
-          AppLogger.debug('  - Valor filtro: ${_minSaleValue!}');
-          
-          // Filtro por igualdade com tolerância de 0.01 para evitar problemas de ponto flutuante
-          final difference = (amountInReais - _minSaleValue!).abs();
-          if (difference > 0.01) {
-            AppLogger.debug('  ❌ Valor da venda não corresponde: $amountInReais != ${_minSaleValue!} (diferença: $difference)');
+          if (amountInReais < (_minSaleValue! - 0.01)) {
             return false;
           }
-          AppLogger.debug('  ✅ Valor da venda passou no filtro (igualdade)');
         }
         
-        // Filtro de valor líquido (filtro por igualdade com tolerância)
-        if (_minNetValue != null && _minNetValue! > 0) {
-          final netAmount = transaction['net_amount'] ?? 0.0;
-          // Converter para reais (valores vêm em centavos do Firestore)
-          double netInReais;
-          if (netAmount is int) {
-            netInReais = netAmount / 100.0;
-          } else if (netAmount is double) {
-            // Se já estiver em reais, usar diretamente
-            netInReais = netAmount;
+        // Filtro valor máximo da venda: amount <= _maxSaleValue
+        if (_maxSaleValue != null && _maxSaleValue! > 0) {
+          final saleAmount = transaction['amount'] ?? transaction['gross_amount'] ?? 0.0;
+          double amountInReais;
+          if (saleAmount is int) {
+            amountInReais = saleAmount / 100.0;
+          } else if (saleAmount is double) {
+            amountInReais = saleAmount;
           } else {
-            netInReais = 0.0;
+            amountInReais = 0.0;
           }
-          
-          AppLogger.debug('  - Valor líquido original: $netAmount (tipo: ${netAmount.runtimeType})');
-          AppLogger.debug('  - Valor líquido em reais: $netInReais');
-          AppLogger.debug('  - Valor líquido filtro: ${_minNetValue!}');
-          
-          // Filtro por igualdade com tolerância de 0.01 para evitar problemas de ponto flutuante
-          final difference = (netInReais - _minNetValue!).abs();
-          if (difference > 0.01) {
-            AppLogger.debug('  ❌ Valor líquido não corresponde: $netInReais != ${_minNetValue!} (diferença: $difference)');
+          if (amountInReais > (_maxSaleValue! + 0.01)) {
             return false;
           }
-          AppLogger.debug('  ✅ Valor líquido passou no filtro (igualdade)');
         }
         
         AppLogger.debug('  ✅ Transação passou em todos os filtros');

@@ -75,6 +75,16 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
 
   void _detectCardBrand() {
     final cardNumber = _numeroCartaoController.text.replaceAll(' ', '');
+    final digitsOnly = cardNumber.replaceAll(RegExp(r'\D'), '');
+
+    // Mostrar bandeira somente a partir do 6º dígito
+    if (digitsOnly.length < 6) {
+      if (_detectedBrand != CardBrand.unknown) {
+        setState(() => _detectedBrand = CardBrand.unknown);
+      }
+      return;
+    }
+
     final detectedBrand = CardBrandDetector.detectBrand(cardNumber);
 
     if (detectedBrand != _detectedBrand) {
@@ -281,13 +291,16 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                 ),
                 const SizedBox(height: 20),
 
-                // CVV e Data de Vencimento
+                // CVV e Data de Vencimento (altura fixa para erro não desalinhar a caixa)
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // CVV
                     Expanded(
                       flex: 2,
-                      child: TextFormField(
+                      child: SizedBox(
+                        height: 76,
+                        child: TextFormField(
                         controller: _cvvController,
                         keyboardType: TextInputType.number,
                         keyboardAppearance: Brightness.dark,
@@ -337,12 +350,15 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                         },
                       ),
                     ),
+                    ),
                     const SizedBox(width: 16),
 
                     // Data de Vencimento
                     Expanded(
                       flex: 3,
-                      child: TextFormField(
+                      child: SizedBox(
+                        height: 76,
+                        child: TextFormField(
                         controller: _vencimentoController,
                         keyboardType: TextInputType.number,
                         keyboardAppearance: Brightness.dark,
@@ -394,9 +410,16 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                           if (month < 1 || month > 12) {
                             return 'Mês inválido';
                           }
+                          final yearTwoDigits = int.tryParse(parts.length > 1 ? parts[1] : '') ?? 0;
+                          final now = DateTime.now();
+                          final fullYear = 2000 + (yearTwoDigits % 100);
+                          if (fullYear < now.year || (fullYear == now.year && month < now.month)) {
+                            return 'Cartão vencido';
+                          }
                           return null;
                         },
                       ),
+                    ),
                     ),
                   ],
                 ),
@@ -466,6 +489,9 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
         brandText = 'AMEX';
         break;
       case CardBrand.hipercard:
+        brandText = 'HIPERCARD';
+        break;
+      case CardBrand.hiper:
         brandText = 'HIPER';
         break;
       case CardBrand.diners:

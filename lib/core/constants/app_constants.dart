@@ -9,7 +9,7 @@ class AppConstants {
   static const String userKey = 'user_data';
   
   // Configurações da aplicação
-  static const String appName = 'Neves Capital';
+  static const String appName = 'Pag Pag';
   static const String appVersion = '1.0.0';
   
   // Timeouts

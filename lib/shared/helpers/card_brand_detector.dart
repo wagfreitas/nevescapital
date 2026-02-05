@@ -18,6 +18,17 @@ class CardBrandDetector {
       return CardBrand.unknown;
     }
     
+    // Verificar BINs específicos ANTES das regras genéricas (ex.: "começa com 4" = Visa).
+    // Ordem: Hiper (6 dígitos), Hipercard (6062), Elo (6 dígitos).
+    if (digits.length >= 6) {
+      if (_isHiper(digits)) return CardBrand.hiper;
+      if (_isHipercard(digits)) return CardBrand.hipercard;
+      if (_isElo(digits)) return CardBrand.elo;
+    }
+    if (digits.length >= 4) {
+      if (_isHipercard(digits)) return CardBrand.hipercard;
+    }
+    
     // Visa: começa com 4
     if (digits.startsWith('4')) {
       return CardBrand.visa;
@@ -75,16 +86,6 @@ class CardBrandDetector {
       }
     }
     
-    // Elo: vários ranges
-    if (_isElo(digits)) {
-      return CardBrand.elo;
-    }
-    
-    // Hipercard: 606282, 637095, 637568, 637599, 637609, 637612
-    if (_isHipercard(digits)) {
-      return CardBrand.hipercard;
-    }
-    
     return CardBrand.unknown;
   }
   
@@ -134,16 +135,17 @@ class CardBrandDetector {
     return eloBins.contains(first6);
   }
   
-  /// Verifica se é cartão Hipercard
-  static bool _isHipercard(String digits) {
+  /// Hiper: BINs 637095, 637612, 637599, 637609 (6 primeiros dígitos)
+  static bool _isHiper(String digits) {
     if (digits.length < 6) return false;
-    
-    final hipercardBins = [
-      '606282', '637095', '637568', '637599', '637609', '637612',
-    ];
-    
-    final first6 = digits.substring(0, 6);
-    return hipercardBins.contains(first6);
+    const hiperBins = ['637095', '637612', '637599', '637609'];
+    return hiperBins.contains(digits.substring(0, 6));
+  }
+
+  /// Hipercard: prefixo 6062 (qualquer número que comece com 6062)
+  static bool _isHipercard(String digits) {
+    if (digits.length < 4) return false;
+    return digits.startsWith('6062');
   }
   
   /// Retorna o nome da bandeira em português
@@ -159,6 +161,8 @@ class CardBrandDetector {
         return 'Elo';
       case CardBrand.hipercard:
         return 'Hipercard';
+      case CardBrand.hiper:
+        return 'Hiper';
       case CardBrand.diners:
         return 'Diners Club';
       case CardBrand.discover:
@@ -183,6 +187,8 @@ class CardBrandDetector {
         return 'assets/icons/elo.png';
       case CardBrand.hipercard:
         return 'assets/icons/hipercard.png';
+      case CardBrand.hiper:
+        return 'assets/icons/hiper.png';
       case CardBrand.diners:
         return 'assets/icons/diners.png';
       case CardBrand.discover:
@@ -202,6 +208,7 @@ enum CardBrand {
   amex,
   elo,
   hipercard,
+  hiper,
   diners,
   discover,
   jcb,

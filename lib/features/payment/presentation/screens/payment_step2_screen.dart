@@ -32,6 +32,7 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
   bool _hasAccount = false;
   bool _isLoadingAccount = true;
   bool _isButtonEnabled = false;
+  bool _triedSubmitEmpty = false;
 
   @override
   void initState() {
@@ -80,27 +81,31 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
     // Verificar se o valor está dentro do range permitido (R$ 10,00 a R$ 5.000,00)
     final isValid = valorCentavos >= 1000 && valorCentavos <= 500000;
     
-    // Aplicar taxa de desconto (exemplo: 3%)
+    // Limpar erro "inserir valor" quando o usuário começar a digitar
     setState(() {
       _valorLiquido = valor * 0.97; // 97% do valor total
       _isButtonEnabled = isValid;
+      if (valorTexto.isNotEmpty) _triedSubmitEmpty = false;
     });
-    
-    // Atualizar validação do formulário em tempo real
-    if (_formKey.currentState != null) {
-      _formKey.currentState!.validate();
-    }
   }
 
   void _continuar() {
+    final valorTexto = _valorController.text
+        .replaceAll('R\$', '')
+        .replaceAll('.', '')
+        .replaceAll(',', '')
+        .trim();
+    if (valorTexto.isEmpty) {
+      setState(() => _triedSubmitEmpty = true);
+    }
     if (_formKey.currentState?.validate() ?? false) {
-      // Remove formatação e converte para centavos
-      final valorTexto = _valorController.text
+      // Remove formatação e converte para centavos (valorTexto já obtido acima se vazio)
+      final valorTextoFinal = _valorController.text
           .replaceAll('R\$', '')
           .replaceAll('.', '')
           .replaceAll(',', '')
           .trim();
-      final valorCentavos = int.tryParse(valorTexto) ?? 0;
+      final valorCentavos = int.tryParse(valorTextoFinal) ?? 0;
 
       Navigator.push(
         context,
@@ -221,7 +226,7 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Por favor, insira o valor da venda';
+                        return _triedSubmitEmpty ? 'Por favor, insira o valor da venda' : null;
                       }
                       final valorTexto = value
                           .replaceAll('R\$', '')

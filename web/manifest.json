@@ -1,11 +1,11 @@
 {
-    "name": "neves_capital",
-    "short_name": "neves_capital",
+    "name": "Pag Pag",
+    "short_name": "Pag Pag",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#hexcode",
     "theme_color": "#hexcode",
-    "description": "Projeto da Neves Capital",
+    "description": "App Pag Pag",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

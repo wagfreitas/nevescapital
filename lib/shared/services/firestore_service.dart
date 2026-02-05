@@ -572,6 +572,9 @@ class FirestoreService {
     String? cardBrand,
     String? cardLastFour,
     String? cardNumber, // número mascarado
+    String? bankCode,
+    String? branch,
+    String? account,
     String status = 'completed',
   }) async {
     try {
@@ -604,6 +607,9 @@ class FirestoreService {
       if (cardNumber != null) {
         saleData['cardNumber'] = cardNumber; // já vem mascarado
       }
+      if (bankCode != null) saleData['bankCode'] = bankCode;
+      if (branch != null) saleData['branch'] = branch;
+      if (account != null) saleData['account'] = account;
 
       // Salvar na subcollection
       await _firestore
