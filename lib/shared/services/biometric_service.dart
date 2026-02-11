@@ -62,8 +62,6 @@ class BiometricService {
       // IMPORTANTE: No iOS, quando allowDevicePassword = true, sempre usar biometricOnly = false
       // para que o sistema ofereça imediatamente a opção de senha quando o Face ID falhar
       // No Android, se não há biometria e allowDevicePassword = true, sempre usar biometricOnly = false
-      final bool shouldUseBiometricOnly = hasBiometrics && !allowDevicePassword;
-      
       // Se allowDevicePassword = true, sempre permitir fallback para senha (biometricOnly = false)
       // Isso garante que no iOS a opção de senha apareça imediatamente após falha do Face ID
       final bool finalBiometricOnly = (hasBiometrics && !allowDevicePassword) ? true : false;

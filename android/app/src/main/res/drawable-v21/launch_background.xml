@@ -1,15 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Modify this file to customize your launch splash screen -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Fundo verde escuro PagPag (#122118) - mesmo tom das outras telas -->
+    <!-- Fundo igual ao do logo (#0d3d26) -->
     <item>
-        <color android:color="#122118" />
+        <color android:color="#0d3d26" />
     </item>
 
-    <!-- Logo Pag Pag centralizado (mesmo ícone do launcher / iOS) -->
-    <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/launcher_icon" />
-    </item>
+    <!-- Logo Pag Pag centralizado -->
+   
 </layer-list>

@@ -24,7 +24,6 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _hasCheckedResume = false;
-  bool _resumedRegistration = false;
 
   @override
   void initState() {
@@ -105,7 +104,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
       if (shouldResume) {
         // Retomar cadastro
-        _resumedRegistration = true;
         RegistrationNavigator.navigateToStep(
           context: context,
           progress: progress,
@@ -259,6 +257,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
                     const SizedBox(height: 16),
 
+                    // (debug button removed)
+
                     // Botão "Abrir Conta" - vai para MESMA tela unificada
                     SizedBox(
                       width: double.infinity,
@@ -302,7 +302,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
         ),
       ),
-      ),
+    ),
     );
   }
 }

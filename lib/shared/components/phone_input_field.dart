@@ -339,7 +339,7 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Botão de seleção de país
+                // Botão de seleção de país (sem borda)
                 GestureDetector(
                   onTap: widget.enabled && !widget.readOnly ? _showCountryPicker : null,
                   child: Container(
@@ -465,7 +465,7 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
                         labelStyle: TextStyle(
                           color: Colors.white.withValues(alpha: 0.7),
                         ),
-                        floatingLabelBehavior: FloatingLabelBehavior.never, // Nunca flutua para evitar mudanças de layout
+                        floatingLabelBehavior: FloatingLabelBehavior.auto,
                         hintText: hintText,
                         hintStyle: TextStyle(
                           color: Colors.white.withValues(alpha: 0.5),
@@ -486,10 +486,7 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
                             topRight: Radius.circular(12.0),
                             bottomRight: Radius.circular(12.0),
                           ),
-                          borderSide: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            width: 1, // Largura fixa para evitar mudança de tamanho
-                          ),
+                          borderSide: BorderSide.none,
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -547,6 +544,24 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
       ),
     );
   }
+}
+
+/// Remove acentos para busca insensível a acentuação (ex: "alba" encontra "Albânia").
+String _removeAccentsForSearch(String text) {
+  const accents = {
+    'á': 'a', 'à': 'a', 'ã': 'a', 'â': 'a', 'ä': 'a',
+    'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e',
+    'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i',
+    'ó': 'o', 'ò': 'o', 'õ': 'o', 'ô': 'o', 'ö': 'o',
+    'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u',
+    'ç': 'c', 'ñ': 'n',
+  };
+  final lower = text.toLowerCase();
+  return lower.splitMapJoin(
+    RegExp(r'[áàãâäéèêëíìîïóòõôöúùûüçñ]'),
+    onMatch: (m) => accents[m.group(0)] ?? m.group(0)!,
+    onNonMatch: (n) => n,
+  );
 }
 
 /// Dialog customizado para seleção de país com botão de fechar
@@ -640,16 +655,18 @@ class _CountryPickerDialogState extends State<_CountryPickerDialog> {
   }
 
   void _filterCountries() {
-    final query = _searchController.text.toLowerCase();
+    final rawQuery = _searchController.text.trim();
+    final query = _removeAccentsForSearch(rawQuery);
     setState(() {
       if (query.isEmpty) {
         _filteredCountries = List.from(_allCountries);
       } else {
         _filteredCountries = _allCountries.where((country) {
           final countryNamePt = CountryNamesPt.getName(country.countryCode);
-          return countryNamePt.toLowerCase().contains(query) ||
-              country.countryCode.toLowerCase().contains(query) ||
-              country.phoneCode.contains(query);
+          final nameNormalized = _removeAccentsForSearch(countryNamePt);
+          return nameNormalized.contains(query) ||
+              country.countryCode.toLowerCase().contains(rawQuery.toLowerCase()) ||
+              country.phoneCode.contains(rawQuery);
         }).toList();
       }
       // Ordenar com Brasil primeiro
