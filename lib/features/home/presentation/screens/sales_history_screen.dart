@@ -220,34 +220,30 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     Expanded(
                       child: _transactions.isEmpty
                           ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.receipt_long_outlined,
-                                    size: 64,
-                                    color: Colors.grey[400],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Nenhuma venda encontrada',
+                              child: Align(
+                                alignment: const Alignment(0, -0.20),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.receipt_long_outlined,
+                                      size: 64,
+                                      color: const Color.fromARGB(255, 238, 238, 238),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'Nenhuma venda encontrada',
                                     style: TextStyle(
                                       fontSize: 18,
-                                      color: Colors.grey[600],
+                                      color: const Color.fromARGB(255, 219, 217, 217),
                                       fontWeight: FontWeight.w500,
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Suas vendas aparecerão aqui',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[500],
-                                    ),
+                                    textAlign: TextAlign.center,
                                   ),
                                 ],
                               ),
-                            )
+                            ),
+                          )
                           : RefreshIndicator(
                               onRefresh: _loadTransactions,
                               color: AppTheme.primaryColor,

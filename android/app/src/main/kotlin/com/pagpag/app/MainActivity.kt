@@ -1,10 +1,24 @@
 package com.pagpag.app
 
-import io.flutter.embedding.android.FlutterActivity
+import android.os.Build
+import android.os.Bundle
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import com.pagpag.app.SecurityPlugin
 
-class MainActivity : FlutterActivity() {
+// Use FlutterFragmentActivity so plugins that require a FragmentActivity (like local_auth)
+// work correctly on Android.
+class MainActivity : FlutterFragmentActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            splashScreen.setOnExitAnimationListener { splashScreenView ->
+                splashScreenView.remove()
+            }
+        }
+        super.onCreate(savedInstanceState)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         // Registrar plugin de segurança

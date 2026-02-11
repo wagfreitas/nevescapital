@@ -143,23 +143,24 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-# Configuração para gerar ícones do app
+# Configuração para gerar ícones do app (flutter_launcher_icons)
 flutter_launcher_icons:
-  android: "launcher_icon"
+  android: true
   ios: true
-  image_path: "assets/icons/logo_ios_filled.png"
-  image_path_ios: "assets/icons/logo_ios_filled.png"
+  image_path: "assets/icons/logo.png"
+  image_path_ios: "assets/icons/logo.png"
   min_sdk_android: 19
   remove_alpha_ios: true
   web:
     generate: true
-    image_path: "assets/icons/logo_ios_filled.png"
-    background_color: "#hexcode"
-    theme_color: "#hexcode"
+    image_path: "assets/icons/logo.png"
+    # background_color and theme_color podem ser ajustados conforme desejado
+    background_color: "#02391E"
+    theme_color: "#02391E"
   windows:
     generate: true
-    image_path: "assets/icons/logo_ios_filled.png"
+    image_path: "assets/icons/logo.png"
     icon_size: 48
   macos:
     generate: true
-    image_path: "assets/icons/logo_ios_filled.png"
+    image_path: "assets/icons/logo.png"

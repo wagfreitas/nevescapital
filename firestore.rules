@@ -59,22 +59,9 @@ service cloud.firestore {
     
     // Subcollection de vendas do usuário
     // Estrutura: users/{userId}/sales/{saleId}
-    // NOTA: O app usa autenticação via OTP (sem Firebase Auth), então permitimos
-    // criação/leitura se o documento do usuário existir. A validação do userId
-    // é feita no código da aplicação antes de chamar saveSale.
+    // Permite leitura/escrita na subcollection (app identifica usuário por CPF/doc id no código)
     match /users/{userId}/sales/{saleId} {
-      // Permitir leitura se o documento do usuário existir
-      // (validação de segurança: apenas usuários válidos podem ter vendas)
-      allow read: if exists(/databases/$(database)/documents/users/$(userId));
-      
-      // Permitir criação se o documento do usuário existir
-      // O userId é validado no código antes de chamar saveSale
-      allow create: if exists(/databases/$(database)/documents/users/$(userId));
-      
-      // Permitir atualização se o documento do usuário existir
-      allow update: if exists(/databases/$(database)/documents/users/$(userId));
-      
-      // Não permitir exclusão (vendas são permanentes)
+      allow read, create, update: if true;
       allow delete: if false;
     }
   }

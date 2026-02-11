@@ -144,6 +144,33 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
     }
   }
 
+  String? _getSelectedRamoLabel() {
+    if (_selectedBusinessType == null) return null;
+    final type = _businessTypes.firstWhere(
+      (t) => t['value'] == _selectedBusinessType,
+      orElse: () => {'label': ''},
+    );
+    return type['label'];
+  }
+
+  void _showRamoSearch(BuildContext context) async {
+    final selected = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _RamoSearchScreen(
+          businessTypes: _businessTypes,
+          selectedValue: _selectedBusinessType,
+        ),
+      ),
+    );
+    if (selected != null && mounted) {
+      setState(() {
+        _selectedBusinessType = selected;
+        _checkForChanges();
+      });
+    }
+  }
+
   /// Salvar dados da loja no Firestore
   Future<void> _saveStoreData() async {
     if (!_formKey.currentState!.validate()) return;
@@ -289,94 +316,46 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                       ),
                       const SizedBox(height: 24.0),
                       
-                      // Ramo de atividade (dropdown)
-                      DefaultTextStyle(
-                        style: const TextStyle(
+                      // Ramo de atividade (campo com busca - igual à tela de ocupação)
+                      const Text(
+                        'Ramos de Atuação:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                           color: Colors.white,
-                          fontSize: 16.0,
-                          fontWeight: FontWeight.normal,
-                          height: 1.0,
-                          letterSpacing: 0.0,
                         ),
-                        child: DropdownButtonFormField<String>(
-                          initialValue: _selectedBusinessType,
-                          isExpanded: true,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16.0,
-                            fontWeight: FontWeight.normal,
-                            height: 1.0,
-                            letterSpacing: 0.0,
-                            inherit: false,
-                          ),
-                          selectedItemBuilder: (BuildContext context) {
-                            return _businessTypes.map((type) {
-                              return DefaultTextStyle(
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16.0,
-                                  fontWeight: FontWeight.normal,
-                                  height: 1.0,
-                                  letterSpacing: 0.0,
-                                ),
-                                child: Text(
-                                  type['label']!,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              );
-                            }).toList();
-                          },
-                        decoration: InputDecoration(
-                          labelText: 'Ramos de Atuação',
-                          labelStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 16,
-                          ),
-                          hintStyle: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                          ),
-                          filled: true,
-                          fillColor: AppTheme.inputEditableBackgroundColor,
-                          border: OutlineInputBorder(
+                      ),
+                      const SizedBox(height: 16),
+                      GestureDetector(
+                        onTap: () => _showRamoSearch(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
-                          ),
-                        ),
-                        dropdownColor: const Color(0xFF1a2d21),
-                        icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-                        items: _businessTypes.map((type) {
-                          return DropdownMenuItem<String>(
-                            value: type['value'],
-                            child: Text(
-                              type['label']!,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                              ),
+                            border: Border.all(
+                              color: AppTheme.primaryColor,
+                              width: 1,
                             ),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedBusinessType = value;
-                          });
-                          _checkForChanges();
-                        },
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Selecione o ramo de atividade';
-                          }
-                          return null;
-                        },
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.store, color: Colors.white70),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _getSelectedRamoLabel() ?? 'Buscar ramo de atuação',
+                                  style: TextStyle(
+                                    color: _selectedBusinessType != null
+                                        ? Colors.white
+                                        : Colors.white.withValues(alpha: 0.5),
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                              const Icon(Icons.search, color: Colors.white70),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 40.0),
@@ -422,3 +401,130 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
   }
 }
 
+/// Tela de busca de ramo de atuação (igual à tela de ocupação)
+class _RamoSearchScreen extends StatefulWidget {
+  final List<Map<String, String>> businessTypes;
+  final String? selectedValue;
+
+  const _RamoSearchScreen({
+    required this.businessTypes,
+    this.selectedValue,
+  });
+
+  @override
+  State<_RamoSearchScreen> createState() => _RamoSearchScreenState();
+}
+
+class _RamoSearchScreenState extends State<_RamoSearchScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  List<Map<String, String>> _filteredTypes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredTypes = List.from(widget.businessTypes);
+    _searchController.addListener(_filterTypes);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _searchFocusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_filterTypes);
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _filterTypes() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredTypes = List.from(widget.businessTypes);
+      } else {
+        _filteredTypes = widget.businessTypes
+            .where((type) =>
+                (type['label'] ?? '').toLowerCase().contains(query))
+            .toList();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
+      resizeToAvoidBottomInset: true,
+      appBar: AppBar(
+        backgroundColor: AppTheme.backgroundColor,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            Navigator.pop(context, widget.selectedValue);
+          },
+        ),
+        title: TextField(
+          controller: _searchController,
+          focusNode: _searchFocusNode,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          keyboardType: TextInputType.text,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _searchFocusNode.unfocus(),
+          decoration: InputDecoration(
+            hintText: 'Buscar ramo de atuação',
+            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+            filled: true,
+            fillColor: AppTheme.inputEditableBackgroundColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.primaryColor),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            prefixIcon: const Icon(Icons.search, color: Colors.white70),
+            suffixIcon: _searchController.text.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear, color: Colors.white70),
+                    onPressed: () => _searchController.clear(),
+                  )
+                : null,
+          ),
+        ),
+      ),
+      body: ListView.builder(
+        itemCount: _filteredTypes.length,
+        itemBuilder: (context, index) {
+          final type = _filteredTypes[index];
+          final value = type['value']!;
+          final label = type['label']!;
+          final isSelected = value == widget.selectedValue;
+
+          return ListTile(
+            title: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? AppTheme.primaryColor : Colors.white,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+            trailing: isSelected
+                ? Icon(Icons.check, color: AppTheme.primaryColor)
+                : null,
+            onTap: () => Navigator.pop(context, value),
+          );
+        },
+      ),
+    );
+  }
+}

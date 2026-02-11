@@ -261,14 +261,14 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.check_circle, color: Colors.green[700], size: 20),
+                      Icon(Icons.check_circle, color: Colors.white, size: 20),
                       const SizedBox(width: 8),
                       Text(
                         'Você receberá líquido $valorLiquidoFormatado',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Colors.green[700],
+                          color: Colors.white,
                         ),
                       ),
                     ],
