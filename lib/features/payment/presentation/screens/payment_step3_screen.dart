@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:neves_capital/shared/data/brazilian_banks.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
 import 'package:neves_capital/shared/services/secure_storage_service.dart';
@@ -281,14 +282,8 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
     final totalSteps = PaymentStepHelper.getTotalSteps(_hasAccount);
     
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        backgroundColor: AppTheme.backgroundColor,
-        elevation: 0,
-      ),
+      extendBodyBehindAppBar: true,
+      appBar: const GlassAppBar(),
       body: (_isLoadingBankData || _isLoadingAccount)
           ? const Center(
               child: CircularProgressIndicator(
@@ -362,7 +357,7 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
                   label: 'Conta com Dígito',
                   controller: _accountController,
                   keyboardType: TextInputType.number,
-                  maxLength: 20,
+                  maxLength: 10,
                   prefixIcon: Icons.account_balance_wallet,
                   validator: (value) {
                     if (value == null || value.isEmpty) {

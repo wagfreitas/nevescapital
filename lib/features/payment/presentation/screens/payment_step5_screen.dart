@@ -5,6 +5,7 @@ import 'package:neves_capital/shared/helpers/format_helpers.dart';
 import 'package:neves_capital/shared/helpers/card_brand_detector.dart';
 import 'package:neves_capital/shared/helpers/card_brand_image_loader.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 // TODO: Reativar quando implementar retorno do gateway:
 // import 'package:neves_capital/features/payment/data/services/pagarme_service.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
@@ -236,14 +237,8 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
     final detectedBrand = showBrand ? CardBrandDetector.detectBrand(widget.numeroCartao) : CardBrand.unknown;
 
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        backgroundColor: AppTheme.backgroundColor,
-        elevation: 0,
-      ),
+      extendBodyBehindAppBar: true,
+      appBar: const GlassAppBar(),
       body: _isProcessing
           ? const Center(
               child: Column(
@@ -444,11 +439,12 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
                           ),
                         ),
                       ),
-                      // Botão Avançar sempre visível e fixo no rodapé
+                      // Botão Finalizar a Venda sempre visível e fixo no rodapé
                       Padding(
                         padding: const EdgeInsets.fromLTRB(24.0, 12.0, 24.0, 24.0),
                         child: CustomButton(
-                          text: 'Avançar',
+                          text: 'Finalizar a Venda',
+                          icon: Icons.lock,
                           onPressed: _concluirVenda,
                         ),
                       ),

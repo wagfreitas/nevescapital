@@ -1,5 +1,9 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:neves_capital/shared/screens/terms_of_use_screen.dart';
+import 'package:neves_capital/shared/screens/privacy_policy_screen.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/registration_lifecycle_observer.dart';
@@ -448,45 +452,41 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            // Tentar fazer pop primeiro (se houver tela anterior na pilha)
-            // Se não houver, navegar explicitamente para a tela anterior
-            // Isso garante que funciona tanto no fluxo normal quanto no "Recomeçar"
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              // Não há tela anterior na pilha (vem do fluxo de "Recomeçar")
-              // Navegar explicitamente para a tela anterior (Endereço)
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => Step6AddressScreen(
-                    authController: widget.authController,
-                    themeController: widget.themeController,
-                    cpf: widget.cpf,
-                    phone: widget.phone,
-                    email: widget.email,
-                    fullName: widget.fullName,
-                    birthDate: widget.birthDate,
-                    motherName: widget.motherName,
-                    initialCep: widget.cep,
-                    initialStreet: widget.street,
-                    initialNumber: widget.number,
-                    initialComplement: widget.complement,
-                    initialNeighborhood: widget.neighborhood,
-                    initialCity: widget.city,
-                    initialState: widget.state,
-                  ),
+      extendBodyBehindAppBar: true,
+      appBar: GlassAppBar(
+        onBackPressed: () {
+          // Tentar fazer pop primeiro (se houver tela anterior na pilha)
+          // Se não houver, navegar explicitamente para a tela anterior
+          // Isso garante que funciona tanto no fluxo normal quanto no "Recomeçar"
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            // Não há tela anterior na pilha (vem do fluxo de "Recomeçar")
+            // Navegar explicitamente para a tela anterior (Endereço)
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => Step6AddressScreen(
+                  authController: widget.authController,
+                  themeController: widget.themeController,
+                  cpf: widget.cpf,
+                  phone: widget.phone,
+                  email: widget.email,
+                  fullName: widget.fullName,
+                  birthDate: widget.birthDate,
+                  motherName: widget.motherName,
+                  initialCep: widget.cep,
+                  initialStreet: widget.street,
+                  initialNumber: widget.number,
+                  initialComplement: widget.complement,
+                  initialNeighborhood: widget.neighborhood,
+                  initialCity: widget.city,
+                  initialState: widget.state,
                 ),
-              );
-            }
-          },
-        ),
+              ),
+            );
+          }
+        },
       ),
       body: SafeArea(
         child: KeyboardDismissWrapper(
@@ -550,14 +550,6 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Precisamos de mais algumas informações',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.white70,
-                        ),
-                      ),
                       const SizedBox(height: 40),
                       // PEP
                       const Text(
@@ -618,7 +610,7 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
                                   ),
                                 ),
                               ),
-                              const Icon(Icons.search, color: Colors.white70),
+                              const Icon(Icons.keyboard_arrow_down, color: Colors.white70),
                             ],
                           ),
                         ),
@@ -732,7 +724,7 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
                                   ),
                                 )
                               : const Text(
-                                  'Avançar',
+                                  'Finalizar Cadastro',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w600,
@@ -740,7 +732,47 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
                                 ),
                         ),
                       ),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: RichText(
+                          textAlign: TextAlign.center,
+                          text: TextSpan(
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.6),
+                              fontSize: 12,
+                            ),
+                            children: [
+                              const TextSpan(
+                                text: 'Ao finalizar o cadastro você concorda com os ',
+                              ),
+                              TextSpan(
+                                text: 'Termos de Uso',
+                                style: const TextStyle(
+                                  color: AppTheme.primaryColor,
+                                  decoration: TextDecoration.underline,
+                                ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () {
+                                    Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsOfUseScreen()));
+                                  },
+                              ),
+                              const TextSpan(text: ' e com a '),
+                              TextSpan(
+                                text: 'Política de Privacidade',
+                                style: const TextStyle(
+                                  color: AppTheme.primaryColor,
+                                  decoration: TextDecoration.underline,
+                                ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () {
+                                    Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()));
+                                  },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
@@ -848,15 +880,11 @@ class _OccupationSearchScreenState extends State<_OccupationSearchScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: AppTheme.backgroundColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.pop(context, widget.selectedOccupation);
-          },
-        ),
+      extendBodyBehindAppBar: true,
+      appBar: GlassAppBar(
+        onBackPressed: () {
+          Navigator.pop(context, widget.selectedOccupation);
+        },
         title: TextField(
           controller: _searchController,
           focusNode: _searchFocusNode,

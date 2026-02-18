@@ -3,6 +3,7 @@ import 'package:neves_capital/shared/services/database_service.dart';
 import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
 /// Tela para alterar chaves PIX cadastradas
@@ -226,14 +227,9 @@ class _EditPixKeysScreenState extends State<EditPixKeysScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
+      extendBodyBehindAppBar: true,
+      appBar: const GlassAppBar(
+        title: Text(
           'Voltar para Vendas',
           style: TextStyle(color: Colors.white, fontSize: 16),
         ),

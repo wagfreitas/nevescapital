@@ -21,9 +21,6 @@ class HomeScreen extends StatelessWidget {
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         title: const Text('Pag Pag'),
-        backgroundColor: AppTheme.backgroundColor,
-        foregroundColor: AppTheme.textPrimary,
-        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),

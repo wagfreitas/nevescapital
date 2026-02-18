@@ -142,14 +142,15 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
     final currentStep = PaymentStepHelper.calculateCurrentStep(4, _hasAccount);
     final totalSteps = PaymentStepHelper.getTotalSteps(_hasAccount);
     
+    final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
+        forceMaterialTransparency: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        backgroundColor: AppTheme.backgroundColor,
-        elevation: 0,
       ),
       body: _isLoadingAccount
           ? const Center(
@@ -157,10 +158,9 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                 valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
               ),
             )
-          : SafeArea(
-              child: KeyboardDismissWrapper(
+          : KeyboardDismissWrapper(
                 child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 24.0),
+                padding: EdgeInsets.fromLTRB(24.0, topPadding, 24.0, 24.0),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -372,6 +372,8 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                         decoration: InputDecoration(
                           labelText: 'Data de Vencimento',
                           labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                          hintText: 'MM/AA',
+                          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
                           floatingLabelBehavior: FloatingLabelBehavior.auto,
                           prefixIcon: Icon(Icons.calendar_today, color: AppTheme.textSecondary),
                           filled: true,
@@ -453,7 +455,6 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
           ),
         ),
       ),
-    ),
     );
   }
 

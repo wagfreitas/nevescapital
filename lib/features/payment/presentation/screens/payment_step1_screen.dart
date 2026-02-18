@@ -5,6 +5,7 @@ import 'package:neves_capital/shared/services/firestore_service.dart';
 import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import '../helpers/payment_step_helper.dart';
 import 'payment_step2_screen.dart';
 
@@ -212,14 +213,8 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: AppTheme.backgroundColor, // Verde padrão do fundo
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
+      extendBodyBehindAppBar: true,
+      appBar: const GlassAppBar(),
       body: SafeArea(
         child: KeyboardDismissWrapper(
           child: SingleChildScrollView(

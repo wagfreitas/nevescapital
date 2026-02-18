@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/components/glass_app_bar.dart';
 import '../../../../shared/components/custom_button.dart';
 import '../../../../shared/data/brazilian_banks.dart';
 import '../../../../core/utils/app_logger.dart';
@@ -227,11 +228,16 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
           const SnackBar(
             content: Text('Dados bancários salvos com sucesso!'),
             backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
           ),
         );
         
-        // Voltar para tela anterior após salvar
-        Navigator.of(context).pop();
+        // Aguardar o SnackBar desaparecer antes de navegar
+        await Future.delayed(const Duration(seconds: 3));
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          Navigator.of(context).pop();
+        }
       } else {
         throw Exception('Falha ao salvar dados bancários');
       }
@@ -258,14 +264,8 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
+      extendBodyBehindAppBar: true,
+      appBar: const GlassAppBar(),
       body: _isLoadingData
           ? const Center(
               child: CircularProgressIndicator(
@@ -325,7 +325,7 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
                         controller: _accountController,
                         focusNode: _accountFocusNode,
                         keyboardType: TextInputType.number,
-                        maxLength: 20,
+                        maxLength: 10,
                         prefixIcon: Icons.account_balance_wallet,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -342,9 +342,9 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
                       
                       const SizedBox(height: 24),
 
-                      // Botão Confirmar
+                      // Botão Atualizar
                       CustomButton(
-                        text: 'Confirmar',
+                        text: 'Atualizar',
                         onPressed: (_isLoading || !_hasChanges) ? null : _handleConfirm,
                         isLoading: _isLoading,
                       ),

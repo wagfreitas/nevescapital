@@ -1,12 +1,11 @@
-import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:neves_capital/shared/components/phone_input_field.dart';
 import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:neves_capital/features/auth/presentation/screens/login_otp/login_step3_otp_screen.dart';
 import 'package:neves_capital/features/auth/presentation/screens/onboarding_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -112,18 +111,8 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
               } else if (e.code == 'too-many-requests') {
                 _errorMessage = 'Muitas tentativas. Aguarde alguns minutos.';
               } else if (e.code == 'internal-error') {
-                // Erro interno pode ter várias causas
-                // Detectar plataforma para dar instruções específicas
-                final isIOS = !kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS || Platform.isIOS);
-                
-                // Mensagem focada na solução real para produção
-                _errorMessage = 'Erro de configuração do Firebase (internal-error).\n\n'
-                    '🔧 AÇÃO NECESSÁRIA:\n\n'
-                    '${isIOS ? "1. Configure APNs no Firebase Console:" : "1. Configure SHA-1 no Firebase Console:"}\n'
-                    '   ${isIOS ? "Project Settings > Cloud Messaging > APNs authentication key" : "Project Settings > Your apps > Android > SHA certificate fingerprints"}\n'
-                    '   ${isIOS ? "Faça upload do arquivo .p8 da Apple Developer" : "SHA-1 Debug: 33:2A:B5:0C:B5:9B:A9:C1:F2:8D:02:13:AE:01:67:56:AE:11:CB:16"}\n\n'
-                    '2. Verifique Phone Auth habilitado:\n'
-                    '   Authentication > Sign-in method > Phone > Enable';
+                AppLogger.error('Firebase internal-error: possível problema com APNs (iOS) ou SHA-1 (Android)');
+                _errorMessage = 'Não foi possível enviar o código de verificação. Tente novamente em alguns instantes.';
               } else if (e.code == 'missing-phone-number') {
                 _errorMessage = 'Número de telefone não fornecido.';
               } else if (e.code == 'quota-exceeded') {
@@ -191,29 +180,23 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () async {
-            // Evita crash: não dar pop enquanto teclado está aberto.
-            if (FocusManager.instance.primaryFocus != null) {
-              FocusScope.of(context).unfocus();
-            }
-            if (!context.mounted) return;
-            // Voltar para a tela de onboarding
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => OnboardingScreen(
-                  authController: widget.authController ?? AuthController(),
-                  themeController: widget.themeController,
-                ),
+      extendBodyBehindAppBar: true,
+      appBar: GlassAppBar(
+        onBackPressed: () async {
+          if (FocusManager.instance.primaryFocus != null) {
+            FocusScope.of(context).unfocus();
+          }
+          if (!context.mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OnboardingScreen(
+                authController: widget.authController ?? AuthController(),
+                themeController: widget.themeController,
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
       body: KeyboardDismissWrapper(
         focusNodes: [_phoneFocusNode],

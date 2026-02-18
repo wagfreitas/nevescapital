@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/features/auth/presentation/screens/onboarding_screen.dart';
-// import removed: main_tab_screen not used
-import 'package:neves_capital/features/home/presentation/screens/dashboard_screen.dart';
+import 'package:neves_capital/features/home/presentation/screens/main_tab_screen.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/shared/services/biometric_service.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
-// app theme import removed (not used in this file)
 
 /// Splash screen - ponto de entrada da aplicação
 /// Verifica estado de login e navega conforme necessário
@@ -42,8 +40,8 @@ class _SplashScreenState extends State<SplashScreen> {
 
   /// Verifica estado de login e navega conforme necessário
   Future<void> _checkLoginAndNavigate() async {
-    // Aguardar um pouco para garantir que o logo apareça na tela
-    await Future.delayed(const Duration(milliseconds: 1000));
+    // Aguardar para garantir que o logo apareça na tela
+    await Future.delayed(const Duration(milliseconds: 1500));
 
     try {
       // Verificar isLoggedIn do SharedPreferences
@@ -256,7 +254,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (context) => DashboardScreen(
+        builder: (context) => MainTabScreen(
           authController: authController,
           themeController: themeController,
         ),
@@ -267,15 +265,15 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     debugPrint('🎨 [SPLASH] Construindo SplashScreen');
-    // Fundo solicitado antes do onboarding: HEX #0D3D26
-    const splashBackground = Color(0xFF0D3D26);
+    // Cor específica da splash e main tab: #023E25
+    const splashColor = Color(0xFF023E25);
     return Scaffold(
-      backgroundColor: splashBackground,
+      backgroundColor: splashColor,
       body: Container(
         width: double.infinity,
         height: double.infinity,
         decoration: const BoxDecoration(
-          color: splashBackground,
+          color: splashColor,
         ),
         child: SafeArea(
           child: LayoutBuilder(

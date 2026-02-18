@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
@@ -271,35 +272,26 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            // Tentar fazer pop primeiro (se houver tela anterior na pilha)
-            // Se não houver, navegar explicitamente para a tela de email
-            // Isso garante que funciona tanto no fluxo normal quanto no "Recomeçar"
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              // Não há tela anterior na pilha (vem do fluxo de "Recomeçar")
-              // Navegar explicitamente para a tela de email
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => Step4EmailScreen(
-                    authController: widget.authController,
-                    themeController: widget.themeController,
-                    cpf: widget.cpf,
-                    phone: widget.phone,
-                    initialEmail: widget.email,
-                  ),
+      extendBodyBehindAppBar: true,
+      appBar: GlassAppBar(
+        onBackPressed: () {
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => Step4EmailScreen(
+                  authController: widget.authController,
+                  themeController: widget.themeController,
+                  cpf: widget.cpf,
+                  phone: widget.phone,
+                  initialEmail: widget.email,
                 ),
-              );
-            }
-          },
-        ),
+              ),
+            );
+          }
+        },
       ),
       body: SafeArea(
         child: KeyboardDismissWrapper(
@@ -368,14 +360,6 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Precisamos de algumas informações para completar seu cadastro',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white70,
-                          ),
-                        ),
                         const SizedBox(height: 40),
                         // Nome Completo
                         TextFormField(
@@ -385,6 +369,8 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                           decoration: InputDecoration(
                             labelText: 'Nome Completo',
                             labelStyle: const TextStyle(color: Colors.white70),
+                            hintText: 'Igual ao Doc. de Identidade',
+                            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
                             filled: true,
                             fillColor: AppTheme.inputEditableBackgroundColor,
                             border: OutlineInputBorder(
@@ -498,6 +484,8 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                           decoration: InputDecoration(
                             labelText: 'Nome da Mãe',
                             labelStyle: const TextStyle(color: Colors.white70),
+                            hintText: 'Igual ao Doc. de Identidade',
+                            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
                             filled: true,
                             fillColor: AppTheme.inputEditableBackgroundColor,
                             border: OutlineInputBorder(
@@ -557,6 +545,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                           ),
                         ],
                         const SizedBox(height: 32),
+                        const Spacer(),
                         SizedBox(
                           width: double.infinity,
                           height: 56,
@@ -589,7 +578,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                                   ),
                           ),
                         ),
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 24),
                       ],
                     ),
                   ),
@@ -597,7 +586,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
               ),
             );
           },
-        ),
+          ),
         ),
       ),
     );

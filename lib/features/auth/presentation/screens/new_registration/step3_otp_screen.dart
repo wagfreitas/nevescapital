@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
@@ -39,7 +40,7 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   String? _errorMessage;
-  int _resendCountdown = 0;
+  int _resendCountdown = 30; // Inicia com cooldown de 30s ao abrir a tela
   bool _isOtpComplete = false;
   late RegistrationLifecycleObserver _lifecycleObserver;
 
@@ -74,6 +75,9 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _otpFocusNode.requestFocus();
     });
+
+    // Iniciar countdown ao abrir a tela (o código já foi enviado)
+    _startResendCountdown();
   }
 
   @override
@@ -283,14 +287,8 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      extendBodyBehindAppBar: true,
+      appBar: const GlassAppBar(),
       body: SafeArea(
         child: KeyboardDismissWrapper(
           child: LayoutBuilder(
@@ -307,7 +305,7 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
                   key: _formKey,
                   child: IntrinsicHeight(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         const SizedBox(height: 40),
                         const Text(
@@ -317,14 +315,16 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
+                          textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Informe o código de verificação recebido no número ${PhoneHelper.formatPhone(widget.phone)}',
+                          'Informe o código de verificação recebido no número +55 ${PhoneHelper.formatPhone(widget.phone)}',
                           style: const TextStyle(
                             fontSize: 16,
                             color: Colors.white70,
                           ),
+                          textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 40),
                         TextFormField(

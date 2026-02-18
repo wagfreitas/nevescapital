@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
-import 'package:neves_capital/shared/components/cpf_input_field.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:neves_capital/shared/helpers/cpf_helper.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
@@ -39,6 +40,7 @@ class UnifiedCpfScreen extends StatefulWidget {
 
 class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
   final TextEditingController _cpfController = TextEditingController();
+  final TextEditingController _cpfMaskedController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   String? _errorMessage;
@@ -49,13 +51,13 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
     
     // Restaurar CPF se fornecido
     if (widget.initialCpf != null && widget.initialCpf!.isNotEmpty) {
-      // Formatar o CPF para exibição
-      _cpfController.text = CpfHelper.formatCpf(widget.initialCpf!);
+      _cpfController.text = CpfHelper.getCpfNumbers(widget.initialCpf!);
+      _cpfMaskedController.text = CpfHelper.formatCpf(widget.initialCpf!);
       AppLogger.debug('CPF restaurado: ${widget.initialCpf!.substring(0, 3)}***');
     }
     
     // Limpar mensagem de erro quando o usuário começar a digitar
-    _cpfController.addListener(() {
+    _cpfMaskedController.addListener(() {
       if (_errorMessage != null) {
         setState(() {
           _errorMessage = null;
@@ -67,7 +69,19 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
   @override
   void dispose() {
     _cpfController.dispose();
+    _cpfMaskedController.dispose();
     super.dispose();
+  }
+
+  void _onCpfChanged(String value) {
+    final cleanValue = CpfHelper.cleanCpf(value);
+    final limitedValue = cleanValue.length > 11 ? cleanValue.substring(0, 11) : cleanValue;
+    final formatted = CpfHelper.formatCpf(limitedValue);
+    if (_cpfMaskedController.text != formatted) {
+      _cpfMaskedController.text = formatted;
+      _cpfMaskedController.selection = TextSelection.collapsed(offset: formatted.length);
+    }
+    _cpfController.text = limitedValue;
   }
 
   Future<void> _handleNext() async {
@@ -232,27 +246,22 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              // Se não há tela anterior, navegar para a tela de login
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => PhoneLoginScreen(
-                    authController: widget.authController,
-                    themeController: widget.themeController,
-                  ),
+      extendBodyBehindAppBar: true,
+      appBar: GlassAppBar(
+        onBackPressed: () {
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => PhoneLoginScreen(
+                  authController: widget.authController,
+                  themeController: widget.themeController,
                 ),
-              );
-            }
-          },
-        ),
+              ),
+            );
+          }
+        },
       ),
       body: SafeArea(
         child: KeyboardDismissWrapper(
@@ -272,22 +281,125 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
                   constraints: BoxConstraints(
                     minHeight: constraints.maxHeight,
                   ),
-                  child: IntrinsicHeight(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildLogo(),
-                        const SizedBox(height: 40.0),
-                        _buildTitle(),
-                        const SizedBox(height: 8.0),
-                        _buildSubtitle(),
-                        const SizedBox(height: 40.0),
-                        if (_errorMessage != null) ...[
-                          _buildErrorMessage(),
-                          const SizedBox(height: 16.0),
+                  child: Form(
+                    key: _formKey,
+                    child: IntrinsicHeight(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 40),
+                          const Text(
+                            'Vamos começar',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Insira seu CPF para continuar',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.white70,
+                            ),
+                          ),
+                          const SizedBox(height: 40),
+                          if (_errorMessage != null) ...[
+                            _buildErrorMessage(),
+                            const SizedBox(height: 16),
+                          ],
+                          TextFormField(
+                            controller: _cpfMaskedController,
+                            autofocus: widget.initialCpf == null || widget.initialCpf!.isEmpty,
+                            keyboardType: TextInputType.number,
+                            style: const TextStyle(color: Colors.white),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(14),
+                            ],
+                            onChanged: _onCpfChanged,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Por favor, digite seu CPF';
+                              }
+                              final cpfNumbers = CpfHelper.getCpfNumbers(value);
+                              if (cpfNumbers.length != 11) {
+                                return 'CPF deve ter 11 dígitos';
+                              }
+                              if (!CpfHelper.isValidCpf(value)) {
+                                return 'CPF inválido. Verifique os dígitos.';
+                              }
+                              return null;
+                            },
+                            decoration: InputDecoration(
+                              labelText: 'CPF',
+                              labelStyle: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                              ),
+                              hintText: '000.000.000-00',
+                              hintStyle: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.3),
+                              ),
+                              filled: true,
+                              fillColor: AppTheme.inputEditableBackgroundColor,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Colors.red, width: 2),
+                              ),
+                              focusedErrorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Colors.red, width: 2),
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _handleNext,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryColor,
+                                foregroundColor: AppTheme.backgroundColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.backgroundColor),
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Continuar',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
                         ],
-                        _buildForm(),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -296,38 +408,6 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildLogo() {
-    return Image.asset(
-      'assets/icons/PagPag_icon.png',
-      width: 120,
-      height: 120,
-      fit: BoxFit.contain,
-    );
-  }
-
-  Widget _buildTitle() {
-    return const Text(
-      'Vamos começar',
-      style: TextStyle(
-        fontSize: 24,
-        fontWeight: FontWeight.bold,
-        color: Colors.white,
-      ),
-      textAlign: TextAlign.center,
-    );
-  }
-
-  Widget _buildSubtitle() {
-    return const Text(
-      'Insira seu CPF para continuar',
-      style: TextStyle(
-        fontSize: 16,
-        color: Colors.white70,
-      ),
-      textAlign: TextAlign.center,
     );
   }
 
@@ -354,70 +434,7 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
     );
   }
 
-  Widget _buildForm() {
-    return Form(
-      key: _formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          CpfInputField(
-            controller: _cpfController,
-            labelText: 'CPF',
-            hintText: '000.000.000-00',
-            autofocus: widget.initialCpf == null || widget.initialCpf!.isEmpty,
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Por favor, digite seu CPF';
-              }
-
-              final cpfNumbers = CpfHelper.getCpfNumbers(value);
-
-              if (cpfNumbers.length != 11) {
-                return 'CPF deve ter 11 dígitos';
-              }
-
-              if (!CpfHelper.isValidCpf(value)) {
-                return 'CPF inválido. Verifique os dígitos.';
-              }
-
-              return null;
-            },
-          ),
-          const SizedBox(height: 32.0),
-          SizedBox(
-            height: 56,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _handleNext,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF28CC28),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text(
-                      'Continuar',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // _buildForm removido - formulário inline no build
 
   String? _normalizeInitialPhone(String? phone) {
     if (phone == null || phone.trim().isEmpty) {

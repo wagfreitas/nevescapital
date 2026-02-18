@@ -4,6 +4,7 @@ import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/helpers/format_helpers.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import '../helpers/payment_step_helper.dart';
 import 'payment_step3_screen.dart';
 
@@ -134,14 +135,8 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
     final totalSteps = PaymentStepHelper.getTotalSteps(effectiveHasAccount);
     
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        backgroundColor: AppTheme.backgroundColor,
-        elevation: 0,
-      ),
+      extendBodyBehindAppBar: true,
+      appBar: const GlassAppBar(),
       body: _isLoadingAccount
           ? const Center(
               child: CircularProgressIndicator(

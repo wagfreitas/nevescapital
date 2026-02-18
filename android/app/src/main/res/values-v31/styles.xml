@@ -3,11 +3,11 @@
     <!--
     Android 12+ usa a Splash Screen API do sistema: o ícone do app aparece
     dentro de um círculo. Para "esconder" o círculo, usamos a mesma cor de fundo
-    do app (#0d3d26) no windowSplashScreenIconBackgroundColor.
+    do app (#023E25) no windowSplashScreenIconBackgroundColor.
     -->
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
-        <item name="android:windowSplashScreenBackground">#0d3d26</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">#0d3d26</item>
+        <item name="android:windowSplashScreenBackground">#023E25</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">#023E25</item>
         <!-- Opcional: ícone customizado. Coloque em res/drawable/ (ex.: splash_icon.png) e descomente:
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
         -->

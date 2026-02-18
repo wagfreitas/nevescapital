@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:neves_capital/shared/components/phone_input_field.dart';
 import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
@@ -178,31 +179,27 @@ class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            // Se não houver tela anterior na pilha, navegar para tela de CPF
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              // Se não pode voltar, navegar para tela de CPF com CPF restaurado
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => UnifiedCpfScreen(
-                    authController: widget.authController,
-                    themeController: widget.themeController,
-                    initialPhone: widget.initialPhone,
-                    initialCpf: widget.cpf,
-                  ),
+      extendBodyBehindAppBar: true,
+      appBar: GlassAppBar(
+        onBackPressed: () {
+          // Se não houver tela anterior na pilha, navegar para tela de CPF
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            // Se não pode voltar, navegar para tela de CPF com CPF restaurado
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => UnifiedCpfScreen(
+                  authController: widget.authController,
+                  themeController: widget.themeController,
+                  initialPhone: widget.initialPhone,
+                  initialCpf: widget.cpf,
                 ),
-              );
-            }
-          },
-        ),
+              ),
+            );
+          }
+        },
       ),
       body: SafeArea(
         child: KeyboardDismissWrapper(

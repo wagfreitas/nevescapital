@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
@@ -83,6 +84,8 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
     if (widget.initialCep != null && widget.initialCep!.isNotEmpty) {
       // Formatar CEP corretamente (99999-999)
       _cepController.text = CepHelper.formatCep(widget.initialCep!);
+      // Marcar CEP como já buscado para não buscar de novo ao clicar no campo
+      _lastSearchedCep = CepHelper.getCepNumbers(widget.initialCep!);
     }
     if (widget.initialStreet != null && widget.initialStreet!.isNotEmpty) {
       _streetController.text = widget.initialStreet!;
@@ -331,37 +334,33 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            // Tentar fazer pop primeiro (se houver tela anterior na pilha)
-            // Se não houver, navegar explicitamente para a tela anterior
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              // Não há tela anterior na pilha (vem do fluxo de "Recomeçar")
-              // Navegar explicitamente para a tela de dados pessoais 1
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => Step5PersonalData1Screen(
-                    authController: widget.authController,
-                    themeController: widget.themeController,
-                    cpf: widget.cpf,
-                    phone: widget.phone,
-                    email: widget.email,
-                    initialFullName: widget.fullName,
-                    initialBirthDate: widget.birthDate,
-                    initialMotherName: widget.motherName,
-                  ),
+      extendBodyBehindAppBar: true,
+      appBar: GlassAppBar(
+        onBackPressed: () {
+          // Tentar fazer pop primeiro (se houver tela anterior na pilha)
+          // Se não houver, navegar explicitamente para a tela anterior
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            // Não há tela anterior na pilha (vem do fluxo de "Recomeçar")
+            // Navegar explicitamente para a tela de dados pessoais 1
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => Step5PersonalData1Screen(
+                  authController: widget.authController,
+                  themeController: widget.themeController,
+                  cpf: widget.cpf,
+                  phone: widget.phone,
+                  email: widget.email,
+                  initialFullName: widget.fullName,
+                  initialBirthDate: widget.birthDate,
+                  initialMotherName: widget.motherName,
                 ),
-              );
-            }
-          },
-        ),
+              ),
+            );
+          }
+        },
       ),
       body: SafeArea(
         child: KeyboardDismissWrapper(
@@ -386,7 +385,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                         children: [
                           const SizedBox(height: 40),
                           const Text(
-                            'Informações Pessoais',
+                            'Endereço',
                             style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.bold,
@@ -427,14 +426,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Informe seu Endereço:',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.white70,
-                            ),
-                          ),
+                          
                           const SizedBox(height: 40),
                           // CEP
                           TextFormField(

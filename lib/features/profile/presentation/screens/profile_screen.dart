@@ -272,7 +272,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   padding: const EdgeInsets.only(right: 16),
                   child: Icon(
                     icon,
-                    color: AppTheme.primaryColor, // Verde vibrante
+                    color: Colors.white70,
                     size: 32,
                   ),
                 )
