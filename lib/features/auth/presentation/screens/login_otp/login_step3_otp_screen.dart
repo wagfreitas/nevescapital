@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/features/auth/presentation/screens/cpf_check_screen.dart';
@@ -39,7 +40,7 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
   String? _phone;
   String? _formattedPhone; // Telefone formatado E.164 para reenvio
   int? _resendToken; // Token do Firebase para reenvio
-  int _resendCountdown = 0;
+  int _resendCountdown = 30; // Inicia com cooldown de 30s ao abrir a tela
   bool _isOtpComplete = false;
   bool _isFakeMode = false;
   int _failedAttempts = 0; // Contador de tentativas falhadas
@@ -61,6 +62,9 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
         });
       }
     });
+
+    // Iniciar countdown ao abrir a tela (o código já foi enviado)
+    _startResendCountdown();
   }
 
   @override
@@ -275,57 +279,53 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
           AppLogger.debug(
               'UserId retornado: ${userId != null ? "${userId.substring(0, 8)}..." : "null"}');
 
-          String? cpf;
-
           if (userId != null && widget.authController != null) {
-            try {
-              // Garante que o documento reconhece este UID como proprietário
-              await FirestoreService.linkUserDocumentToFirebaseUid(
+            // ⚡ OTIMIZADO: Rodar linkFirebaseUid e getUserByDocumentId em PARALELO
+            // Antes eram sequenciais (~1s cada = ~2s). Agora rodam juntos (~1s total).
+            AppLogger.debug('⚡ Executando linkFirebaseUid + getUserByDocumentId em paralelo...');
+
+            final results = await Future.wait([
+              // Task 1: Vincular Firebase UID (fire-and-forget, não precisamos do resultado)
+              FirestoreService.linkUserDocumentToFirebaseUid(
                 userId: userId,
                 firebaseUid: user.uid,
-              );
-            } catch (e) {
-              AppLogger.error(
-                  'Erro ao vincular Firebase UID ao documento do usuário: $e');
-            }
+              ).catchError((e) {
+                AppLogger.error('Erro ao vincular Firebase UID: $e');
+              }),
+              // Task 2: Buscar dados do usuário (precisamos do CPF)
+              FirestoreService.getUserByDocumentId(userId),
+            ]);
 
-            // Buscar usuário no Firestore para obter CPF
-            try {
-              AppLogger.debug('Buscando usuário no Firestore pelo userId...');
-              final userData =
-                  await FirestoreService.getUserByDocumentId(userId);
-              if (userData != null) {
-                cpf = userData['cpf'] as String?;
-                AppLogger.debug(
-                    'CPF obtido do usuário: ${cpf != null ? "${cpf.substring(0, 3)}***" : "null"}');
-              } else {
-                AppLogger.warning(
-                    'Usuário não encontrado no Firestore pelo userId');
-              }
-            } catch (e) {
-              AppLogger.error('Erro ao buscar CPF do usuário: $e');
-            }
+            final userData = results[1] as Map<String, dynamic>?;
+            final cpf = userData?['cpf'] as String?;
 
-            // Se conseguiu obter CPF, fazer login via OTP
             if (cpf != null) {
               AppLogger.info(
-                  'Fazendo login com CPF: ${cpf.substring(0, 3)}***');
-              final loginSuccess =
-                  await widget.authController!.loginWithOtpMock(cpf);
+                  'CPF obtido: ${cpf.substring(0, 3)}***');
+
+              // ⚡ OTIMIZADO: Usa loginWithOtpDirect() em vez de loginWithOtpMock()
+              // loginWithOtpMock faria OUTRA query ao Firestore (getUserByCpf) = ~500ms desperdiçados
+              // loginWithOtpDirect usa o CPF que já temos = 0ms de query extra
+              final loginSuccess = await widget.authController!.loginWithOtpDirect(
+                cpf: cpf,
+                userId: userId,
+              );
 
               if (!loginSuccess) {
                 AppLogger.error('Erro ao fazer login após OTP validado');
-                setState(() {
-                  _errorMessage = widget.authController?.errorMessage ??
-                      'Erro ao fazer login';
-                });
+                if (mounted) {
+                  setState(() {
+                    _errorMessage = widget.authController?.errorMessage ??
+                        'Erro ao fazer login';
+                  });
+                }
                 return;
               }
 
               AppLogger.info(
                   '✅ Login realizado com sucesso - redirecionando para MainTabScreen');
-              
-              // Navegar diretamente para Dashboard quando usuário está logado e cadastro completo
+
+              // Navegar diretamente para Dashboard
               if (mounted) {
                 Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
                   MaterialPageRoute(
@@ -334,7 +334,7 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
                       themeController: widget.themeController ?? ThemeController(),
                     ),
                   ),
-                  (route) => false, // Remove todas as rotas anteriores
+                  (route) => false,
                 );
               }
               return;
@@ -343,17 +343,7 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
               AppLogger.warning(
                   'CPF não encontrado no cadastro - redirecionando para trilha de cadastro');
               if (mounted) {
-                _errorMessage = null;
-                Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-                  MaterialPageRoute(
-                    builder: (context) => UnifiedCpfScreen(
-                      authController: widget.authController!,
-                      themeController: widget.themeController,
-                      initialPhone: _phone,
-                    ),
-                  ),
-                  (route) => false,
-                );
+                _navigateToRegistration();
               }
               return;
             }
@@ -362,17 +352,7 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
             AppLogger.warning(
                 'UserId não retornado pelo backend - redirecionando para cadastro');
             if (mounted) {
-              _errorMessage = null;
-              Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (context) => UnifiedCpfScreen(
-                    authController: widget.authController!,
-                    themeController: widget.themeController,
-                    initialPhone: _phone,
-                  ),
-                ),
-                (route) => false,
-              );
+              _navigateToRegistration();
             }
             return;
           }
@@ -404,20 +384,7 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
         AppLogger.warning(
             '❌ Erro na API ou usuário não encontrado - redirecionando para cadastro');
         if (mounted) {
-          // Limpar mensagem de erro antes de navegar
-          _errorMessage = null;
-
-          // Redirecionar para trilha de cadastro
-          Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (context) => UnifiedCpfScreen(
-                authController: widget.authController,
-                themeController: widget.themeController,
-                initialPhone: _phone,
-              ),
-            ),
-            (route) => false,
-          );
+          _navigateToRegistration();
         }
         return;
       }
@@ -561,6 +528,22 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
     });
   }
 
+  /// Redireciona para tela de cadastro (UnifiedCpfScreen)
+  void _navigateToRegistration() {
+    if (!mounted) return;
+    _errorMessage = null;
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (context) => UnifiedCpfScreen(
+          authController: widget.authController,
+          themeController: widget.themeController,
+          initialPhone: _phone,
+        ),
+      ),
+      (route) => false,
+    );
+  }
+
   /// Redireciona para Onboarding quando OTP não confere após várias tentativas
   void _redirectToOnboarding() {
     if (!mounted) return;
@@ -587,29 +570,19 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () async {
-            // Fechar teclado se estiver aberto
-            if (FocusManager.instance.primaryFocus != null) {
-              FocusScope.of(context).unfocus();
-              // Aguardar um momento para o teclado fechar antes de navegar
-              await Future.delayed(const Duration(milliseconds: 200));
-            }
-
-            if (!context.mounted) return;
-
-            // Tentar voltar na pilha de navegação
-            final didPop = await Navigator.of(context).maybePop();
-            if (!didPop && context.mounted) {
-              // Se não conseguiu voltar, redireciona para onboarding
-              _redirectToOnboarding();
-            }
-          },
-        ),
+      extendBodyBehindAppBar: true,
+      appBar: GlassAppBar(
+        onBackPressed: () async {
+          if (FocusManager.instance.primaryFocus != null) {
+            FocusScope.of(context).unfocus();
+            await Future.delayed(const Duration(milliseconds: 200));
+          }
+          if (!context.mounted) return;
+          final didPop = await Navigator.of(context).maybePop();
+          if (!didPop && context.mounted) {
+            _redirectToOnboarding();
+          }
+        },
       ),
       body: KeyboardDismissWrapper(
         focusNodes: [_otpFocusNode],
@@ -623,7 +596,7 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
               child: Form(
                 key: _formKey,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     const Text(
                       'Digite o código',
@@ -632,16 +605,18 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
+                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
                     Text(
                       _phone != null && _phone!.isNotEmpty
-                          ? 'Informe o código de verificação recebido no número ${PhoneHelper.formatPhone(_phone!)}'
+                          ? 'Informe o código de verificação recebido no número +55 ${PhoneHelper.formatPhone(_phone!)}'
                           : 'Informe o código de verificação recebido',
                       style: const TextStyle(
                         fontSize: 16,
                         color: Colors.white70,
                       ),
+                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 40),
                     if (_isFakeMode) ...[

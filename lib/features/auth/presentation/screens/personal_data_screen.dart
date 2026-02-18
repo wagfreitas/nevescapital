@@ -6,6 +6,7 @@ import 'package:neves_capital/shared/services/cep_service.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
 
@@ -221,14 +222,8 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      extendBodyBehindAppBar: true,
+      appBar: const GlassAppBar(),
       body: SafeArea(
         child: KeyboardDismissWrapper(
           child: SingleChildScrollView(
@@ -620,7 +615,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                           ],
                           const SizedBox(height: 32),
                           CustomButton(
-                            text: widget.isEditMode ? 'Confirmar' : 'Finalizar Cadastro',
+                            text: widget.isEditMode ? 'Atualizar' : 'Finalizar Cadastro',
                             onPressed: (_isLoading || (widget.isEditMode && !_hasChanges)) ? null : _handleContinue,
                             isLoading: _isLoading,
                           ),
@@ -684,12 +679,16 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
             const SnackBar(
               content: Text('Endereço atualizado com sucesso!'),
               backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
             ),
           );
 
-          await Future.delayed(const Duration(seconds: 1));
+          // Aguardar o SnackBar desaparecer antes de navegar
+          await Future.delayed(const Duration(seconds: 3));
           if (mounted) {
-            Navigator.of(context).pop(true); // Retornar true indica sucesso
+            // Limpar SnackBars residuais antes de voltar
+            ScaffoldMessenger.of(context).clearSnackBars();
+            Navigator.of(context).pop(true);
           }
         } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

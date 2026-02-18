@@ -121,12 +121,12 @@ class KeyboardAccessoryService {
   ///
   /// Usa as cores do tema:
   /// - Botão: Azul iOS (#007AFF)
-  /// - Toolbar: Verde escuro do app (#122118) ou cinza padrão do iOS
+  /// - Toolbar: Verde escuro do app (#023E25) ou cinza padrão do iOS
   Future<bool> configureWithAppTheme({bool useDarkToolbar = false}) async {
     return configure(
       buttonText: 'OK',
       buttonColor: '#007AFF', // Azul iOS padrão
-      toolbarColor: useDarkToolbar ? '#122118' : null, // Verde escuro do app ou padrão
+      toolbarColor: useDarkToolbar ? '#023E25' : null, // Verde escuro do app ou padrão
     );
   }
 }

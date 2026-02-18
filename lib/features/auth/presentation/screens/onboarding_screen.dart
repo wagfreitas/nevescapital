@@ -167,7 +167,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     
     return Scaffold(
       // Evita flash branco (asset de fundo pode demorar 1 frame para pintar)
-      backgroundColor: const Color(0xFF02391E),
+      backgroundColor: const Color(0xFF023E25),
       resizeToAvoidBottomInset: false, // Evitar que o teclado apareça
       body: GestureDetector(
         onTap: () {
@@ -277,7 +277,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor:
-                              const Color(0xFF02391E), // Verde Escuro
+                              const Color(0xFF023E25), // Verde Escuro (mesmo fundo)
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),

@@ -57,9 +57,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       
       if (userData['displayName'] != null) {
         final displayName = userData['displayName'] as String;
-        // Pegar apenas o primeiro nome
+        // Pegar apenas o primeiro nome e capitalizar
         final nameParts = displayName.trim().split(' ');
-        final firstName = nameParts.isNotEmpty ? nameParts[0] : 'Usuário';
+        final rawFirst = nameParts.isNotEmpty ? nameParts[0] : 'Usuário';
+        final firstName = rawFirst.isNotEmpty
+            ? '${rawFirst[0].toUpperCase()}${rawFirst.substring(1).toLowerCase()}'
+            : 'Usuário';
         
         setState(() {
           _userDisplayName = firstName;
@@ -270,19 +273,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
         
         const SizedBox(height: 20),
         
-        // Botão "Histórico"
-        _buildMainButton(
-          context,
-          title: 'Histórico',
-          icon: Icons.description,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const SalesHistoryScreen(),
+        // Botão "Histórico" (fundo escuro, borda verde)
+        SizedBox(
+          width: double.infinity,
+          height: 60,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SalesHistoryScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.description, size: 24),
+            style: OutlinedButton.styleFrom(
+              backgroundColor: AppTheme.backgroundColor,
+              foregroundColor: AppTheme.primaryColor,
+              side: const BorderSide(color: AppTheme.primaryColor, width: 2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-            );
-          },
+            ),
+            label: const Text(
+              'Histórico',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ),
       ],
     );

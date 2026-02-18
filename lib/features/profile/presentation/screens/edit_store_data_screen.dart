@@ -4,7 +4,9 @@ import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
+import 'package:neves_capital/shared/components/custom_button.dart';
 
 /// Tela para alterar dados da loja (Nome e Ramo)
 /// Conforme wireframe fornecido
@@ -235,14 +237,8 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
+      extendBodyBehindAppBar: true,
+      appBar: const GlassAppBar(),
       body: SafeArea(
         child: KeyboardDismissWrapper(
           child: _isLoadingData
@@ -316,16 +312,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                       ),
                       const SizedBox(height: 24.0),
                       
-                      // Ramo de atividade (campo com busca - igual à tela de ocupação)
-                      const Text(
-                        'Ramos de Atuação:',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                      // Ramo de atividade (campo com busca)
                       GestureDetector(
                         onTap: () => _showRamoSearch(context),
                         child: Container(
@@ -334,7 +321,9 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                             color: Colors.white.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: AppTheme.primaryColor,
+                              color: _selectedBusinessType != null
+                                  ? AppTheme.primaryColor
+                                  : Colors.white.withValues(alpha: 0.2),
                               width: 1,
                             ),
                           ),
@@ -344,7 +333,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  _getSelectedRamoLabel() ?? 'Buscar ramo de atuação',
+                                  _getSelectedRamoLabel() ?? 'Ramo de Atuação',
                                   style: TextStyle(
                                     color: _selectedBusinessType != null
                                         ? Colors.white
@@ -353,43 +342,18 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                                   ),
                                 ),
                               ),
-                              const Icon(Icons.search, color: Colors.white70),
+                              const Icon(Icons.keyboard_arrow_down, color: Colors.white70),
                             ],
                           ),
                         ),
                       ),
                       const SizedBox(height: 40.0),
                       
-                      // Botão CONFIRMAR
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: (_isLoading || !_hasChanges) ? null : _saveStoreData,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryColor,
-                            foregroundColor: AppTheme.backgroundColor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(25),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.backgroundColor),
-                                  ),
-                                )
-                              : const Text(
-                                  'CONFIRMAR',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                        ),
+                      // Botão Atualizar
+                      CustomButton(
+                        text: 'Atualizar',
+                        onPressed: (_isLoading || !_hasChanges) ? null : _saveStoreData,
+                        isLoading: _isLoading,
                       ),
                     ],
                   ),
@@ -456,74 +420,83 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        backgroundColor: AppTheme.backgroundColor,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.pop(context, widget.selectedValue);
-          },
+          onPressed: () => Navigator.pop(context, widget.selectedValue),
         ),
-        title: TextField(
-          controller: _searchController,
-          focusNode: _searchFocusNode,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-          keyboardType: TextInputType.text,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _searchFocusNode.unfocus(),
-          decoration: InputDecoration(
-            hintText: 'Buscar ramo de atuação',
-            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-            filled: true,
-            fillColor: AppTheme.inputEditableBackgroundColor,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppTheme.primaryColor),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            prefixIcon: const Icon(Icons.search, color: Colors.white70),
-            suffixIcon: _searchController.text.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear, color: Colors.white70),
-                    onPressed: () => _searchController.clear(),
-                  )
-                : null,
-          ),
+        title: const Text(
+          'Selecione o Ramo de Atuação',
+          style: TextStyle(color: Colors.white, fontSize: 18),
         ),
       ),
-      body: ListView.builder(
-        itemCount: _filteredTypes.length,
-        itemBuilder: (context, index) {
-          final type = _filteredTypes[index];
-          final value = type['value']!;
-          final label = type['label']!;
-          final isSelected = value == widget.selectedValue;
-
-          return ListTile(
-            title: Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? AppTheme.primaryColor : Colors.white,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+      body: Column(
+        children: [
+          // Campo de busca
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Digite o nome do ramo de atuação',
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                prefixIcon: Icon(Icons.search, color: AppTheme.textSecondary),
+                filled: true,
+                fillColor: AppTheme.inputEditableBackgroundColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                ),
               ),
             ),
-            trailing: isSelected
-                ? Icon(Icons.check, color: AppTheme.primaryColor)
-                : null,
-            onTap: () => Navigator.pop(context, value),
-          );
-        },
+          ),
+          // Lista de ramos
+          Expanded(
+            child: _filteredTypes.isEmpty
+                ? Center(
+                    child: Text(
+                      'Nenhum ramo encontrado',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: _filteredTypes.length,
+                    itemBuilder: (context, index) {
+                      final type = _filteredTypes[index];
+                      final value = type['value']!;
+                      final label = type['label']!;
+                      final isSelected = value == widget.selectedValue;
+
+                      return ListTile(
+                        title: Text(
+                          label,
+                          style: TextStyle(
+                            color: isSelected ? AppTheme.primaryColor : Colors.white,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? Icon(Icons.check, color: AppTheme.primaryColor)
+                            : const Icon(Icons.arrow_forward_ios, size: 16, color: AppTheme.textSecondary),
+                        onTap: () => Navigator.pop(context, value),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }

@@ -41,7 +41,6 @@ class PaymentResultScreen extends StatelessWidget {
           ),
         ),
         centerTitle: true,
-        backgroundColor: AppTheme.backgroundColor,
         elevation: 0,
         automaticallyImplyLeading: false,
       ),

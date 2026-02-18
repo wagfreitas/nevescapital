@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
-import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../../shared/components/bottom_tab_bar.dart';
 import 'dashboard_screen.dart';
@@ -43,7 +42,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: const Color(0xFF023E25),
       bottomNavigationBar: BottomTabBar(
         isVendasActive: _currentIndex == 0,
         onVendasTap: () => _onTabTapped(0),

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Modify this file to customize your launch splash screen -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Fundo igual ao do logo (#0d3d26) -->
+    <!-- Fundo igual ao do app (#023E25) -->
     <item>
-        <color android:color="#0d3d26" />
+        <color android:color="#023E25" />
     </item>
 
     <!-- Logo Pag Pag centralizado -->

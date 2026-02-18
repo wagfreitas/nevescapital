@@ -122,13 +122,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        backgroundColor: AppTheme.backgroundColor,
-        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: null,
       ),
       body: _isLoading
           ? const Center(
@@ -547,6 +544,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                                   surface: AppTheme.cardColor,
                                   onSurface: Colors.white,
                                 ),
+                                textButtonTheme: TextButtonThemeData(
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
                               ),
                               child: child!,
                             );
@@ -622,6 +624,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                                   onPrimary: Colors.white,
                                   surface: AppTheme.cardColor,
                                   onSurface: Colors.white,
+                                ),
+                                textButtonTheme: TextButtonThemeData(
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                  ),
                                 ),
                               ),
                               child: child!,
@@ -1101,9 +1108,9 @@ class _CurrencyInputFormatter extends TextInputFormatter {
       return newValue.copyWith(text: '');
     }
 
-    // Limitar a 9 dígitos (máximo R$999.999,99 = 99999999 centavos)
-    final limitedDigits = digitsOnly.length > 9 
-        ? digitsOnly.substring(0, 9) 
+    // Limitar a 7 dígitos (máximo R$99.999,99 = 5 inteiros + 2 decimais)
+    final limitedDigits = digitsOnly.length > 7 
+        ? digitsOnly.substring(0, 7) 
         : digitsOnly;
     
     final intValue = int.parse(limitedDigits);

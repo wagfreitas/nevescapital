@@ -7,6 +7,7 @@ import 'package:neves_capital/features/auth/presentation/controllers/auth_contro
 import 'package:neves_capital/features/auth/presentation/screens/personal_data_screen.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
 /// Tela para alterar dados pessoais (Email, Endereço)
@@ -171,12 +172,6 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
     // Se o usuário salvou o endereço, atualizar estado
     if (result == true && mounted) {
       await _loadUserData(); // Recarregar dados do Firestore
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Endereço atualizado com sucesso!'),
-          backgroundColor: Colors.green,
-        ),
-      );
     }
   }
 
@@ -360,14 +355,8 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
+      extendBodyBehindAppBar: true,
+      appBar: const GlassAppBar(),
       body: _isLoadingData
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF4ADE80)),
@@ -444,15 +433,14 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
                               readOnly: true,
                               onTap: _navigateToAddressEdit,
                               controller: _addressController,
-                              maxLines: 2,
+                              maxLines: 3,
                               textAlign: TextAlign.left,
                               textAlignVertical: TextAlignVertical.top,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
-                                height: 1.0,
+                                height: 1.6,
                                 letterSpacing: 0.0,
-                                wordSpacing: 0.0,
                               ),
                               decoration: InputDecoration(
                                 labelText: 'Endereço',
@@ -491,9 +479,9 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
                             
                             const SizedBox(height: 40),
                             
-                            // Botão Confirmar (desabilitado se não houver mudanças)
+                            // Botão Atualizar (desabilitado se não houver mudanças)
                             CustomButton(
-                              text: 'Confirmar',
+                              text: 'Atualizar',
                               onPressed: (_isLoading || !_hasChanges) ? null : _handleConfirm,
                               isLoading: _isLoading,
                             ),

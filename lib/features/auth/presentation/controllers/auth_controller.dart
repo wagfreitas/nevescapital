@@ -104,14 +104,9 @@ class AuthController extends ChangeNotifier {
   Future<void> _saveOtpLoginState(bool isLoggedIn) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final saved = await prefs.setBool(_isLoggedInKey, isLoggedIn);
+      await prefs.setBool(_isLoggedInKey, isLoggedIn);
       _isLoggedInOtp = isLoggedIn;
-      AppLogger.info('🔐 [AUTH] Estado de login OTP salvo no SharedPreferences: $isLoggedIn (sucesso: $saved)');
-      AppLogger.debug('🔐 [AUTH] Chave usada: $_isLoggedInKey');
-      
-      // Verificar se foi salvo corretamente
-      final verification = prefs.getBool(_isLoggedInKey);
-      AppLogger.debug('🔐 [AUTH] Verificação após salvar: $verification');
+      AppLogger.info('🔐 [AUTH] Estado de login OTP salvo: $isLoggedIn');
     } catch (e) {
       AppLogger.error('❌ [AUTH] Erro ao salvar estado de login OTP', e);
     }
@@ -347,24 +342,26 @@ class AuthController extends ChangeNotifier {
 
   /// Login com OTP (sem Firebase, apenas validação do código)
   /// Após validação do OTP, marca o usuário como logado no SharedPreferences
-  /// 
+  ///
   /// **REFATORADO**: Agora usa GetUserByCpfUseCase (Clean Architecture)
+  /// **Nota**: Prefira loginWithOtpDirect() quando já tiver os dados do usuário
   Future<bool> loginWithOtpMock(String cpf) async {
-    _setLoading(true);
-    _clearError();
-    _setLoginProgress(LoginProgress.searchingUser);
+    _isLoading = true;
+    _errorMessage = null;
+    _loginProgress = LoginProgress.searchingUser;
+    notifyListeners();
 
     try {
       AppLogger.sensitive('OTP: Iniciando login com OTP para CPF', cpf);
-      
+
       // 1. Buscar usuário usando UseCase (Clean Architecture)
       final getUserUseCase = await AuthUseCaseFactory.createGetUserByCpfUseCase();
       final result = await getUserUseCase(cpf: cpf);
-      
+
       if (result.isError) {
         throw Exception(result.errorMessage ?? 'Erro ao buscar usuário');
       }
-      
+
       final user = result.dataOrNull;
       if (user == null) {
         throw Exception('CPF não cadastrado');
@@ -372,41 +369,71 @@ class AuthController extends ChangeNotifier {
 
       AppLogger.info('OTP: Usuário encontrado via UseCase');
 
-      // 2. OTP foi validado na tela anterior, então apenas marcamos como logado
-      // Em produção, aqui seria feita a validação do OTP com o backend
-      _setLoginProgress(LoginProgress.authenticating);
-      
-      // 3. Salvar estado de login no SharedPreferences
-      await _saveOtpLoginState(true);
-      
-      // 4. Salvar CPF e timestamp de login
-      await SecureStorageService.saveLastCpf(cpf);
-      await UserCacheService.saveLastLogin();
+      // 2. Salvar estado + CPF + timestamp em PARALELO (antes era sequencial)
+      _loginProgress = LoginProgress.authenticating;
+      await Future.wait([
+        _saveOtpLoginState(true),
+        SecureStorageService.saveLastCpf(cpf),
+        UserCacheService.saveLastLogin(),
+      ]);
 
-      _setLoginProgress(LoginProgress.success);
-      
+      _loginProgress = LoginProgress.success;
+      _isLoading = false;
       AppLogger.info('OTP: Login com OTP realizado com sucesso!');
-      AppLogger.debug('isLoggedIn: $isLoggedIn');
-      
       notifyListeners();
-      
+
       return true;
-      
+
     } catch (e) {
       AppLogger.error('OTP: Erro no login com OTP', e);
-      _setLoginProgress(LoginProgress.error);
-      
-      String errorMessage = 'Erro no login';
-      if (e.toString().contains('CPF não cadastrado')) {
-        errorMessage = 'CPF não cadastrado';
-      } else {
-        errorMessage = e.toString().replaceAll('Exception: ', '');
-      }
-      
-      _setError(errorMessage);
+      _loginProgress = LoginProgress.error;
+      _errorMessage = e.toString().contains('CPF não cadastrado')
+          ? 'CPF não cadastrado'
+          : e.toString().replaceAll('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
       return false;
-    } finally {
-      _setLoading(false);
+    }
+  }
+
+  /// Login direto com OTP - OTIMIZADO (sem re-busca ao Firestore)
+  ///
+  /// Chamado quando já temos CPF e userId do getUserByDocumentId().
+  /// Evita uma segunda query ao Firestore que o loginWithOtpMock() faria.
+  /// Economiza ~500ms-1s por login.
+  Future<bool> loginWithOtpDirect({
+    required String cpf,
+    required String userId,
+  }) async {
+    try {
+      AppLogger.info('OTP Direct: Login direto sem re-busca ao Firestore');
+
+      _loginProgress = LoginProgress.authenticating;
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      // Salvar TUDO em paralelo (4 operações simultâneas)
+      await Future.wait([
+        _saveOtpLoginState(true),
+        SecureStorageService.saveLastCpf(cpf),
+        SecureStorageService.saveUserId(userId),
+        UserCacheService.saveLastLogin(),
+      ]);
+
+      _loginProgress = LoginProgress.success;
+      _isLoading = false;
+      AppLogger.info('OTP Direct: Login realizado com sucesso!');
+      notifyListeners();
+
+      return true;
+    } catch (e) {
+      AppLogger.error('OTP Direct: Erro no login', e);
+      _loginProgress = LoginProgress.error;
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
     }
   }
 

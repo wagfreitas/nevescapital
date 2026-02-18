@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:neves_capital/shared/helpers/email_helper.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
@@ -166,34 +167,30 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            // Tentar fazer pop primeiro (se houver tela anterior na pilha)
-            // Se não houver, navegar explicitamente para a tela de CPF
-            // Isso garante que funciona tanto no fluxo normal quanto no "Recomeçar"
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              // Não há tela anterior na pilha (vem do fluxo de "Recomeçar")
-              // Navegar explicitamente para a tela de CPF com o CPF restaurado
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => UnifiedCpfScreen(
-                    authController: widget.authController,
-                    themeController: widget.themeController,
-                    initialPhone: widget.phone,
-                    initialCpf: widget.cpf,
-                  ),
+      extendBodyBehindAppBar: true,
+      appBar: GlassAppBar(
+        onBackPressed: () {
+          // Tentar fazer pop primeiro (se houver tela anterior na pilha)
+          // Se não houver, navegar explicitamente para a tela de CPF
+          // Isso garante que funciona tanto no fluxo normal quanto no "Recomeçar"
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            // Não há tela anterior na pilha (vem do fluxo de "Recomeçar")
+            // Navegar explicitamente para a tela de CPF com o CPF restaurado
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => UnifiedCpfScreen(
+                  authController: widget.authController,
+                  themeController: widget.themeController,
+                  initialPhone: widget.phone,
+                  initialCpf: widget.cpf,
                 ),
-              );
-            }
-          },
-        ),
+              ),
+            );
+          }
+        },
       ),
       body: SafeArea(
         child: KeyboardDismissWrapper(
@@ -241,9 +238,12 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
                           keyboardType: TextInputType.emailAddress,
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
-                            hintText: 'seu@email.com',
+                            labelText: 'Email',
+                            labelStyle: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7)),
+                            hintText: 'Email',
                             hintStyle: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.5)),
+                                color: Colors.white.withValues(alpha: 0.3)),
                             filled: true,
                             fillColor: AppTheme.inputEditableBackgroundColor,
                             border: OutlineInputBorder(
