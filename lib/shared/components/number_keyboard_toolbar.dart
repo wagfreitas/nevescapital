@@ -202,7 +202,6 @@ class _KeyboardToolbarOverlayState extends State<_KeyboardToolbarOverlay> {
                   // Removida a borda superior para integrar melhor com o teclado
                 ),
                 child: SafeArea(
-                  top: false,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [

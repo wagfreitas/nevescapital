@@ -8,6 +8,7 @@ import 'package:neves_capital/shared/helpers/card_brand_detector.dart';
 import 'package:neves_capital/shared/helpers/card_brand_image_loader.dart';
 import 'package:neves_capital/shared/helpers/format_helpers.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   const SalesHistoryScreen({super.key});
@@ -121,12 +122,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
+      extendBodyBehindAppBar: true,
+      appBar: const GlassAppBar(),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(
