@@ -6,6 +6,7 @@ import 'package:neves_capital/shared/helpers/card_brand_image_loader.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import '../helpers/payment_step_helper.dart';
 // import 'package:credit_card_scanner/credit_card_scanner.dart'; // TEMPORARIAMENTE DESABILITADO
 import 'payment_step5_screen.dart';
@@ -40,6 +41,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
   CardBrand _detectedBrand = CardBrand.unknown;
   bool _hasAccount = false;
   bool _isLoadingAccount = true;
+  bool _submitted = false;
 
   @override
   void initState() {
@@ -116,6 +118,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
   */
 
   void _continuar() {
+    setState(() => _submitted = true);
     if (_formKey.currentState?.validate() ?? false) {
       Navigator.push(
         context,
@@ -145,13 +148,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
     final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        forceMaterialTransparency: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
+      appBar: const GlassAppBar(),
       body: _isLoadingAccount
           ? const Center(
               child: CircularProgressIndicator(
@@ -163,6 +160,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                 padding: EdgeInsets.fromLTRB(24.0, topPadding, 24.0, 24.0),
                 child: Form(
                   key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -225,10 +223,10 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Insira o nome do titular';
+                      return _submitted ? 'Insira o nome do titular' : null;
                     }
                     if (value.length < 3) {
-                      return 'Nome inválido';
+                      return _submitted ? 'Nome inválido' : null;
                     }
                     return null;
                   },
@@ -280,11 +278,11 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Insira o número do cartão';
+                      return _submitted ? 'Insira o número do cartão' : null;
                     }
                     final digits = value.replaceAll(' ', '');
-                    if (digits.length != 16) {
-                      return 'O número do cartão deve ter 16 dígitos';
+                    if (digits.length < 16) {
+                      return _submitted ? 'O número do cartão deve ter 16 dígitos' : null;
                     }
                     return null;
                   },
@@ -341,10 +339,10 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Insira o CVV';
+                            return _submitted ? 'Insira o CVV' : null;
                           }
                           if (value.length < 3) {
-                            return 'CVV inválido';
+                            return _submitted ? 'CVV inválido' : null;
                           }
                           return null;
                         },
@@ -402,10 +400,10 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Insira a validade';
+                            return _submitted ? 'Insira a validade' : null;
                           }
-                          if (value.length != 5) {
-                            return 'Data inválida';
+                          if (value.length < 5) {
+                            return _submitted ? 'Data inválida' : null;
                           }
                           final parts = value.split('/');
                           final month = int.tryParse(parts[0]) ?? 0;

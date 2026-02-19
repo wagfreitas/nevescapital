@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 class AppTheme {
   // Cores baseadas no Design Concept
   static const Color primaryColor = Color(0xFF28CC28); // Verde dos botões (#28CC28)
-  static const Color backgroundColor = Color(0xFF023E25); // Fundo verde escuro (#023E25) - mesmo da splash
+  static const Color splashColor = Color(0xFF023E25); // Verde da Splash e MainTab (#023E25)
+  static const Color backgroundColor = Color(0xFF122118); // Fundo verde escuro padrão (#122118)
   static const Color surfaceColor = Color(0xFF1A2B1F); // Superfície verde escura
   static const Color cardColor = Color(0xFF1F2A1F); // Cards com tom verde
   static const Color borderColor = Color(0xFF2A3A2A); // Bordas verdes sutis

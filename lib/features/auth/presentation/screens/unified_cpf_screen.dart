@@ -268,18 +268,20 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+              const topPad = 40.0;
+              const bottomPad = 48.0;
               return SingleChildScrollView(
                 reverse: true,
                 keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: EdgeInsets.only(
                   left: 16.0,
                   right: 16.0,
-                  top: 40.0,
-                  bottom: bottomInset + 32.0,
+                  top: topPad,
+                  bottom: bottomInset + bottomPad,
                 ),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight,
+                    minHeight: constraints.maxHeight - topPad - bottomPad,
                   ),
                   child: Form(
                     key: _formKey,
@@ -288,20 +290,15 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const SizedBox(height: 40),
-                          const Text(
-                            'Vamos começar',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Insira seu CPF para continuar',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.white70,
+                          const Center(
+                            child: Text(
+                              'Insira seu CPF',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 40),
@@ -397,7 +394,6 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
                                     ),
                             ),
                           ),
-                          const SizedBox(height: 24),
                         ],
                       ),
                     ),

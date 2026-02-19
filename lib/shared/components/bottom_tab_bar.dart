@@ -24,7 +24,6 @@ class BottomTabBar extends StatelessWidget {
         ),
       ),
       child: SafeArea(
-        top: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           child: Row(

@@ -48,13 +48,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       // Buscar dados do usuário no Firestore
       final userData = await FirestoreService.getUserByCpf(cpf);
-      
+
       if (userData == null) {
         AppLogger.warning('Usuário não encontrado no Firestore - fazendo logout e redirecionando');
         await _handleUserNotFound();
         return;
       }
-      
+
       if (userData['displayName'] != null) {
         final displayName = userData['displayName'] as String;
         // Pegar apenas o primeiro nome e capitalizar
@@ -63,7 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final firstName = rawFirst.isNotEmpty
             ? '${rawFirst[0].toUpperCase()}${rawFirst.substring(1).toLowerCase()}'
             : 'Usuário';
-        
+
         setState(() {
           _userDisplayName = firstName;
           _isLoadingName = false;

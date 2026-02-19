@@ -26,6 +26,15 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
+  // Forçar status bar transparente globalmente
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    statusBarBrightness: Brightness.dark,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.light,
+  ));
+
   // Tratamento de erros global - configurar ANTES de qualquer outra coisa
   FlutterError.onError = (FlutterErrorDetails details) {
     // Verificar se é erro de overflow (são avisos visuais, não erros críticos)
@@ -400,21 +409,15 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
       );
     }
 
-    return ListenableBuilder(
-      listenable: _authController!,
-      builder: (context, child) {
-        // Debug: verificar estado de autenticação
-        AppLogger.debug(
-            'AppWrapper reconstruindo - isLoggedIn: ${_authController!.isLoggedIn}');
-
-        // SEMPRE passar pelo SplashScreen primeiro
-        // O SplashScreen verifica isLoggedIn e gerencia o fluxo de biometria
-        AppLogger.debug('Navegando para SplashScreen (verificação de login e biometria)');
-        return SplashScreen(
-          authController: _authController!,
-          themeController: widget.themeController,
-        );
-      },
+    // NÃO usar ListenableBuilder aqui!
+    // O SplashScreen é o ponto de entrada único — ele verifica login + biometria
+    // e faz navegação imperativa (pushReplacement) para Dashboard ou Onboarding.
+    // Se usarmos ListenableBuilder no AuthController, qualquer notifyListeners()
+    // recria o SplashScreen, causando loop de verificação/biometria.
+    AppLogger.debug('AppWrapper: Exibindo SplashScreen (entrada única)');
+    return SplashScreen(
+      authController: _authController!,
+      themeController: widget.themeController,
     );
   }
 }

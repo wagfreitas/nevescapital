@@ -573,13 +573,8 @@ class _BankSearchScreenState extends State<_BankSearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+      extendBodyBehindAppBar: true,
+      appBar: GlassAppBar(
         title: const Text(
           'Selecione o Banco',
           style: TextStyle(color: Colors.white, fontSize: 18),

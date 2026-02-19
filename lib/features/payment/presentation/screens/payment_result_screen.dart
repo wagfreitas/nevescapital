@@ -3,6 +3,7 @@ import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/helpers/format_helpers.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 
 /// Tela 5: Resultado do pagamento
 class PaymentResultScreen extends StatelessWidget {
@@ -31,7 +32,9 @@ class PaymentResultScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
+      extendBodyBehindAppBar: true,
+      appBar: GlassAppBar(
+        showBackButton: false,
         title: const Text(
           'Resultado da Venda',
           style: TextStyle(
@@ -40,9 +43,6 @@ class PaymentResultScreen extends StatelessWidget {
             fontSize: 18,
           ),
         ),
-        centerTitle: true,
-        elevation: 0,
-        automaticallyImplyLeading: false,
       ),
       body: SafeArea(
         child: SingleChildScrollView(

@@ -420,13 +420,9 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context, widget.selectedValue),
-        ),
+      extendBodyBehindAppBar: true,
+      appBar: GlassAppBar(
+        onBackPressed: () => Navigator.pop(context, widget.selectedValue),
         title: const Text(
           'Selecione o Ramo de Atuação',
           style: TextStyle(color: Colors.white, fontSize: 18),

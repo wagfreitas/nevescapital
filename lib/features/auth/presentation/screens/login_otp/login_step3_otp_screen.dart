@@ -567,37 +567,42 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      resizeToAvoidBottomInset: true,
-      extendBodyBehindAppBar: true,
-      appBar: GlassAppBar(
-        onBackPressed: () async {
-          if (FocusManager.instance.primaryFocus != null) {
-            FocusScope.of(context).unfocus();
-            await Future.delayed(const Duration(milliseconds: 200));
-          }
-          if (!context.mounted) return;
-          final didPop = await Navigator.of(context).maybePop();
-          if (!didPop && context.mounted) {
-            _redirectToOnboarding();
-          }
-        },
-      ),
       body: KeyboardDismissWrapper(
         focusNodes: [_otpFocusNode],
         doneText: 'OK',
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.only(top: 40, bottom: 40),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: EdgeInsets.only(top: topPadding + 8, bottom: 40),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Botão voltar alinhado à esquerda
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: LiquidBackButton(
+                          onPressed: () async {
+                            if (FocusManager.instance.primaryFocus != null) {
+                              FocusScope.of(context).unfocus();
+                              await Future.delayed(const Duration(milliseconds: 200));
+                            }
+                            if (!context.mounted) return;
+                            final didPop = await Navigator.of(context).maybePop();
+                            if (!didPop && context.mounted) {
+                              _redirectToOnboarding();
+                            }
+                          },
+                        ),
+                      ),
+                    ),
                     const Text(
                       'Digite o código',
                       style: TextStyle(
@@ -797,7 +802,6 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
             ),
           ),
         ),
-      ),
     );
   }
 }

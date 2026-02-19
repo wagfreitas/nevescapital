@@ -214,12 +214,15 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 40),
-                        const Text(
-                          'Insira seu email',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                        const Center(
+                          child: Text(
+                            'Insira seu email',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),

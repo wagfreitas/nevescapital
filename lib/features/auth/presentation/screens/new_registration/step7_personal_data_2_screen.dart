@@ -508,12 +508,15 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 40),
-                      const Text(
-                        'Informações Pessoais',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                      const Center(
+                        child: Text(
+                          'Informações Pessoais',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),

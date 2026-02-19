@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 
 class PrivacyPolicyScreen extends StatelessWidget {
   const PrivacyPolicyScreen({super.key});
@@ -8,11 +9,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+      extendBodyBehindAppBar: true,
+      appBar: GlassAppBar(
         title: const Text(
           'Política de Privacidade',
           style: TextStyle(color: Colors.white, fontSize: 18),

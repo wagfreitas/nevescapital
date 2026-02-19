@@ -506,12 +506,15 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 40),
-                      const Text(
-                        'Documento com Foto',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                      const Center(
+                        child: Text(
+                          'Documento com Foto',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 40),
