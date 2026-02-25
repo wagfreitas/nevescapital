@@ -213,14 +213,6 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Precisamos do seu email para completar o cadastro',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white70,
-                          ),
-                        ),
                         const SizedBox(height: 40),
                         TextFormField(
                           controller: _emailController,
