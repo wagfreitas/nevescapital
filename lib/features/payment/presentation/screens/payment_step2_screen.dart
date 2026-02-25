@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/helpers/format_helpers.dart';
-import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import '../helpers/payment_step_helper.dart';
@@ -142,27 +141,13 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
               ),
             )
           : SafeArea(
-              child: GestureDetector(
-                onTap: () {
-                  FocusScope.of(context).unfocus();
-                },
-                behavior: HitTestBehavior.translucent,
-                child: KeyboardDismissWrapper(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-                    return SingleChildScrollView(
-                      reverse: true,
-                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                      padding: EdgeInsets.fromLTRB(24.0, 0, 24.0, bottomInset + 24.0),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                        child: Form(
-                          key: _formKey,
-                          child: IntrinsicHeight(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                         const SizedBox(height: 40),
                         // Título centralizado
                         const Center(
@@ -284,17 +269,11 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
                   onPressed: _isButtonEnabled ? _continuar : null,
                 ),
                 const SizedBox(height: 24),
-                          ],
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
-                );
-              },
+                ),
+              ),
             ),
-          ),
-        ),
-      ),
     );
   }
 
