@@ -488,26 +488,29 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
           }
         },
       ),
-      body: SafeArea(
+      body: Container(
+        color: AppTheme.backgroundColor,
         child: KeyboardDismissWrapper(
           child: LayoutBuilder(
             builder: (context, constraints) {
             final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
             return SingleChildScrollView(
               reverse: true,
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: EdgeInsets.only(
                 left: 24.0,
                 right: 24.0,
+                top: topPadding,
                 bottom: bottomInset + 32.0,
               ),
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                constraints: BoxConstraints(minHeight: constraints.maxHeight - topPadding),
                 child: IntrinsicHeight(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 16),
                       const Center(
                         child: Text(
                           'Informações Pessoais',
