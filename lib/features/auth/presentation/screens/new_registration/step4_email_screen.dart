@@ -194,24 +194,12 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
       ),
       body: SafeArea(
         child: KeyboardDismissWrapper(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-            return SingleChildScrollView(
-              reverse: true,
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: EdgeInsets.only(
-                left: 24.0,
-                right: 24.0,
-                bottom: bottomInset + 32.0,
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Form(
-                  key: _formKey,
-                  child: IntrinsicHeight(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 40),
                         const Center(
@@ -244,7 +232,7 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
                             labelText: 'Email',
                             labelStyle: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.7)),
-                            hintText: 'Email',
+                            hintText: 'Seu Email',
                             hintStyle: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.3)),
                             filled: true,
@@ -346,11 +334,7 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
                   ),
                 ),
               ),
-            );
-          },
-        ),
-        ),
-      ),
+            ),
     );
   }
 }
