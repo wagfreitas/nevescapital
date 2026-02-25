@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:neves_capital/core/theme/app_theme.dart';
 
 /// Scaffold com AppBar 100% transparente integrada.
 ///
@@ -182,11 +183,7 @@ class LiquidBackButton extends StatelessWidget {
             height: size,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.12),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.20),
-                width: 1,
-              ),
+              color: AppTheme.backgroundColor,
             ),
             child: const Icon(
               Icons.arrow_back,
