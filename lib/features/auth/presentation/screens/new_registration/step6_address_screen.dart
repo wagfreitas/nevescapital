@@ -566,86 +566,96 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                             },
                           ),
                           const SizedBox(height: 20),
-                          // Número e Complemento (lado a lado)
+                          // Número e Complemento (lado a lado, altura fixa para erro não desalinhar)
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Expanded(
                                 flex: 2,
-                                child: TextFormField(
-                                  controller: _numberController,
-                                  focusNode: _numberFocusNode,
-                                  keyboardType: TextInputType.number,
-                                  textInputAction: TextInputAction.done,
-                                  onFieldSubmitted: (_) {
-                                    // Fechar teclado quando usuário pressionar "OK" ou "Done"
-                                    _numberFocusNode.unfocus();
-                                  },
-                                  style: const TextStyle(color: Colors.white),
-                                  decoration: InputDecoration(
-                                    labelText: 'Nº',
-                                    labelStyle: const TextStyle(color: Colors.white70),
-                                    filled: true,
-                                    fillColor: AppTheme.inputEditableBackgroundColor,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide.none,
+                                child: SizedBox(
+                                  height: 76,
+                                  child: TextFormField(
+                                    controller: _numberController,
+                                    focusNode: _numberFocusNode,
+                                    keyboardType: TextInputType.number,
+                                    textInputAction: TextInputAction.done,
+                                    onFieldSubmitted: (_) {
+                                      _numberFocusNode.unfocus();
+                                    },
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration: InputDecoration(
+                                      labelText: 'Nº',
+                                      labelStyle: const TextStyle(color: Colors.white70),
+                                      filled: true,
+                                      fillColor: AppTheme.inputEditableBackgroundColor,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                            color: Colors.white.withValues(alpha: 0.2)),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide:
+                                            BorderSide(color: AppTheme.primaryColor, width: 2),
+                                      ),
+                                      errorBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(color: Colors.red, width: 2),
+                                      ),
+                                      focusedErrorBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(color: Colors.red, width: 2),
+                                      ),
+                                      prefixIcon: const Icon(Icons.numbers, color: Colors.white70),
                                     ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(
-                                          color: Colors.white.withValues(alpha: 0.2)),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide:
-                                          BorderSide(color: AppTheme.primaryColor, width: 2),
-                                    ),
-                                    errorBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: const BorderSide(color: Colors.red, width: 2),
-                                    ),
-                                    prefixIcon: const Icon(Icons.numbers, color: Colors.white70),
+                                    validator: (value) {
+                                      if (value == null || value.trim().isEmpty) {
+                                        return 'Informe';
+                                      }
+                                      return null;
+                                    },
                                   ),
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'Digite o número';
-                                    }
-                                    return null;
-                                  },
                                 ),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
                                 flex: 3,
-                                child: TextFormField(
-                                  controller: _complementController,
-                                  focusNode: _complementFocusNode,
-                                  keyboardType: TextInputType.text,
-                                  style: const TextStyle(color: Colors.white),
-                                  decoration: InputDecoration(
-                                    labelText: 'Complemento',
-                                    labelStyle: const TextStyle(color: Colors.white70),
-                                    filled: true,
-                                    fillColor: AppTheme.inputEditableBackgroundColor,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide.none,
+                                child: SizedBox(
+                                  height: 76,
+                                  child: TextFormField(
+                                    controller: _complementController,
+                                    focusNode: _complementFocusNode,
+                                    keyboardType: TextInputType.text,
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration: InputDecoration(
+                                      labelText: 'Complemento',
+                                      labelStyle: const TextStyle(color: Colors.white70),
+                                      filled: true,
+                                      fillColor: AppTheme.inputEditableBackgroundColor,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                            color: Colors.white.withValues(alpha: 0.2)),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide:
+                                            BorderSide(color: AppTheme.primaryColor, width: 2),
+                                      ),
+                                      errorBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(color: Colors.red, width: 2),
+                                      ),
+                                      prefixIcon: const Icon(Icons.apartment, color: Colors.white70),
                                     ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(
-                                          color: Colors.white.withValues(alpha: 0.2)),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide:
-                                          BorderSide(color: AppTheme.primaryColor, width: 2),
-                                    ),
-                                    errorBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: const BorderSide(color: Colors.red, width: 2),
-                                    ),
-                                    prefixIcon: const Icon(Icons.apartment, color: Colors.white70),
                                   ),
                                 ),
                               ),
