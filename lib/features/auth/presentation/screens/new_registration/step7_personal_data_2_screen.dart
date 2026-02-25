@@ -853,10 +853,6 @@ class _OccupationSearchScreenState extends State<_OccupationSearchScreen> {
     super.initState();
     _filteredOccupations = widget.occupations;
     _searchController.addListener(_filterOccupations);
-    // Focar no campo de busca automaticamente
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _searchFocusNode.requestFocus();
-    });
   }
 
   @override
@@ -894,7 +890,7 @@ class _OccupationSearchScreenState extends State<_OccupationSearchScreen> {
         title: TextField(
           controller: _searchController,
           focusNode: _searchFocusNode,
-          autofocus: true,
+          autofocus: false,
           style: const TextStyle(color: Colors.white),
           keyboardType: TextInputType.text,
           textInputAction: TextInputAction.done,

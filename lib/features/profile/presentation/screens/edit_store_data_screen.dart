@@ -443,13 +443,19 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
           style: TextStyle(color: Colors.white, fontSize: 18),
         ),
       ),
-      body: Column(
+      body: Container(
+        color: AppTheme.backgroundColor,
+        child: Builder(
+          builder: (context) {
+            final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
+            return Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: EdgeInsets.only(left: 16.0, right: 16.0, top: topPadding - 8.0, bottom: 4.0),
             child: TextField(
               controller: _searchController,
               focusNode: _searchFocusNode,
+              autofocus: false,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Digite o nome do ramo de atuação',
@@ -485,6 +491,7 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
                     ),
                   )
                 : ListView.builder(
+                    padding: EdgeInsets.zero,
                     itemCount: _filteredTypes.length,
                     itemBuilder: (context, index) {
                       final type = _filteredTypes[index];
@@ -514,6 +521,9 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
                   ),
           ),
         ],
+            );
+          },
+        ),
       ),
     );
   }
