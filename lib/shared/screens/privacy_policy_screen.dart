@@ -7,17 +7,19 @@ class PrivacyPolicyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
+        onBackPressed: () => Navigator.of(context).pop(),
         title: const Text(
           'Política de Privacidade',
           style: TextStyle(color: Colors.white, fontSize: 18),
         ),
       ),
-      body: const SingleChildScrollView(
-        padding: EdgeInsets.all(24),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(24, 24 + topPadding, 24, 24),
         child: Text(
           'POLÍTICA DE PRIVACIDADE - PagPag\n\n'
           'Última atualização: Fevereiro de 2026\n\n'

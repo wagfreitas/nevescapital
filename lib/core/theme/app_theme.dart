@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Tema da aplicação
 class AppTheme {
@@ -47,13 +48,20 @@ class AppTheme {
         error: errorColor,
         onError: Colors.white,
       ),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         foregroundColor: textPrimary,
         elevation: 0,
         centerTitle: true,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarIconBrightness: Brightness.light,
+        ),
       ),
       cardTheme: CardThemeData(
         color: cardColor,

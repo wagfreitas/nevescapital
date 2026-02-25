@@ -231,7 +231,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Digite seu celular para entrar ou criar uma conta',
+                          'Digite seu celular para continuar',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.white70,

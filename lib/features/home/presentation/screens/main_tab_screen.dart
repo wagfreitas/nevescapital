@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../../shared/components/bottom_tab_bar.dart';
@@ -42,7 +43,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF023E25),
+      backgroundColor: AppTheme.backgroundColor,
       bottomNavigationBar: BottomTabBar(
         isVendasActive: _currentIndex == 0,
         onVendasTap: () => _onTabTapped(0),
@@ -65,4 +66,3 @@ class _MainTabScreenState extends State<MainTabScreen> {
     );
   }
 }
-

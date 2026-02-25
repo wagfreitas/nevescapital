@@ -291,13 +291,22 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
               ),
             )
           : SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 24.0),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+                return SingleChildScrollView(
+                  reverse: true,
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: EdgeInsets.fromLTRB(24.0, 0, 24.0, bottomInset + 24.0),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Form(
+                      key: _formKey,
+                      child: IntrinsicHeight(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                const SizedBox(height: 40),
                 // Título centralizado
                 const Center(
                   child: Text(
@@ -309,9 +318,9 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 20),
-                
+
                 // Indicador de progresso com barras
                 PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
                 const SizedBox(height: 32),
@@ -371,18 +380,23 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
                 // Aviso sobre regras de preenchimento
                 _buildRulesWarning(),
                 
-                const SizedBox(height: 24),
-
+                const SizedBox(height: 32),
+                const Spacer(),
                 // Botão Avançar
                 CustomButton(
                   text: _isSaving ? 'Salvando...' : 'Avançar',
                   onPressed: _isSaving ? null : _continuar,
                 ),
-              ],
+                const SizedBox(height: 24),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
-        ),
-      ),
     );
   }
 
@@ -609,7 +623,7 @@ class _BankSearchDialogState extends State<_BankSearchDialog> {
                 ],
               ),
             ),
-            // Search field
+            // Search field — teclado já aberto ao abrir o diálogo
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: TextField(

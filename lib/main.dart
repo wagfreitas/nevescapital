@@ -220,15 +220,23 @@ class _NevesCapitalAppState extends State<NevesCapitalApp> {
           Locale('en', 'US'),
         ],
         locale: const Locale('pt', 'BR'),
-        // Builder global para fechar teclado ao tocar em qualquer parte do body
+        // Builder global: status bar/AppBar transparentes + fechar teclado ao tocar fora
         builder: (context, child) {
-          return GestureDetector(
-            onTap: () {
-              // Fechar teclado ao tocar em qualquer área vazia
-              FocusScope.of(context).unfocus();
-            },
-            behavior: HitTestBehavior.translucent,
-            child: child ?? const SizedBox.shrink(),
+          return AnnotatedRegion<SystemUiOverlayStyle>(
+            value: const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.light,
+              statusBarBrightness: Brightness.dark,
+              systemNavigationBarColor: Colors.transparent,
+              systemNavigationBarIconBrightness: Brightness.light,
+            ),
+            child: GestureDetector(
+              onTap: () {
+                FocusScope.of(context).unfocus();
+              },
+              behavior: HitTestBehavior.translucent,
+              child: child ?? const SizedBox.shrink(),
+            ),
           );
         },
       );
@@ -256,15 +264,23 @@ class _NevesCapitalAppState extends State<NevesCapitalApp> {
             Locale('en', 'US'),
           ],
           locale: const Locale('pt', 'BR'),
-          // Builder global para fechar teclado ao tocar em qualquer parte do body
+          // Builder global: status bar/AppBar transparentes + fechar teclado ao tocar fora
           builder: (context, child) {
-            return GestureDetector(
-              onTap: () {
-                // Fechar teclado ao tocar em qualquer área vazia
-                FocusScope.of(context).unfocus();
-              },
-              behavior: HitTestBehavior.translucent,
-              child: child ?? const SizedBox.shrink(),
+            return AnnotatedRegion<SystemUiOverlayStyle>(
+              value: const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.light,
+                statusBarBrightness: Brightness.dark,
+                systemNavigationBarColor: Colors.transparent,
+                systemNavigationBarIconBrightness: Brightness.light,
+              ),
+              child: GestureDetector(
+                onTap: () {
+                  FocusScope.of(context).unfocus();
+                },
+                behavior: HitTestBehavior.translucent,
+                child: child ?? const SizedBox.shrink(),
+              ),
             );
           },
         );

@@ -575,6 +575,7 @@ class _BankSearchScreenState extends State<_BankSearchScreen> {
       backgroundColor: AppTheme.backgroundColor,
       extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
+        onBackPressed: () => Navigator.of(context).pop(),
         title: const Text(
           'Selecione o Banco',
           style: TextStyle(color: Colors.white, fontSize: 18),
@@ -582,12 +583,11 @@ class _BankSearchScreenState extends State<_BankSearchScreen> {
       ),
       body: Column(
         children: [
-          // Campo de busca
+          // Campo de busca (abaixo do título)
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
               controller: _searchController,
-              autofocus: true,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Digite o nome ou código do banco',
