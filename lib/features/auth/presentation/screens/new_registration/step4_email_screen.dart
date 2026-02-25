@@ -224,7 +224,7 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
                             labelText: 'Email',
                             labelStyle: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.7)),
-                            hintText: 'Seu Email',
+                            hintText: 'seu@email.com.br',
                             hintStyle: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.3)),
                             filled: true,
