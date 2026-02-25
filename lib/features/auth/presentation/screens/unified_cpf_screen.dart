@@ -265,30 +265,17 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
       ),
       body: SafeArea(
         child: KeyboardDismissWrapper(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-              const topPad = 40.0;
-              const bottomPad = 48.0;
-              return SingleChildScrollView(
-                reverse: true,
-                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: EdgeInsets.only(
-                  left: 16.0,
-                  right: 16.0,
-                  top: topPad,
-                  bottom: bottomInset + bottomPad,
-                ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight - topPad - bottomPad,
-                  ),
-                  child: Form(
-                    key: _formKey,
-                    child: IntrinsicHeight(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 24.0,
+              right: 24.0,
+              bottom: 32.0 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                           const SizedBox(height: 40),
                           const Center(
                             child: Text(
@@ -394,13 +381,9 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
                                     ),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
+                ],
+              ),
+            ),
           ),
         ),
       ),

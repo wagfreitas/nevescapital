@@ -145,7 +145,6 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
     final currentStep = PaymentStepHelper.calculateCurrentStep(4, _hasAccount);
     final totalSteps = PaymentStepHelper.getTotalSteps(_hasAccount);
     
-    final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: const GlassAppBar(),
@@ -155,31 +154,41 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                 valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
               ),
             )
-          : KeyboardDismissWrapper(
-                child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(24.0, topPadding, 24.0, 24.0),
-                child: Form(
-                  key: _formKey,
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Título centralizado (igual às telas de dados pessoais)
+          : SafeArea(
+              child: KeyboardDismissWrapper(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                  final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+                  return SingleChildScrollView(
+                    reverse: true,
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: EdgeInsets.fromLTRB(24.0, 0, 24.0, bottomInset + 24.0),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      child: Form(
+                        key: _formKey,
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        child: IntrinsicHeight(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                      const SizedBox(height: 40),
+                      // Título centralizado
                       const Center(
-                        child: Text(
-                          'Dados do Cartão',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                      child: Text(
+                        'Dados do Cartão',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
                       ),
-                      
-                      const SizedBox(height: 20),
-                      
-                      // Indicador de progresso (abaixo do título)
-                      PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Indicador de progresso (abaixo do título)
+                    PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
                       const SizedBox(height: 32),
 
                 // BOTÃO DE SCAN TEMPORARIAMENTE REMOVIDO
@@ -189,7 +198,6 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                 // Nome do Titular
                 TextFormField(
                   controller: _nomeTitularController,
-                  autofocus: true,
                   textInputAction: TextInputAction.next,
                   textCapitalization: TextCapitalization.words,
                   keyboardAppearance: Brightness.dark,
@@ -423,8 +431,8 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 40),
-
+                const SizedBox(height: 32),
+                const Spacer(),
                 // Botão Avançar
                 CustomButton(
                   text: 'Avançar',
@@ -448,11 +456,17 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                     ),
                   ],
                 ),
-              ],
+                const SizedBox(height: 24),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
-        ),
-      ),
     );
   }
 

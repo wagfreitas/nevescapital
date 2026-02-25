@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
+import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
 import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/shared/helpers/card_brand_detector.dart';
 import 'package:neves_capital/shared/helpers/card_brand_image_loader.dart';
 import 'package:neves_capital/shared/helpers/format_helpers.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
-import 'package:neves_capital/shared/components/glass_app_bar.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   const SalesHistoryScreen({super.key});

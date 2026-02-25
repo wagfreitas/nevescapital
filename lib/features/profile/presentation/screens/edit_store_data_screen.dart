@@ -25,12 +25,12 @@ class EditStoreDataScreen extends StatefulWidget {
 class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
   final _formKey = GlobalKey<FormState>();
   final _storeNameController = TextEditingController();
-  
+
   bool _isLoading = false;
   bool _isLoadingData = true;
   String? _userId;
   String? _selectedBusinessType;
-  
+
   // Valores originais para rastrear mudanças
   String _originalStoreName = '';
   String? _originalBusinessType;
@@ -38,8 +38,14 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
 
   // Lista de ramos de atividade
   final List<Map<String, String>> _businessTypes = [
-    {'value': 'alimentos_bebidas_vr', 'label': 'Alimentos e Bebidas (Aceita VR)'},
-    {'value': 'acougues_peixarias_va', 'label': 'Açougues e Peixarias (Aceita VA)'},
+    {
+      'value': 'alimentos_bebidas_vr',
+      'label': 'Alimentos e Bebidas (Aceita VR)'
+    },
+    {
+      'value': 'acougues_peixarias_va',
+      'label': 'Açougues e Peixarias (Aceita VA)'
+    },
     {'value': 'beleza_cuidados', 'label': 'Beleza e Cuidados Pessoais'},
     {'value': 'construcao_reparos', 'label': 'Construção e Reparos'},
     {'value': 'lazer_eventos', 'label': 'Lazer e Eventos'},
@@ -49,7 +55,10 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
     {'value': 'servicos_gerais', 'label': 'Serviços Gerais'},
     {'value': 'tecnologia_informatica', 'label': 'Tecnologia e Informática'},
     {'value': 'transporte_entregas', 'label': 'Transporte e Entregas'},
-    {'value': 'outros_produtos_servicos', 'label': 'Outros Produtos e Serviços'},
+    {
+      'value': 'outros_produtos_servicos',
+      'label': 'Outros Produtos e Serviços'
+    },
   ];
 
   @override
@@ -64,13 +73,13 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
     _storeNameController.dispose();
     super.dispose();
   }
-  
+
   /// Verificar se houve mudanças nos campos
   void _checkForChanges() {
     final currentStoreName = _storeNameController.text.trim();
     final hasChanges = currentStoreName != _originalStoreName ||
         _selectedBusinessType != _originalBusinessType;
-    
+
     if (_hasChanges != hasChanges) {
       setState(() {
         _hasChanges = hasChanges;
@@ -103,32 +112,35 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
       AppLogger.debug('Carregando dados da loja...');
       AppLogger.debug('storeName: ${userData['storeName']}');
       AppLogger.debug('businessType: ${userData['businessType']}');
-      
+
       // Validar se o businessType existe na lista atual
       final loadedBusinessType = userData['businessType'] as String?;
       final validBusinessType = loadedBusinessType != null &&
-          _businessTypes.any((type) => type['value'] == loadedBusinessType)
+              _businessTypes.any((type) => type['value'] == loadedBusinessType)
           ? loadedBusinessType
           : null;
-      
+
       if (loadedBusinessType != null && validBusinessType == null) {
-        AppLogger.warning('BusinessType "$loadedBusinessType" não existe mais na lista. Resetando para null.');
+        AppLogger.warning(
+            'BusinessType "$loadedBusinessType" não existe mais na lista. Resetando para null.');
       }
-      
+
       setState(() {
         _storeNameController.text = userData['storeName'] ?? '';
         _selectedBusinessType = validBusinessType;
         
         // Armazenar valores originais
         _originalStoreName = _storeNameController.text.trim();
+        _originalStoreName = _storeNameController.text.trim();
         _originalBusinessType = _selectedBusinessType;
         _hasChanges = false;
       });
-      
+
       // Adicionar listeners para rastrear mudanças
       _storeNameController.addListener(_checkForChanges);
-      
-      AppLogger.info('Dados da loja carregados: ${_storeNameController.text}, $_selectedBusinessType');
+
+      AppLogger.info(
+          'Dados da loja carregados: ${_storeNameController.text}, $_selectedBusinessType');
     } catch (e) {
       AppLogger.error('Erro ao carregar dados da loja', e);
       if (mounted) {
@@ -205,7 +217,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
         _originalStoreName = _storeNameController.text.trim();
         _originalBusinessType = _selectedBusinessType;
         _hasChanges = false;
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Dados da loja salvos com sucesso!'),
@@ -243,122 +255,128 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
         child: KeyboardDismissWrapper(
           child: _isLoadingData
               ? Center(
-                  child: CircularProgressIndicator(color: AppTheme.primaryColor),
+                  child:
+                      CircularProgressIndicator(color: AppTheme.primaryColor),
                 )
               : SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Título centralizado
-                      const Center(
-                        child: Text(
-                          'Dados da Loja',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 32),
-                      
-                      // Nome da loja
-                      TextFormField(
-                        controller: _storeNameController,
-                        autofocus: false, // Não focar automaticamente
-                        textInputAction: TextInputAction.next,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16.0,
-                          fontWeight: FontWeight.normal,
-                          height: 1.0,
-                          letterSpacing: 0.0,
-                        ),
-                        onChanged: (value) => _checkForChanges(),
-                        decoration: InputDecoration(
-                          labelText: 'Nome da Loja',
-                          labelStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 16,
-                          ),
-                          filled: true,
-                          fillColor: AppTheme.inputEditableBackgroundColor,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Nome da loja é obrigatório';
-                          }
-                          if (value.trim().length < 3) {
-                            return 'Nome deve ter pelo menos 3 caracteres';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 24.0),
-                      
-                      // Ramo de atividade (campo com busca)
-                      GestureDetector(
-                        onTap: () => _showRamoSearch(context),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _selectedBusinessType != null
-                                  ? AppTheme.primaryColor
-                                  : Colors.white.withValues(alpha: 0.2),
-                              width: 1,
+                  padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Título centralizado
+                        const Center(
+                          child: Text(
+                            'Dados da Loja',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
                           ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.store, color: Colors.white70),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  _getSelectedRamoLabel() ?? 'Ramo de Atuação',
-                                  style: TextStyle(
-                                    color: _selectedBusinessType != null
-                                        ? Colors.white
-                                        : Colors.white.withValues(alpha: 0.5),
-                                    fontSize: 16,
+                        ),
+
+                        const SizedBox(height: 32),
+
+                        // Nome da loja
+                        TextFormField(
+                          controller: _storeNameController,
+                          autofocus: false, // Não focar automaticamente
+                          textInputAction: TextInputAction.next,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16.0,
+                            fontWeight: FontWeight.normal,
+                            height: 1.0,
+                            letterSpacing: 0.0,
+                          ),
+                          onChanged: (value) => _checkForChanges(),
+                          decoration: InputDecoration(
+                            labelText: 'Nome da Loja',
+                            labelStyle: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              fontSize: 16,
+                            ),
+                            filled: true,
+                            fillColor: AppTheme.inputEditableBackgroundColor,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.2)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                  color: AppTheme.primaryColor, width: 2),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Nome da loja é obrigatório';
+                            }
+                            if (value.trim().length < 3) {
+                              return 'Nome deve ter pelo menos 3 caracteres';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 24.0),
+
+                        // Ramo de atividade (campo com busca)
+                        GestureDetector(
+                          onTap: () => _showRamoSearch(context),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.store, color: Colors.white70),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    _getSelectedRamoLabel() ??
+                                        'Ramo de Atuação',
+                                    style: TextStyle(
+                                      color: _selectedBusinessType != null
+                                          ? Colors.white
+                                          : Colors.white.withValues(alpha: 0.5),
+                                      fontSize: 16,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const Icon(Icons.keyboard_arrow_down, color: Colors.white70),
-                            ],
+                                const Icon(Icons.keyboard_arrow_down,
+                                    color: Colors.white70),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 40.0),
-                      
-                      // Botão Atualizar
-                      CustomButton(
-                        text: 'Atualizar',
-                        onPressed: (_isLoading || !_hasChanges) ? null : _saveStoreData,
-                        isLoading: _isLoading,
-                      ),
-                    ],
+                        const SizedBox(height: 40.0),
+
+                        // Botão Atualizar
+                        CustomButton(
+                          text: 'Atualizar',
+                          onPressed: (_isLoading || !_hasChanges)
+                              ? null
+                              : _saveStoreData,
+                          isLoading: _isLoading,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
         ),
       ),
     );
@@ -389,9 +407,6 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
     super.initState();
     _filteredTypes = List.from(widget.businessTypes);
     _searchController.addListener(_filterTypes);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _searchFocusNode.requestFocus();
-    });
   }
 
   @override
@@ -409,8 +424,8 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
         _filteredTypes = List.from(widget.businessTypes);
       } else {
         _filteredTypes = widget.businessTypes
-            .where((type) =>
-                (type['label'] ?? '').toLowerCase().contains(query))
+            .where(
+                (type) => (type['label'] ?? '').toLowerCase().contains(query))
             .toList();
       }
     });
@@ -430,17 +445,16 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
       ),
       body: Column(
         children: [
-          // Campo de busca
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
               controller: _searchController,
               focusNode: _searchFocusNode,
-              autofocus: true,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Digite o nome do ramo de atuação',
-                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                hintStyle:
+                    TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                 prefixIcon: Icon(Icons.search, color: AppTheme.textSecondary),
                 filled: true,
                 fillColor: AppTheme.inputEditableBackgroundColor,
@@ -450,22 +464,24 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                  borderSide:
+                      BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                  borderSide:
+                      BorderSide(color: AppTheme.primaryColor, width: 2),
                 ),
               ),
             ),
           ),
-          // Lista de ramos
           Expanded(
             child: _filteredTypes.isEmpty
                 ? Center(
                     child: Text(
                       'Nenhum ramo encontrado',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                      style:
+                          TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                     ),
                   )
                 : ListView.builder(
@@ -480,13 +496,18 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
                         title: Text(
                           label,
                           style: TextStyle(
-                            color: isSelected ? AppTheme.primaryColor : Colors.white,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                            color: isSelected
+                                ? AppTheme.primaryColor
+                                : Colors.white,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
                           ),
                         ),
                         trailing: isSelected
                             ? Icon(Icons.check, color: AppTheme.primaryColor)
-                            : const Icon(Icons.arrow_forward_ios, size: 16, color: AppTheme.textSecondary),
+                            : const Icon(Icons.arrow_forward_ios,
+                                size: 16, color: AppTheme.textSecondary),
                         onTap: () => Navigator.pop(context, value),
                       );
                     },

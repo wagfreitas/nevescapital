@@ -53,6 +53,15 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
     super.dispose();
   }
 
+  String? _getRamoLabel(String? value) {
+    if (value == null) return null;
+    try {
+      return _businessTypes.firstWhere((e) => e['value'] == value)['label'];
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Verificar se o usuário já tem estabelecimento e ramo definidos
   Future<void> _checkIfShouldShowScreen() async {
     setState(() {
@@ -247,7 +256,6 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
                   // Campo de nome do estabelecimento
                   TextFormField(
                     controller: _nomeEstabelecimentoController,
-                    autofocus: true,
                     textInputAction: TextInputAction.next,
                     textCapitalization: TextCapitalization.words,
                     style: const TextStyle(color: Colors.white),
@@ -285,53 +293,82 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Campo de ramo de atuação (dropdown) - igual à tela Dados da Loja
-                  DropdownButtonFormField<String>(
+                  // Campo de ramo de atuação (abre tela de seleção no formato da escolha do banco)
+                  FormField<String>(
                     initialValue: _ramoAtuacao,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Ramos de Atuação',
-                      labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
-                      filled: true,
-                      fillColor: AppTheme.inputEditableBackgroundColor,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
-                      ),
-                      errorBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.red, width: 2),
-                      ),
-                    ),
-                    dropdownColor: const Color(0xFF1a2d21),
-                    icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-                    items: _businessTypes.map((type) {
-                      return DropdownMenuItem<String>(
-                        value: type['value'],
-                        child: Text(
-                          type['label']!,
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _ramoAtuacao = value;
-                      });
-                    },
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Por favor, selecione o ramo de atuação';
                       }
                       return null;
+                    },
+                    builder: (formState) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          GestureDetector(
+                            onTap: () async {
+                              final value = await Navigator.of(context).push<String>(
+                                MaterialPageRoute(
+                                  builder: (context) => _RamoSearchScreen(
+                                    businessTypes: _businessTypes,
+                                    selectedValue: _ramoAtuacao,
+                                  ),
+                                ),
+                              );
+                              if (value != null && mounted) {
+                                setState(() {
+                                  _ramoAtuacao = value;
+                                  formState.didChange(value);
+                                });
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: formState.hasError
+                                      ? Colors.red
+                                      : Colors.white.withValues(alpha: 0.2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.store, color: Colors.white70),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      _getRamoLabel(_ramoAtuacao) ?? 'Ramo de Atuação',
+                                      style: TextStyle(
+                                        color: _ramoAtuacao != null
+                                            ? Colors.white
+                                            : Colors.white.withValues(alpha: 0.5),
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  const Icon(Icons.keyboard_arrow_down,
+                                      color: Colors.white70),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (formState.hasError) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              formState.errorText!,
+                              style: const TextStyle(
+                                color: Colors.red,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ],
+                      );
                     },
                   ),
                   const SizedBox(height: 40),
@@ -349,5 +386,134 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
       ),
     );
   }
+}
 
+/// Tela de seleção de ramo de atuação (mesmo formato da tela de seleção de banco)
+class _RamoSearchScreen extends StatefulWidget {
+  final List<Map<String, String>> businessTypes;
+  final String? selectedValue;
+
+  const _RamoSearchScreen({
+    required this.businessTypes,
+    this.selectedValue,
+  });
+
+  @override
+  State<_RamoSearchScreen> createState() => _RamoSearchScreenState();
+}
+
+class _RamoSearchScreenState extends State<_RamoSearchScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  List<Map<String, String>> _filteredTypes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredTypes = List.from(widget.businessTypes);
+    _searchController.addListener(_filterTypes);
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_filterTypes);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterTypes() {
+    final query = _searchController.text.toLowerCase().trim();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredTypes = List.from(widget.businessTypes);
+      } else {
+        _filteredTypes = widget.businessTypes
+            .where((type) =>
+                (type['label'] ?? '').toLowerCase().contains(query))
+            .toList();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
+      extendBodyBehindAppBar: true,
+      appBar: GlassAppBar(
+        onBackPressed: () => Navigator.of(context).pop(widget.selectedValue),
+        title: const Text(
+          'Selecione o Ramo de Atuação',
+          style: TextStyle(color: Colors.white, fontSize: 18),
+        ),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Digite o nome do ramo de atuação',
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                prefixIcon: Icon(Icons.search, color: AppTheme.textSecondary),
+                filled: true,
+                fillColor: AppTheme.inputEditableBackgroundColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: _filteredTypes.isEmpty
+                ? Center(
+                    child: Text(
+                      'Nenhum ramo encontrado',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: _filteredTypes.length,
+                    itemBuilder: (context, index) {
+                      final type = _filteredTypes[index];
+                      final value = type['value']!;
+                      final label = type['label']!;
+                      final isSelected = value == widget.selectedValue;
+                      return ListTile(
+                        title: Text(
+                          label,
+                          style: TextStyle(
+                            color: isSelected
+                                ? AppTheme.primaryColor
+                                : Colors.white,
+                            fontWeight:
+                                isSelected ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? Icon(Icons.check, color: AppTheme.primaryColor)
+                            : const Icon(
+                                Icons.arrow_forward_ios,
+                                size: 16,
+                                color: AppTheme.textSecondary,
+                              ),
+                        onTap: () => Navigator.of(context).pop(value),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
 }

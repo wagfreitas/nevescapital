@@ -81,7 +81,12 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
       _originalState = _stateController.text.trim();
       _originalNumber = _numberController.text.trim();
       _originalComplement = _complementController.text.trim();
-      
+
+      // Marcar CEP atual como já buscado para não buscar de novo ao só clicar no campo
+      if (_originalCep.length == 8) {
+        _lastSearchedCep = _originalCep;
+      }
+
       // Adicionar listeners para rastrear mudanças
       _cepController.addListener(_checkForChanges);
       _numberController.addListener(_checkForChanges);
@@ -375,8 +380,9 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                             },
                           ),
                           const SizedBox(height: 20),
-                          // Número e Complemento (lado a lado)
+                          // Número e Complemento (lado a lado) — crossAxisAlignment.start para o erro ficar abaixo sem deslocar o campo
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Expanded(
                                 flex: 2,
@@ -386,7 +392,13 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                                   keyboardType: TextInputType.number,
                                   keyboardAppearance: Brightness.dark, // Teclado escuro para uniformidade
                                   style: const TextStyle(color: Colors.white),
-                                  onChanged: (_) => _checkForChanges(), // Trigger change detection
+                                  onChanged: (_) {
+                                    _checkForChanges();
+                                    // Revalidar ao digitar para a mensagem de erro sumir
+                                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                                      _formKey.currentState?.validate();
+                                    });
+                                  },
                                   decoration: InputDecoration(
                                     labelText: 'Nº',
                                     labelStyle: const TextStyle(color: Colors.white70),
@@ -410,6 +422,8 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: const BorderSide(color: Colors.red, width: 2),
                                     ),
+                                    errorMaxLines: 2,
+                                    errorStyle: const TextStyle(color: Colors.red, fontSize: 12),
                                     prefixIcon: const Icon(Icons.numbers, color: Colors.white70),
                                   ),
                                   validator: (value) {

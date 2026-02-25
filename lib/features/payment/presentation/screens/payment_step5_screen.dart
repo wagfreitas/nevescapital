@@ -443,7 +443,7 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(24.0, 12.0, 24.0, 24.0),
                         child: CustomButton(
-                          text: 'Finalizar a Venda',
+                          text: 'Finalizar a venda',
                           icon: Icons.lock,
                           onPressed: _concluirVenda,
                         ),

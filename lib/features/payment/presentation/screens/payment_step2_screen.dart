@@ -50,9 +50,7 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
       _hasAccount = hasAccount;
       _isLoadingAccount = false;
     });
-    
-    // Dar foco no campo apenas depois que a tela estiver completamente carregada
-    // Aguardar a animação de transição terminar antes de abrir o teclado
+    // Teclado já aberto ao entrar na tela (Valor da Venda)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 400), () {
         if (mounted && _valorFocusNode.canRequestFocus) {
@@ -146,34 +144,42 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
           : SafeArea(
               child: GestureDetector(
                 onTap: () {
-                  // Fechar teclado ao tocar em qualquer área vazia
                   FocusScope.of(context).unfocus();
                 },
                 behavior: HitTestBehavior.translucent,
                 child: KeyboardDismissWrapper(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 24.0),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                        // Título centralizado (igual às telas de dados pessoais)
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+                    return SingleChildScrollView(
+                      reverse: true,
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: EdgeInsets.fromLTRB(24.0, 0, 24.0, bottomInset + 24.0),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        child: Form(
+                          key: _formKey,
+                          child: IntrinsicHeight(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                        const SizedBox(height: 40),
+                        // Título centralizado
                         const Center(
-                          child: Text(
-                            'Valor da Venda',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
+                        child: Text(
+                          'Valor da Venda',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
-                        
-                        const SizedBox(height: 20),
-                        
-                        // Indicador de progresso com barras
-                        PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Indicador de progresso com barras
+                      PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
                         const SizedBox(height: 32),
 
                   // Campo de valor (padronizado)
@@ -270,18 +276,23 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
                   ),
                 ),
                 
-                const SizedBox(height: 40),
-
+                const SizedBox(height: 32),
+                const Spacer(),
                 // Botão Avançar
                 CustomButton(
                   text: 'Avançar',
                   onPressed: _isButtonEnabled ? _continuar : null,
                 ),
-              ],
+                const SizedBox(height: 24),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
-        ),
-        ),
         ),
       ),
     );

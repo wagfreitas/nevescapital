@@ -2,6 +2,7 @@ package com.pagpag.app
 
 import android.os.Build
 import android.os.Bundle
+import androidx.core.view.WindowCompat
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import com.pagpag.app.SecurityPlugin
@@ -11,6 +12,8 @@ import com.pagpag.app.SecurityPlugin
 class MainActivity : FlutterFragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Permitir desenho atrás da status bar e navigation bar (transparência real)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             splashScreen.setOnExitAnimationListener { splashScreenView ->
                 splashScreenView.remove()

@@ -433,7 +433,8 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
                               readOnly: true,
                               onTap: _navigateToAddressEdit,
                               controller: _addressController,
-                              maxLines: 3,
+                              maxLines: null,
+                              minLines: 1,
                               textAlign: TextAlign.left,
                               textAlignVertical: TextAlignVertical.top,
                               style: const TextStyle(
