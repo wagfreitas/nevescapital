@@ -295,24 +295,12 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
       ),
       body: SafeArea(
         child: KeyboardDismissWrapper(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-            return SingleChildScrollView(
-              reverse: true,
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: EdgeInsets.only(
-                left: 24.0,
-                right: 24.0,
-                bottom: bottomInset + 32.0,
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Form(
-                  key: _formKey,
-                  child: IntrinsicHeight(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 40),
                         const Center(
@@ -587,11 +575,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                   ),
                 ),
               ),
-            );
-          },
-          ),
-        ),
-      ),
+            ),
     );
   }
 }
