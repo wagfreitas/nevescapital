@@ -252,6 +252,17 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
   Future<void> _handleNext() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Validar campos autopreenchidos pelo CEP (sem mostrar erro inline)
+    if (_streetController.text.trim().isEmpty ||
+        _neighborhoodController.text.trim().isEmpty ||
+        _stateController.text.trim().isEmpty ||
+        _cityController.text.trim().isEmpty) {
+      setState(() {
+        _errorMessage = 'Preencha o CEP para carregar o endereço completo.';
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -379,6 +390,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                   constraints: BoxConstraints(minHeight: constraints.maxHeight),
                   child: Form(
                     key: _formKey,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                     child: IntrinsicHeight(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -552,18 +564,8 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                 borderSide: BorderSide(
                                     color: Colors.white.withValues(alpha: 0.1)),
                               ),
-                              errorBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Colors.red, width: 2),
-                              ),
                               prefixIcon: const Icon(Icons.home, color: Colors.white60),
                             ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Digite o logradouro';
-                              }
-                              return null;
-                            },
                           ),
                           const SizedBox(height: 20),
                           // Número e Complemento (lado a lado, altura fixa para erro não desalinhar)
@@ -687,18 +689,8 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                 borderSide: BorderSide(
                                     color: Colors.white.withValues(alpha: 0.1)),
                               ),
-                              errorBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Colors.red, width: 2),
-                              ),
                               prefixIcon: const Icon(Icons.location_city, color: Colors.white60),
                             ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Digite o bairro';
-                              }
-                              return null;
-                            },
                           ),
                           const SizedBox(height: 20),
                           // UF e Cidade (lado a lado)
@@ -731,22 +723,9 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                       borderSide: BorderSide(
                                           color: Colors.white.withValues(alpha: 0.1)),
                                     ),
-                                    errorBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: const BorderSide(color: Colors.red, width: 2),
-                                    ),
                                     prefixIcon: const Icon(Icons.map, color: Colors.white60),
                                     counterText: '',
                                   ),
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'Digite a UF';
-                                    }
-                                    if (value.trim().length != 2) {
-                                      return 'UF deve ter 2 letras';
-                                    }
-                                    return null;
-                                  },
                                 ),
                               ),
                               const SizedBox(width: 16),
@@ -776,18 +755,8 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                       borderSide: BorderSide(
                                           color: Colors.white.withValues(alpha: 0.1)),
                                     ),
-                                    errorBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: const BorderSide(color: Colors.red, width: 2),
-                                    ),
                                     prefixIcon: const Icon(Icons.location_city, color: Colors.white60),
                                   ),
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'Digite a cidade';
-                                    }
-                                    return null;
-                                  },
                                 ),
                               ),
                             ],
