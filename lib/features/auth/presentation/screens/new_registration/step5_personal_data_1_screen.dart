@@ -305,7 +305,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                         const SizedBox(height: 40),
                         const Center(
                           child: Text(
-                            'Informações Pessoais',
+                            'Dados Cadastrais',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 28,
