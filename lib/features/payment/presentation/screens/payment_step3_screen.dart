@@ -290,23 +290,25 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
                 valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
               ),
             )
-          : SafeArea(
+          : Container(
+              color: AppTheme.backgroundColor,
               child: LayoutBuilder(
                 builder: (context, constraints) {
                 final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+                final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
                 return SingleChildScrollView(
                   reverse: true,
                   keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: EdgeInsets.fromLTRB(24.0, 0, 24.0, bottomInset + 24.0),
+                  padding: EdgeInsets.fromLTRB(24.0, topPadding, 24.0, bottomInset + 24.0),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight - topPadding),
                     child: Form(
                       key: _formKey,
                       child: IntrinsicHeight(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                const SizedBox(height: 40),
+                const SizedBox(height: 16),
                 // Título centralizado
                 const Center(
                   child: Text(
