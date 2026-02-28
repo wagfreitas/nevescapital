@@ -283,7 +283,23 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
     
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: const GlassAppBar(),
+      appBar: GlassAppBar(
+        title: const Text(
+          'Dados Bancários',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(28),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
+          ),
+        ),
+      ),
       body: (_isLoadingBankData || _isLoadingAccount)
           ? const Center(
               child: CircularProgressIndicator(
@@ -292,113 +308,88 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
             )
           : Container(
               color: AppTheme.backgroundColor,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-                final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
-                return SingleChildScrollView(
-                  reverse: true,
-                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: EdgeInsets.fromLTRB(24.0, topPadding, 24.0, bottomInset + 24.0),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: constraints.maxHeight - topPadding),
-                    child: Form(
-                      key: _formKey,
-                      child: IntrinsicHeight(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                const SizedBox(height: 16),
-                // Título centralizado
-                const Center(
-                  child: Text(
-                    'Dados Bancários',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    24.0,
+                    MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40,
+                    24.0,
+                    0,
                   ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Indicador de progresso com barras
-                PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
-                const SizedBox(height: 32),
-
-                // Texto de instrução
-                const Text(
-                  'Confirme a conta em que receberá a venda:',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white70,
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Campo: Banco
-                GestureDetector(
-                  onTap: _openBankSearch,
-                  child: _buildBankField(),
-                ),
-                const SizedBox(height: 24),
-
-                // Campo: Agência
-                _buildTextField(
-                  label: 'Agência',
-                  controller: _branchController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 4,
-                  prefixIcon: Icons.location_on,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Informe sua Agência';
-                    }
-                    if (value.length != 4) {
-                      return 'Agência deve ter 4 dígitos';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
-
-                // Campo: Conta com dígito
-                _buildTextField(
-                  label: 'Conta com Dígito',
-                  controller: _accountController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 10,
-                  prefixIcon: Icons.account_balance_wallet,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Informe sua Conta com Dígito';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 32),
-
-                // Aviso sobre regras de preenchimento
-                _buildRulesWarning(),
-                
-                const SizedBox(height: 32),
-                const Spacer(),
-                // Botão Avançar
-                CustomButton(
-                  text: _isSaving ? 'Salvando...' : 'Avançar',
-                  onPressed: _isSaving ? null : _continuar,
-                ),
-                const SizedBox(height: 24),
-                          ],
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Texto de instrução (mesma altura que Valor da Venda: 40px do fim da app bar)
+                        const Text(
+                          'Confirme a conta em que receberá a venda:',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.white70,
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 24),
+
+                        // Campo: Banco
+                        GestureDetector(
+                          onTap: _openBankSearch,
+                          child: _buildBankField(),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Campo: Agência
+                        _buildTextField(
+                          label: 'Agência',
+                          controller: _branchController,
+                          keyboardType: TextInputType.number,
+                          maxLength: 4,
+                          prefixIcon: Icons.location_on,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Informe sua Agência';
+                            }
+                            if (value.length != 4) {
+                              return 'Agência deve ter 4 dígitos';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Campo: Conta com dígito
+                        _buildTextField(
+                          label: 'Conta com Dígito',
+                          controller: _accountController,
+                          keyboardType: TextInputType.number,
+                          maxLength: 10,
+                          prefixIcon: Icons.account_balance_wallet,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Informe sua Conta com Dígito';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 32),
+
+                        // Aviso sobre regras de preenchimento
+                        _buildRulesWarning(),
+                        const SizedBox(height: 32),
+                        const Spacer(),
+                        // Botão Avançar
+                        CustomButton(
+                          text: _isSaving ? 'Salvando...' : 'Avançar',
+                          onPressed: _isSaving ? null : _continuar,
+                        ),
+                        const SizedBox(height: 24),
+                      ],
                     ),
                   ),
-                );
-              },
+                ),
+              ),
             ),
-          ),
     );
   }
 
