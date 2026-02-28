@@ -133,7 +133,23 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
     
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: const GlassAppBar(),
+      appBar: GlassAppBar(
+        title: const Text(
+          'Valor da Venda',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(28),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
+          ),
+        ),
+      ),
       body: _isLoadingAccount
           ? const Center(
               child: CircularProgressIndicator(
@@ -148,25 +164,7 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                        const SizedBox(height: 40),
-                        // Título centralizado
-                        const Center(
-                        child: Text(
-                          'Valor da Venda',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // Indicador de progresso com barras
-                      PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
-                        const SizedBox(height: 32),
-
+                      const SizedBox(height: 40),
                   // Campo de valor (padronizado)
                   TextFormField(
                     controller: _valorController,

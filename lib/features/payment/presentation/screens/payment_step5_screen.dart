@@ -238,7 +238,23 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: const GlassAppBar(),
+      appBar: GlassAppBar(
+        title: const Text(
+          'Resumo da Venda',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(28),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
+          ),
+        ),
+      ),
       body: _isProcessing
           ? const Center(
               child: Column(
@@ -270,37 +286,27 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
                     valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
                   ),
                 )
-              : SafeArea(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Conteúdo rolável (resumo da venda)
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 24.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // Título centralizado (igual às telas de dados pessoais)
-                              const Center(
-                                child: Text(
-                                  'Resumo da Venda',
-                                  style: TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 20),
-                              
-                              // Indicador de progresso (abaixo do título)
-                              PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
-                              const SizedBox(height: 32),
-
-                              // Card de resumo
-                              Card(
+              : Container(
+                  color: AppTheme.backgroundColor,
+                  child: SafeArea(
+                    top: false,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Conteúdo rolável (altura inicial igual às outras: 40px do fim da app bar)
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: EdgeInsets.fromLTRB(
+                              24.0,
+                              MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40,
+                              24.0,
+                              24.0,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Card de resumo
+                                Card(
                                 elevation: 2,
                                 color: AppTheme.cardColor,
                                 shape: RoundedRectangleBorder(
@@ -432,23 +438,24 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
                                     ],
                                   ),
                                 ),
-                              ),
-                              // Espaço extra no fim do scroll para não ficar colado no botão fixo
-                              const SizedBox(height: 24),
-                            ],
+                                ),
+                                const SizedBox(height: 24),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      // Botão Finalizar a Venda sempre visível e fixo no rodapé
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(24.0, 12.0, 24.0, 24.0),
-                        child: CustomButton(
-                          text: 'Finalizar a venda',
-                          icon: Icons.lock,
-                          onPressed: _concluirVenda,
+                        // Botão Finalizar a Venda (mesma posição do Avançar: 24px acima e abaixo)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 24.0),
+                          child: CustomButton(
+                            text: 'Finalizar a Venda',
+                            icon: Icons.lock,
+                            onPressed: _concluirVenda,
+                            capitalizeText: false,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
     );

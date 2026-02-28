@@ -147,56 +147,49 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
     
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: const GlassAppBar(),
+      appBar: GlassAppBar(
+        title: const Text(
+          'Dados do Cartão',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(28),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
+          ),
+        ),
+      ),
       body: _isLoadingAccount
           ? const Center(
               child: CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
               ),
             )
-          : SafeArea(
-              child: KeyboardDismissWrapper(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                  final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-                  return SingleChildScrollView(
-                    reverse: true,
-                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: EdgeInsets.fromLTRB(24.0, 0, 24.0, bottomInset + 24.0),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                      child: Form(
-                        key: _formKey,
-                        autovalidateMode: AutovalidateMode.onUserInteraction,
-                        child: IntrinsicHeight(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                      const SizedBox(height: 40),
-                      // Título centralizado
-                      const Center(
-                      child: Text(
-                        'Dados do Cartão',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
+          : Container(
+              color: AppTheme.backgroundColor,
+              child: SafeArea(
+                top: false,
+                child: KeyboardDismissWrapper(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      24.0,
+                      MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40,
+                      24.0,
+                      0,
                     ),
-
-                    const SizedBox(height: 20),
-
-                    // Indicador de progresso (abaixo do título)
-                    PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
-                      const SizedBox(height: 32),
-
-                // BOTÃO DE SCAN TEMPORARIAMENTE REMOVIDO
-                // Conflito de dependências com Firebase
-                // Será reimplementado com solução compatível
-
-                // Nome do Titular
-                TextFormField(
+                    child: Form(
+                      key: _formKey,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Nome Impresso no Cartão (mesma altura das telas anteriores: 40px do fim da app bar)
+                          TextFormField(
                   controller: _nomeTitularController,
                   textInputAction: TextInputAction.next,
                   textCapitalization: TextCapitalization.words,
@@ -433,40 +426,37 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                 ),
                 const SizedBox(height: 32),
                 const Spacer(),
-                // Botão Avançar
+                // Botão Avançar (mesmo espaçamento das outras telas: 24px abaixo)
                 CustomButton(
                   text: 'Avançar',
                   onPressed: _continuar,
                 ),
-                const SizedBox(height: 16),
-
-                // Aviso de segurança
-                const Row(
-                  children: [
-                    Icon(Icons.lock_outline, size: 16, color: Colors.grey),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Seus dados estão protegidos com criptografia',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
                 const SizedBox(height: 24),
+
+                          // Aviso de segurança
+                          const Row(
+                            children: [
+                              Icon(Icons.lock_outline, size: 16, color: Colors.grey),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Seus dados estão protegidos com criptografia',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
-                        ),
+                          const SizedBox(height: 24),
+                        ],
                       ),
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
             ),
-          ),
     );
   }
 

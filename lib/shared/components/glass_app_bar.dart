@@ -111,6 +111,7 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onBackPressed;
   final Widget? title;
   final List<Widget>? actions;
+  final PreferredSizeWidget? bottom;
   final bool showBackButton;
   final bool automaticallyImplyLeading;
 
@@ -119,12 +120,15 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.onBackPressed,
     this.title,
     this.actions,
+    this.bottom,
     this.showBackButton = true,
     this.automaticallyImplyLeading = false,
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  Size get preferredSize => Size.fromHeight(
+        kToolbarHeight + (bottom?.preferredSize.height ?? 0),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -155,6 +159,7 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
           : null,
       title: title,
       actions: actions,
+      bottom: bottom,
     );
   }
 }
