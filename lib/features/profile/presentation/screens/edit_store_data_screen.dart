@@ -250,35 +250,35 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       extendBodyBehindAppBar: true,
-      appBar: const GlassAppBar(),
-      body: SafeArea(
-        child: KeyboardDismissWrapper(
-          child: _isLoadingData
-              ? Center(
-                  child:
-                      CircularProgressIndicator(color: AppTheme.primaryColor),
-                )
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
+      appBar: GlassAppBar(
+        title: const Text(
+          'Dados da Loja',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ),
+      body: _isLoadingData
+          ? const Center(
+              child: CircularProgressIndicator(color: AppTheme.primaryColor),
+            )
+          : SafeArea(
+              top: false,
+              child: KeyboardDismissWrapper(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    24.0,
+                    MediaQuery.of(context).padding.top + kToolbarHeight + 40,
+                    24.0,
+                    0,
+                  ),
                   child: Form(
                     key: _formKey,
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Título centralizado
-                        const Center(
-                          child: Text(
-                            'Dados da Loja',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 32),
-
                         // Nome da loja
                         TextFormField(
                           controller: _storeNameController,
@@ -363,9 +363,8 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 40.0),
-
-                        // Botão Atualizar
+                        const Spacer(),
+                        // Botão Atualizar (altura padrão: 24px abaixo)
                         CustomButton(
                           text: 'Atualizar',
                           onPressed: (_isLoading || !_hasChanges)
@@ -373,12 +372,13 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                               : _saveStoreData,
                           isLoading: _isLoading,
                         ),
+                        const SizedBox(height: 24),
                       ],
                     ),
                   ),
                 ),
-        ),
-      ),
+              ),
+            ),
     );
   }
 }
@@ -447,12 +447,13 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
         color: AppTheme.backgroundColor,
         child: Builder(
           builder: (context) {
-            final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
+            // Pouco espaço entre o título e a caixa de busca (mais próximo)
+            final topPadding = MediaQuery.of(context).padding.top;
             return Column(
-        children: [
-          Padding(
-            padding: EdgeInsets.only(left: 16.0, right: 16.0, top: topPadding - 8.0, bottom: 4.0),
-            child: TextField(
+              children: [
+                Padding(
+                  padding: EdgeInsets.only(left: 16.0, right: 16.0, top: topPadding, bottom: 4.0),
+                  child: TextField(
               controller: _searchController,
               focusNode: _searchFocusNode,
               autofocus: false,
@@ -479,10 +480,10 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
                       BorderSide(color: AppTheme.primaryColor, width: 2),
                 ),
               ),
-            ),
-          ),
-          Expanded(
-            child: _filteredTypes.isEmpty
+                ),
+              ),
+              Expanded(
+                child: _filteredTypes.isEmpty
                 ? Center(
                     child: Text(
                       'Nenhum ramo encontrado',
@@ -519,8 +520,8 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
                       );
                     },
                   ),
-          ),
-        ],
+              ),
+            ],
             );
           },
         ),

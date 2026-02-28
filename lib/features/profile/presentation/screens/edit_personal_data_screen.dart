@@ -356,38 +356,41 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       extendBodyBehindAppBar: true,
-      appBar: const GlassAppBar(),
+      appBar: GlassAppBar(
+        title: const Text(
+          'Dados Pessoais',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ),
       body: _isLoadingData
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF4ADE80)),
             )
           : SafeArea(
+              top: false,
               child: KeyboardDismissWrapper(
-                child: Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 24.0),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Título centralizado
-                            const Center(
-                              child: Text(
-                                'Dados Pessoais',
-                                style: TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                            
-                            const SizedBox(height: 32),
-                            
-                            // Campo Email
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    24.0,
+                    MediaQuery.of(context).padding.top + kToolbarHeight + 40,
+                    24.0,
+                    0,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Campo Email
                             TextFormField(
                               controller: _emailController,
                               focusNode: _emailFocusNode,
@@ -477,24 +480,24 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
                                 ),
                               ),
                             ),
-                            
-                            const SizedBox(height: 40),
-                            
-                            // Botão Atualizar (desabilitado se não houver mudanças)
-                            CustomButton(
-                              text: 'Atualizar',
-                              onPressed: (_isLoading || !_hasChanges) ? null : _handleConfirm,
-                              isLoading: _isLoading,
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
+                      const Spacer(),
+                      // Botão Atualizar (altura padrão: 24px abaixo)
+                      CustomButton(
+                        text: 'Atualizar',
+                        onPressed: (_isLoading || !_hasChanges) ? null : _handleConfirm,
+                        isLoading: _isLoading,
+                      ),
+                      const SizedBox(height: 24),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-        ),
     );
   }
 }

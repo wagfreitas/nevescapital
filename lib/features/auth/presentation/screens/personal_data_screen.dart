@@ -228,29 +228,35 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       extendBodyBehindAppBar: true,
-      appBar: const GlassAppBar(),
+      appBar: GlassAppBar(
+        title: const Text(
+          'Endereço',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ),
       body: SafeArea(
+        top: false,
         child: KeyboardDismissWrapper(
-          child: SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                      const Center(
-                        child: Text(
-                          'Endereço',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 40),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              24.0,
+              MediaQuery.of(context).padding.top + kToolbarHeight + 40,
+              24.0,
+              0,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                       // CEP
                       TextFormField(
                         controller: _cepController,
@@ -340,7 +346,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                               ],
                             ),
                           ],
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 14),
                           // Logradouro
                           TextFormField(
                             controller: _streetController,
@@ -379,7 +385,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                               return null;
                             },
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 14),
                           // Número e Complemento (lado a lado) — crossAxisAlignment.start para o erro ficar abaixo sem deslocar o campo
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -471,7 +477,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 14),
                           // Bairro
                           TextFormField(
                             controller: _neighborhoodController,
@@ -510,7 +516,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                               return null;
                             },
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 14),
                           // UF e Cidade (lado a lado)
                           Row(
                             children: [
@@ -603,7 +609,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                             ],
                           ),
                           if (_errorMessage != null) ...[
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 12),
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
@@ -627,19 +633,22 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                               ),
                             ),
                           ],
-                          const SizedBox(height: 32),
-                          CustomButton(
-                            text: widget.isEditMode ? 'Atualizar' : 'Finalizar Cadastro',
-                            onPressed: (_isLoading || (widget.isEditMode && !_hasChanges)) ? null : _handleContinue,
-                            isLoading: _isLoading,
-                          ),
-                      const SizedBox(height: 40),
-                    ],
-                  ),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    ),
+                const Spacer(),
+                CustomButton(
+                  text: widget.isEditMode ? 'Atualizar' : 'Finalizar Cadastro',
+                  onPressed: (_isLoading || (widget.isEditMode && !_hasChanges)) ? null : _handleContinue,
+                  isLoading: _isLoading,
                 ),
-              ),
+                const SizedBox(height: 24),
+              ],
             ),
           ),
+        ),
+      ),
     );
   }
 
