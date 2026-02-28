@@ -123,7 +123,16 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       extendBodyBehindAppBar: true,
-      appBar: const GlassAppBar(),
+      appBar: GlassAppBar(
+        title: const Text(
+          'Histórico',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(
@@ -163,21 +172,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 )
               : Column(
                   children: [
-                    // Título no corpo (sem padding no alto)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24),
-                      child: Center(
-                        child: Text(
-                          'Histórico',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
+                    // Espaço abaixo da app bar para o botão Filtros não ficar embaixo do botão voltar
+                    SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight + 24),
                     // Botão Filtros
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),

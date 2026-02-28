@@ -265,7 +265,16 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       extendBodyBehindAppBar: true,
-      appBar: const GlassAppBar(),
+      appBar: GlassAppBar(
+        title: const Text(
+          'Dados Bancários',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ),
       body: _isLoadingData
           ? const Center(
               child: CircularProgressIndicator(
@@ -273,27 +282,19 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
               ),
             )
           : SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 24.0),
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  24.0,
+                  MediaQuery.of(context).padding.top + kToolbarHeight + 40,
+                  24.0,
+                  0,
+                ),
                 child: Form(
                   key: _formKey,
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Título centralizado
-                      const Center(
-                        child: Text(
-                          'Dados Bancários',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 32),
-
                       // Campo: Banco
                       _buildBankField(),
                       const SizedBox(height: 24),
@@ -339,15 +340,14 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
 
                       // Aviso sobre regras de preenchimento
                       _buildRulesWarning(),
-                      
-                      const SizedBox(height: 24),
-
-                      // Botão Atualizar
+                      const Spacer(),
+                      // Botão Atualizar (altura padrão: 24px abaixo)
                       CustomButton(
                         text: 'Atualizar',
                         onPressed: (_isLoading || !_hasChanges) ? null : _handleConfirm,
                         isLoading: _isLoading,
                       ),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
@@ -581,12 +581,17 @@ class _BankSearchScreenState extends State<_BankSearchScreen> {
           style: TextStyle(color: Colors.white, fontSize: 18),
         ),
       ),
-      body: Column(
-        children: [
-          // Campo de busca (abaixo do título)
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
+      body: Container(
+        color: AppTheme.backgroundColor,
+        child: Builder(
+          builder: (context) {
+            // Mesmo padrão da tela Ramo: pouco espaço entre título e caixa de busca
+            final topPadding = MediaQuery.of(context).padding.top;
+            return Column(
+              children: [
+                Padding(
+                  padding: EdgeInsets.only(left: 16.0, right: 16.0, top: topPadding, bottom: 4.0),
+                  child: TextField(
               controller: _searchController,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
@@ -608,39 +613,42 @@ class _BankSearchScreenState extends State<_BankSearchScreen> {
                   borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                 ),
               ),
-            ),
-          ),
-          // Lista de bancos
-          Expanded(
-            child: _filteredBanks.isEmpty
-                ? Center(
-                    child: Text(
-                      'Nenhum banco encontrado',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: _filteredBanks.length,
-                    itemBuilder: (context, index) {
-                      final bank = _filteredBanks[index];
-                      return ListTile(
-                        title: Text(
-                          bank.displayName,
-                          style: const TextStyle(color: Colors.white),
+                ),
+              ),
+              Expanded(
+                child: _filteredBanks.isEmpty
+                    ? Center(
+                        child: Text(
+                          'Nenhum banco encontrado',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                         ),
-                        onTap: () {
-                          Navigator.of(context).pop(bank);
+                      )
+                    : ListView.builder(
+                        padding: EdgeInsets.zero,
+                        itemCount: _filteredBanks.length,
+                        itemBuilder: (context, index) {
+                          final bank = _filteredBanks[index];
+                          return ListTile(
+                            title: Text(
+                              bank.displayName,
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            onTap: () {
+                              Navigator.of(context).pop(bank);
+                            },
+                            trailing: const Icon(
+                              Icons.arrow_forward_ios,
+                              size: 16,
+                              color: AppTheme.textSecondary,
+                            ),
+                          );
                         },
-                        trailing: const Icon(
-                          Icons.arrow_forward_ios,
-                          size: 16,
-                          color: AppTheme.textSecondary,
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
+                      ),
+              ),
+            ],
+            );
+          },
+        ),
       ),
     );
   }

@@ -450,12 +450,13 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
         color: AppTheme.backgroundColor,
         child: Builder(
           builder: (context) {
-            final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
+            // Pouco espaço entre o título e a caixa de busca (mais próximo)
+            final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight + 1;
             return Column(
-        children: [
-          Padding(
-            padding: EdgeInsets.only(left: 16.0, right: 16.0, top: topPadding - 8.0, bottom: 4.0),
-            child: TextField(
+              children: [
+                Padding(
+                  padding: EdgeInsets.only(left: 16.0, right: 16.0, top: topPadding, bottom: 4.0),
+                  child: TextField(
               controller: _searchController,
               autofocus: false,
               style: const TextStyle(color: Colors.white),
@@ -478,10 +479,10 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
                   borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                 ),
               ),
-            ),
-          ),
-          Expanded(
-            child: _filteredTypes.isEmpty
+                ),
+              ),
+              Expanded(
+                child: _filteredTypes.isEmpty
                 ? Center(
                     child: Text(
                       'Nenhum ramo encontrado',
@@ -518,8 +519,8 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
                       );
                     },
                   ),
-          ),
-        ],
+              ),
+            ],
             );
           },
         ),
