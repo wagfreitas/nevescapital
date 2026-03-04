@@ -181,6 +181,14 @@ class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
       resizeToAvoidBottomInset: true,
       extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
+        title: const Text(
+          'Insira seu Celular',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
         onBackPressed: () {
           // Se não houver tela anterior na pilha, navegar para tela de CPF
           if (Navigator.canPop(context)) {
@@ -202,123 +210,97 @@ class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
         },
       ),
       body: SafeArea(
+        top: false,
         child: KeyboardDismissWrapper(
-          child: LayoutBuilder(
-          builder: (context, constraints) {
-            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-            return SingleChildScrollView(
-              reverse: true, // faz a tela subir junto com o teclado
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: EdgeInsets.only(
-                left: 24.0,
-                right: 24.0,
-                bottom: bottomInset + 32.0, // espaço extra para não cobrir botão
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight,
-                ),
-                child: Form(
-                  key: _formKey,
-                  child: IntrinsicHeight(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 40),
-                        const Center(
-                          child: Text(
-                            'Insira seu Celular',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Enviaremos um código de verificação via WhatsApp',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white70,
-                          ),
-                        ),
-                        const SizedBox(height: 40),
-                        PhoneInputField(
-                          controller: _phoneController,
-                          focusNode: _phoneFocusNode,
-                          hintText: '(XX) XXXXX-XXXX',
-                          autofocus: true,
-                        ),
-                        if (_errorMessage != null) ...[
-                          const SizedBox(height: 16),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.red),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.error_outline,
-                                    color: Colors.red, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _errorMessage!,
-                                    style: const TextStyle(
-                                        color: Colors.red, fontSize: 14),
-                                  ),
-                                ),
-                              ],
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              24.0,
+              MediaQuery.of(context).padding.top + kToolbarHeight + 40,
+              24.0,
+              0,
+            ),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Enviaremos um código de verificação via WhatsApp',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  PhoneInputField(
+                    controller: _phoneController,
+                    focusNode: _phoneFocusNode,
+                    hintText: '(XX) XXXXX-XXXX',
+                    autofocus: true,
+                  ),
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline,
+                              color: Colors.red, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _errorMessage!,
+                              style: const TextStyle(
+                                  color: Colors.red, fontSize: 14),
                             ),
                           ),
                         ],
-                        // Espaço extra entre input e botão - aumenta quando teclado está aberto
-                        SizedBox(height: bottomInset > 0 ? 80 : 40),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _handleNext,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primaryColor,
-                              foregroundColor: AppTheme.backgroundColor,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          AppTheme.backgroundColor),
-                                    ),
-                                  )
-                                : const Text(
-                                    'Avançar',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                          ),
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _handleNext,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: AppTheme.backgroundColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        const SizedBox(height: 24),
-                      ],
+                        elevation: 0,
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppTheme.backgroundColor),
+                              ),
+                            )
+                          : const Text(
+                              'Avançar',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 24),
+                ],
               ),
-            );
-          },
-        ),
+            ),
+          ),
         ),
       ),
     );

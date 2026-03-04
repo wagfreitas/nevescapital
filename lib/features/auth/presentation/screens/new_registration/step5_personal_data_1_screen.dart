@@ -7,6 +7,7 @@ import 'package:neves_capital/features/auth/presentation/controllers/auth_contro
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/registration_lifecycle_observer.dart';
 import 'package:neves_capital/features/auth/domain/entities/registration_progress.dart';
+import 'package:neves_capital/features/auth/presentation/helpers/registration_progress_indicator.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'package:neves_capital/features/auth/presentation/helpers/registration_navigation_helper.dart';
 import 'step4_email_screen.dart';
@@ -274,6 +275,15 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
       resizeToAvoidBottomInset: true,
       extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
+        title: const Text(
+          'Dados Cadastrais',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        bottom: RegistrationProgressIndicator.preferredSize(1),
         onBackPressed: () {
           if (Navigator.canPop(context)) {
             Navigator.pop(context);
@@ -294,66 +304,22 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
         },
       ),
       body: SafeArea(
+        top: false,
         child: KeyboardDismissWrapper(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            padding: EdgeInsets.fromLTRB(
+              24.0,
+              MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40,
+              24.0,
+              0,
+            ),
             child: Form(
               key: _formKey,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 40),
-                        const Center(
-                          child: Text(
-                            'Dados Cadastrais',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Primeiro traço (ativo) - primeira de 3
-                              Container(
-                                width: 32,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primaryColor,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Segundo traço (inativo)
-                              Container(
-                                width: 32,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Terceiro traço (inativo)
-                              Container(
-                                width: 32,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 40),
-                        // Nome Completo
-                        TextFormField(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Nome Completo
+                  TextFormField(
                           controller: _fullNameController,
                           focusNode: _fullNameFocusNode,
                           style: const TextStyle(color: Colors.white),
@@ -535,7 +501,6 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                             ),
                           ),
                         ],
-                        const SizedBox(height: 32),
                         const Spacer(),
                         SizedBox(
                           width: double.infinity,

@@ -248,6 +248,14 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
       resizeToAvoidBottomInset: true,
       extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
+        title: const Text(
+          'Insira seu CPF',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
         onBackPressed: () {
           if (Navigator.canPop(context)) {
             Navigator.pop(context);
@@ -264,123 +272,113 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
         },
       ),
       body: SafeArea(
+        top: false,
         child: KeyboardDismissWrapper(
           child: Padding(
-            padding: EdgeInsets.only(
-              left: 24.0,
-              right: 24.0,
-              bottom: 32.0 + MediaQuery.of(context).viewInsets.bottom,
+            padding: EdgeInsets.fromLTRB(
+              24.0,
+              MediaQuery.of(context).padding.top + kToolbarHeight + 40,
+              24.0,
+              0,
             ),
             child: Form(
               key: _formKey,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                          const SizedBox(height: 40),
-                          const Center(
-                            child: Text(
-                              'Insira seu CPF',
-                              textAlign: TextAlign.center,
+                  if (_errorMessage != null) ...[
+                    _buildErrorMessage(),
+                    const SizedBox(height: 16),
+                  ],
+                  TextFormField(
+                    controller: _cpfMaskedController,
+                    autofocus: widget.initialCpf == null || widget.initialCpf!.isEmpty,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(color: Colors.white),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(14),
+                    ],
+                    onChanged: _onCpfChanged,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Por favor, digite seu CPF';
+                      }
+                      final cpfNumbers = CpfHelper.getCpfNumbers(value);
+                      if (cpfNumbers.length != 11) {
+                        return 'CPF deve ter 11 dígitos';
+                      }
+                      if (!CpfHelper.isValidCpf(value)) {
+                        return 'CPF inválido. Verifique os dígitos.';
+                      }
+                      return null;
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'CPF',
+                      labelStyle: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                      hintText: '000.000.000-00',
+                      hintStyle: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
+                      filled: true,
+                      fillColor: AppTheme.inputEditableBackgroundColor,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.red, width: 2),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.red, width: 2),
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _handleNext,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: AppTheme.backgroundColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.backgroundColor),
+                              ),
+                            )
+                          : const Text(
+                              'Continuar',
                               style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 40),
-                          if (_errorMessage != null) ...[
-                            _buildErrorMessage(),
-                            const SizedBox(height: 16),
-                          ],
-                          TextFormField(
-                            controller: _cpfMaskedController,
-                            autofocus: widget.initialCpf == null || widget.initialCpf!.isEmpty,
-                            keyboardType: TextInputType.number,
-                            style: const TextStyle(color: Colors.white),
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              LengthLimitingTextInputFormatter(14),
-                            ],
-                            onChanged: _onCpfChanged,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Por favor, digite seu CPF';
-                              }
-                              final cpfNumbers = CpfHelper.getCpfNumbers(value);
-                              if (cpfNumbers.length != 11) {
-                                return 'CPF deve ter 11 dígitos';
-                              }
-                              if (!CpfHelper.isValidCpf(value)) {
-                                return 'CPF inválido. Verifique os dígitos.';
-                              }
-                              return null;
-                            },
-                            decoration: InputDecoration(
-                              labelText: 'CPF',
-                              labelStyle: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.7),
-                              ),
-                              hintText: '000.000.000-00',
-                              hintStyle: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.3),
-                              ),
-                              filled: true,
-                              fillColor: AppTheme.inputEditableBackgroundColor,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
-                              ),
-                              errorBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Colors.red, width: 2),
-                              ),
-                              focusedErrorBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Colors.red, width: 2),
-                              ),
-                            ),
-                          ),
-                          const Spacer(),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _handleNext,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.primaryColor,
-                                foregroundColor: AppTheme.backgroundColor,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 0,
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.backgroundColor),
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Continuar',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                            ),
-                          ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),

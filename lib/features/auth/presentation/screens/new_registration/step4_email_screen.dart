@@ -169,6 +169,14 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
       resizeToAvoidBottomInset: true,
       extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
+        title: const Text(
+          'Insira seu email',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
         onBackPressed: () {
           // Tentar fazer pop primeiro (se houver tela anterior na pilha)
           // Se não houver, navegar explicitamente para a tela de CPF
@@ -193,28 +201,21 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
         },
       ),
       body: SafeArea(
+        top: false,
         child: KeyboardDismissWrapper(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            padding: EdgeInsets.fromLTRB(
+              24.0,
+              MediaQuery.of(context).padding.top + kToolbarHeight + 40,
+              24.0,
+              0,
+            ),
             child: Form(
               key: _formKey,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 40),
-                        const Center(
-                          child: Text(
-                            'Insira seu email',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 40),
-                        TextFormField(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextFormField(
                           controller: _emailController,
                           focusNode: _emailFocusNode,
                           autofocus: true,
@@ -261,72 +262,72 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
                             return null;
                           },
                         ),
-                        if (_errorMessage != null) ...[
-                          const SizedBox(height: 16),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.red),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.error_outline,
-                                    color: Colors.red, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _errorMessage!,
-                                    style: const TextStyle(
-                                        color: Colors.red, fontSize: 14),
-                                  ),
-                                ),
-                              ],
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline,
+                              color: Colors.red, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _errorMessage!,
+                              style: const TextStyle(
+                                  color: Colors.red, fontSize: 14),
                             ),
                           ),
                         ],
-                        const Spacer(),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _handleNext,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primaryColor,
-                              foregroundColor: AppTheme.backgroundColor,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor:
-                                          AlwaysStoppedAnimation<Color>(
-                                              AppTheme.backgroundColor),
-                                    ),
-                                  )
-                                : const Text(
-                                    'Avançar',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                          ),
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _handleNext,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: AppTheme.backgroundColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        const SizedBox(height: 24),
-                      ],
+                        elevation: 0,
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(
+                                        AppTheme.backgroundColor),
+                              ),
+                            )
+                          : const Text(
+                              'Avançar',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 24),
+                ],
               ),
             ),
+          ),
+        ),
+      ),
     );
   }
 }

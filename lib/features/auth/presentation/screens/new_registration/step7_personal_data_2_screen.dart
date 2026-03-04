@@ -9,6 +9,7 @@ import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/registration_lifecycle_observer.dart';
 import 'package:neves_capital/features/auth/domain/entities/registration_progress.dart';
 import 'package:neves_capital/features/auth/presentation/helpers/registration_navigation_helper.dart';
+import 'package:neves_capital/features/auth/presentation/helpers/registration_progress_indicator.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'package:neves_capital/core/config/feature_flags.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
@@ -454,6 +455,15 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
       resizeToAvoidBottomInset: true,
       extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
+        title: const Text(
+          'Informações Pessoais',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        bottom: RegistrationProgressIndicator.preferredSize(3),
         onBackPressed: () {
           // Tentar fazer pop primeiro (se houver tela anterior na pilha)
           // Se não houver, navegar explicitamente para a tela anterior
@@ -490,75 +500,21 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
       ),
       body: Container(
         color: AppTheme.backgroundColor,
-        child: KeyboardDismissWrapper(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-            final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
-            return SingleChildScrollView(
-              reverse: true,
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: EdgeInsets.only(
-                left: 24.0,
-                right: 24.0,
-                top: topPadding,
-                bottom: bottomInset + 32.0,
+        child: SafeArea(
+          top: false,
+          child: KeyboardDismissWrapper(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                24.0,
+                MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40,
+                24.0,
+                0,
               ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight - topPadding),
-                child: IntrinsicHeight(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 16),
-                      const Center(
-                        child: Text(
-                          'Informações Pessoais',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Center(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 32,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.3),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              width: 32,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.3),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              width: 32,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: AppTheme.primaryColor,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 40),
-                      // PEP
-                      const Text(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // PEP
+                  const Text(
                         'Você é uma Pessoa Politicamente Exposta?',
                         style: TextStyle(
                           fontSize: 16,
@@ -705,7 +661,7 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 40),
+                      const Spacer(),
                       SizedBox(
                         width: double.infinity,
                         height: 56,
@@ -778,14 +734,11 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                ),
+                  const SizedBox(height: 24),
+                ],
               ),
-            );
-          },
-        ),
+            ),
+          ),
         ),
       ),
     );
