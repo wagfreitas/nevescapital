@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neves_capital/features/auth/presentation/helpers/registration_progress_indicator.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/screens/terms_of_use_screen.dart';
 import 'package:neves_capital/shared/screens/privacy_policy_screen.dart';
@@ -481,6 +482,15 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
       resizeToAvoidBottomInset: true,
       extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
+        title: const Text(
+          'Documento com Foto',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        bottom: RegistrationProgressIndicator.preferredSize(3),
         onBackPressed: () {
           if (Navigator.canPop(context)) {
             Navigator.pop(context);
@@ -488,36 +498,26 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
         },
       ),
       body: SafeArea(
+        top: false,
         child: LayoutBuilder(
           builder: (context, constraints) {
             final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40;
             return SingleChildScrollView(
               reverse: true,
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: EdgeInsets.only(
                 left: 24.0,
                 right: 24.0,
+                top: topPadding,
                 bottom: bottomInset + 32.0,
               ),
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                constraints: BoxConstraints(minHeight: constraints.maxHeight - topPadding),
                 child: IntrinsicHeight(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 40),
-                      const Center(
-                        child: Text(
-                          'Documento com Foto',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 40),
                       // Seleção de tipo de documento
                       const Text(
                         'Qual documento você irá enviar ?',
@@ -590,7 +590,7 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 40),
+                      const Spacer(),
                       // Botão Finalizar Cadastro
                       SizedBox(
                         width: double.infinity,
@@ -661,7 +661,7 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),

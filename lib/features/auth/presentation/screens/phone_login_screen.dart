@@ -269,7 +269,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                           child: PhoneInputField(
                             controller: _phoneController,
                             focusNode: _phoneFocusNode,
-                            labelText: 'Telefone',
+                            labelText: 'Celular',
                             hintText: '(00) 00000-0000',
                             autofocus: true,
                             validator: (value) {

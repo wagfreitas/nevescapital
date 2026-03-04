@@ -10,6 +10,7 @@ import 'package:neves_capital/features/auth/domain/entities/registration_progres
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'package:neves_capital/features/auth/presentation/helpers/registration_navigation_helper.dart';
+import 'package:neves_capital/features/auth/presentation/helpers/registration_progress_indicator.dart';
 import 'package:neves_capital/shared/helpers/cep_helper.dart';
 import 'package:neves_capital/shared/services/cep_service.dart';
 import 'step5_personal_data_1_screen.dart';
@@ -347,6 +348,15 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
       resizeToAvoidBottomInset: true,
       extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
+        title: const Text(
+          'Endereço',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        bottom: RegistrationProgressIndicator.preferredSize(2),
         onBackPressed: () {
           // Tentar fazer pop primeiro (se houver tela anterior na pilha)
           // Se não houver, navegar explicitamente para a tela anterior
@@ -375,81 +385,26 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
       ),
       body: Container(
         color: AppTheme.backgroundColor,
-        child: KeyboardDismissWrapper(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-              final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
-              return SingleChildScrollView(
-                reverse: true,
-                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: EdgeInsets.only(
-                  left: 24.0,
-                  right: 24.0,
-                  top: topPadding,
-                  bottom: bottomInset + 32.0,
-                ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight - topPadding),
-                  child: Form(
-                    key: _formKey,
-                    autovalidateMode: AutovalidateMode.onUserInteraction,
-                    child: IntrinsicHeight(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 16),
-                          const Center(
-                            child: Text(
-                              'Endereço',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 32,
-                                  height: 4,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.3),
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  width: 32,
-                                  height: 4,
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.primaryColor,
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  width: 32,
-                                  height: 4,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.3),
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          
-                          const SizedBox(height: 40),
-                          // CEP
-                          TextFormField(
-                            controller: _cepController,
-                            focusNode: _cepFocusNode,
+        child: SafeArea(
+          top: false,
+          child: KeyboardDismissWrapper(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                24.0,
+                MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40,
+                24.0,
+                0,
+              ),
+              child: Form(
+                key: _formKey,
+                autovalidateMode: AutovalidateMode.disabled,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // CEP
+                    TextFormField(
+                      controller: _cepController,
+                      focusNode: _cepFocusNode,
                             keyboardType: TextInputType.number,
                             textInputAction: TextInputAction.done,
                             onFieldSubmitted: (_) {
@@ -516,34 +471,34 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                               ),
                               prefixIcon: const Icon(Icons.location_on, color: Colors.white70),
                             ),
-                            validator: CepHelper.validateCep,
-                          ),
-                          if (_isSearchingCep) ...[
-                            const SizedBox(height: 8),
-                            const Row(
-                              children: [
-                                SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-                                  ),
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Buscando endereço...',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
+                      validator: CepHelper.validateCep,
+                    ),
+                    if (_isSearchingCep) ...[
+                      const SizedBox(height: 8),
+                      const Row(
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
                             ),
-                          ],
-                          const SizedBox(height: 20),
-                          // Logradouro
-                          TextFormField(
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Buscando endereço...',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    // Logradouro
+                    TextFormField(
                             controller: _streetController,
                             keyboardType: TextInputType.streetAddress,
                             readOnly: true,
@@ -569,10 +524,10 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                               ),
                               prefixIcon: const Icon(Icons.home, color: Colors.white60),
                             ),
-                          ),
-                          const SizedBox(height: 20),
-                          // Número e Complemento (lado a lado, altura fixa para erro não desalinhar)
-                          Row(
+                    ),
+                    const SizedBox(height: 20),
+                    // Número e Complemento (lado a lado, altura fixa para erro não desalinhar)
+                    Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Expanded(
@@ -664,11 +619,11 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          // Bairro
-                          TextFormField(
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    // Bairro
+                    TextFormField(
                             controller: _neighborhoodController,
                             keyboardType: TextInputType.text,
                             readOnly: true,
@@ -694,10 +649,10 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                               ),
                               prefixIcon: const Icon(Icons.location_city, color: Colors.white60),
                             ),
-                          ),
-                          const SizedBox(height: 20),
-                          // UF e Cidade (lado a lado)
-                          Row(
+                    ),
+                    const SizedBox(height: 20),
+                    // UF e Cidade (lado a lado)
+                    Row(
                             children: [
                               Expanded(
                                 child: TextFormField(
@@ -763,73 +718,70 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                 ),
                               ),
                             ],
-                          ),
-                          if (_errorMessage != null) ...[
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.red.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.red),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.error_outline,
-                                      color: Colors.red, size: 20),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _errorMessage!,
-                                      style: const TextStyle(
-                                          color: Colors.red, fontSize: 14),
-                                    ),
-                                  ),
-                                ],
+                    ),
+                    if (_errorMessage != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline,
+                                color: Colors.red, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _errorMessage!,
+                                style: const TextStyle(
+                                    color: Colors.red, fontSize: 14),
                               ),
                             ),
                           ],
-                          const SizedBox(height: 32),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _handleNext,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.primaryColor,
-                                foregroundColor: AppTheme.backgroundColor,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 0,
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                            AppTheme.backgroundColor),
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Avançar',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                            ),
+                        ),
+                      ),
+                    ],
+                    const Spacer(),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleNext,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryColor,
+                          foregroundColor: AppTheme.backgroundColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          const SizedBox(height: 40),
-                        ],
+                          elevation: 0,
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      AppTheme.backgroundColor),
+                                ),
+                              )
+                            : const Text(
+                                'Avançar',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 24),
+                  ],
                 ),
-              );
-            },
+              ),
+            ),
           ),
         ),
       ),
