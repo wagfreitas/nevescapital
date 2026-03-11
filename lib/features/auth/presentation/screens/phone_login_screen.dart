@@ -6,9 +6,9 @@ import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/glass_app_bar.dart';
-import 'package:neves_capital/features/auth/presentation/screens/login_otp/login_step3_otp_screen.dart';
 import 'package:neves_capital/features/auth/presentation/screens/onboarding_screen.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:neves_capital/features/auth/presentation/screens/whatsapp_otp_screen.dart';
+import 'package:neves_capital/features/auth/data/services/auth_api_service.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 
 /// Tela de Login via Telefone (Phone-First)
@@ -54,7 +54,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
       String phone = PhoneHelper.getPhoneNumbers(_phoneController.text);
 
       // Validar se o telefone tem pelo menos o código do país + 10 dígitos
-      if (phone.length < 12) { // Mínimo: código do país (2-3 dígitos) + 10 dígitos
+      if (phone.length < 12) {
         setState(() {
           _isLoading = false;
           _errorMessage = 'Telefone inválido. Digite um número válido.';
@@ -65,106 +65,37 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
       // Formatar para E.164 (+código do país + número)
       final formattedPhone = '+$phone';
 
-      AppLogger.info('🚀 Iniciando login Firebase');
-      AppLogger.info('📱 Telefone original: ${_phoneController.text}');
+      AppLogger.info('🚀 Enviando OTP via WhatsApp');
       AppLogger.info('📱 Telefone limpo: $phone');
       AppLogger.info('📱 Telefone formatado (E.164): $formattedPhone');
-      AppLogger.info('📱 Comprimento: ${formattedPhone.length} caracteres');
 
-      // Firebase Phone Auth
-      await FirebaseAuth.instance.verifyPhoneNumber(
-        phoneNumber: formattedPhone,
-        verificationCompleted: (PhoneAuthCredential credential) async {
-          // Auto-retrieval ou Instant validation (Android)
-          AppLogger.info('✅ Verificação automática concluída!');
-          // Em alguns casos, o Android faz o login automático.
-          // Vamos passar a credencial para a próxima tela ou logar direto.
-          // Por simplicidade, vamos deixar o usuário ir para a tela de OTP
-          // e lá ele vai detectar que já está logado ou usar o código.
-          // Mas o ideal é tratar aqui.
+      // Enviar OTP via WhatsApp (backend)
+      final result = await AuthApiService.sendOtpWhatsApp(phone);
 
-          // Vamos logar direto aqui se possível
-          try {
-            await FirebaseAuth.instance.signInWithCredential(credential);
-            if (!mounted) return;
-            // Se logou, vai para a próxima tela (que vai verificar o status do usuário)
-            // Mas como a arquitetura pede OTP screen, vamos navegar para lá
-            // passando a credencial ou indicando sucesso.
+      if (!mounted) return;
 
-            // Simplificação: Vamos deixar o fluxo seguir para codeSent na maioria dos casos,
-            // mas se cair aqui, vamos navegar para a tela de OTP com um flag de "auto-verified"
-            // ou simplesmente deixar o usuário digitar o código (que pode não chegar se já validou).
+      if (result['success'] == true) {
+        setState(() => _isLoading = false);
 
-            // Melhor abordagem: Navegar para tela de OTP passando a credencial
-            // A tela de OTP vai detectar que tem credencial e logar.
-          } catch (e) {
-            AppLogger.error('Erro no auto-sign-in: $e');
-          }
-        },
-        verificationFailed: (FirebaseAuthException e) {
-          
-          if (mounted) {
-            setState(() {
-              _isLoading = false;
-              if (e.code == 'invalid-phone-number') {
-                _errorMessage = 'Número de telefone inválido. Verifique o formato.';
-              } else if (e.code == 'too-many-requests') {
-                _errorMessage = 'Muitas tentativas. Aguarde alguns minutos.';
-              } else if (e.code == 'internal-error') {
-                AppLogger.error('Firebase internal-error: possível problema com APNs (iOS) ou SHA-1 (Android)');
-                _errorMessage = 'Não foi possível enviar o código de verificação. Tente novamente em alguns instantes.';
-              } else if (e.code == 'missing-phone-number') {
-                _errorMessage = 'Número de telefone não fornecido.';
-              } else if (e.code == 'quota-exceeded') {
-                _errorMessage = 'Limite de SMS excedido. Tente mais tarde.';
-              } else if (e.code == 'user-disabled') {
-                _errorMessage = 'Conta desabilitada. Contate o suporte.';
-              } else if (e.code == 'operation-not-allowed') {
-                _errorMessage = 'Autenticação por telefone não habilitada.';
-              } else {
-                _errorMessage = 'Erro: ${e.message ?? e.code}';
-              }
-            });
-          }
-        },
-        codeSent: (String verificationId, int? resendToken) {
-          AppLogger.info('✅ Código enviado. VerificationId: $verificationId');
-          AppLogger.debug('📱 ResendToken: ${resendToken != null ? "disponível" : "não disponível"}');
-
-          if (!mounted) return;
-
-          setState(() {
-            _isLoading = false;
-          });
-
-          // Navegar para tela de OTP
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => LoginStep3OtpScreen(
-                authController: widget.authController,
-                themeController: widget.themeController,
-              ),
-              settings: RouteSettings(
-                arguments: {
-                  'phone': phone,
-                  'formattedPhone': formattedPhone, // Telefone formatado E.164 para reenvio
-                  'verificationId': verificationId,
-                  'resendToken': resendToken, // Token para reenvio
-                  'maskedPhone': PhoneHelper.maskPhoneLast4(phone),
-                },
-              ),
+        // Navegar para tela de OTP WhatsApp (4 dígitos)
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => WhatsAppOtpScreen(
+              phone: phone,
+              formattedPhone: formattedPhone,
+              authController: widget.authController,
+              themeController: widget.themeController,
             ),
-          );
-        },
-        codeAutoRetrievalTimeout: (String verificationId) {
-          AppLogger.debug(
-              '⏰ Timeout de auto-retrieval. VerificationId: $verificationId');
-          // Não precisa fazer nada específico aqui, o usuário ainda pode digitar o código
-        },
-      );
-
-      // Nota: O loading continua até o callback codeSent ou verificationFailed ser chamado
+          ),
+        );
+      } else {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = result['message'] as String? ??
+              'Erro ao enviar código via WhatsApp. Tente novamente.';
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {

@@ -5,6 +5,7 @@ import { ApiKeyGuard } from '../common/guards/api-key.guard';
 import * as admin from 'firebase-admin';
 import { EmailSenderService } from './email-sender.service';
 import { SimpleOtpService } from './services/simple-otp.service';
+import { WhatsAppService } from './services/whatsapp.service';
 import { UsersService } from '../users/users.service';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 
@@ -16,6 +17,7 @@ export class AuthController {
   constructor(
     private readonly emailSenderService: EmailSenderService,
     private readonly simpleOtpService: SimpleOtpService,
+    private readonly whatsAppService: WhatsAppService,
     private readonly usersService: UsersService,
   ) { }
 
@@ -90,6 +92,149 @@ export class AuthController {
       success: true,
       message: result.message,
     };
+  }
+
+  @Post('send-otp-whatsapp')
+  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 requests por minuto
+  @ApiOperation({
+    summary: 'Enviar código OTP via WhatsApp',
+    description: 'Gera código OTP de 4 dígitos e envia via WhatsApp para o telefone informado'
+  })
+  @ApiResponse({ status: 200, description: 'OTP enviado via WhatsApp com sucesso' })
+  @ApiResponse({ status: 400, description: 'Telefone inválido ou falha no envio' })
+  async sendOtpWhatsApp(@Body() body: { phone: string }) {
+    if (!body.phone) {
+      throw new BadRequestException('Telefone é obrigatório');
+    }
+
+    // 1. Gerar e salvar OTP no Firestore
+    const result = await this.simpleOtpService.sendOtp(body.phone);
+
+    if (!result.success) {
+      throw new BadRequestException(result.message);
+    }
+
+    // 2. Enviar OTP via WhatsApp (fire-and-forget — não bloqueia a resposta)
+    if (result.code) {
+      this.whatsAppService.sendOtpMessage(body.phone, result.code)
+        .then((sent) => {
+          if (!sent) {
+            console.warn(`⚠️ [AuthController] Falha ao enviar OTP via WhatsApp para ${body.phone.substring(0, 4)}***`);
+          }
+        })
+        .catch((err) => {
+          console.error(`❌ [AuthController] Erro ao enviar OTP via WhatsApp: ${err.message}`);
+        });
+    }
+
+    return {
+      success: true,
+      message: 'Código de verificação enviado via WhatsApp',
+    };
+  }
+
+  @Post('verify-otp-login')
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests por minuto
+  @ApiOperation({
+    summary: 'Verificar OTP e fazer login',
+    description: 'Valida o código OTP, busca usuário pelo telefone e retorna status + custom token para login'
+  })
+  @ApiResponse({ status: 200, description: 'OTP verificado e status do usuário retornado' })
+  @ApiResponse({ status: 400, description: 'Código inválido, expirado ou telefone inválido' })
+  async verifyOtpLogin(@Body() body: { phone: string; code: string }) {
+    if (!body.phone || !body.code) {
+      throw new BadRequestException('Telefone e código são obrigatórios');
+    }
+
+    // 1. Verificar OTP
+    const otpResult = await this.simpleOtpService.verifyOtp(body.phone, body.code);
+
+    if (!otpResult.success) {
+      throw new BadRequestException(otpResult.message);
+    }
+
+    // 2. Normalizar telefone
+    const normalizedPhone = body.phone.replace(/\D/g, '');
+    console.log(`✅ [AuthController] OTP verificado para ${normalizedPhone.substring(0, 4)}***`);
+
+    // 3. Buscar usuário no Firestore pelo telefone
+    const user = await this.usersService.findByPhone(normalizedPhone);
+
+    if (user) {
+      // Verificar se o cadastro está completo
+      const isComplete = this.isRegistrationComplete(user);
+
+      if (!isComplete) {
+        console.log(`⚠️ [AuthController] Usuário encontrado mas cadastro incompleto. ID: ${user.id}`);
+        return {
+          success: true,
+          status: 'REGISTER',
+          message: 'Cadastro incompleto. Redirecionando para finalizar cadastro.',
+          phone: normalizedPhone,
+        };
+      }
+
+      // Usuário com cadastro completo — gerar Custom Token
+      console.log(`✅ [AuthController] Usuário completo encontrado. ID: ${user.id}`);
+
+      try {
+        // Obter ou criar Firebase Auth user para este telefone
+        let firebaseUid: string;
+        try {
+          const firebaseUser = await admin.auth().getUserByPhoneNumber('+' + normalizedPhone);
+          firebaseUid = firebaseUser.uid;
+        } catch (e: any) {
+          if (e.code === 'auth/user-not-found') {
+            // Criar Firebase Auth user
+            const newUser = await admin.auth().createUser({
+              phoneNumber: '+' + normalizedPhone,
+            });
+            firebaseUid = newUser.uid;
+            console.log(`📝 [AuthController] Firebase Auth user criado: ${firebaseUid}`);
+          } else {
+            throw e;
+          }
+        }
+
+        // Gerar Custom Token
+        const customToken = await admin.auth().createCustomToken(firebaseUid);
+        console.log(`🔑 [AuthController] Custom token gerado para UID: ${firebaseUid}`);
+
+        // Registrar login
+        try {
+          await this.usersService.updateLastLogin(user.id);
+        } catch (error) {
+          console.warn(`⚠️ [AuthController] Erro ao registrar login (não crítico): ${error.message}`);
+        }
+
+        return {
+          success: true,
+          status: 'LOGGED_IN',
+          message: 'Login realizado com sucesso.',
+          customToken,
+          userId: user.id,
+          phone: normalizedPhone,
+          user: {
+            id: user.id,
+            full_name: user.full_name,
+            email: user.email,
+            phone: user.phone,
+          },
+        };
+      } catch (error: any) {
+        console.error(`❌ [AuthController] Erro ao gerar custom token: ${error.message}`);
+        throw new BadRequestException('Erro ao processar login. Tente novamente.');
+      }
+    } else {
+      // Usuário não encontrado — cadastro necessário
+      console.log(`📝 [AuthController] Usuário não encontrado para ${normalizedPhone.substring(0, 4)}***`);
+      return {
+        success: true,
+        status: 'REGISTER',
+        message: 'Usuário não encontrado. Redirecionando para cadastro.',
+        phone: normalizedPhone,
+      };
+    }
   }
 
   @Post('check-user-status')

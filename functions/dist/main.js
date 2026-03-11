@@ -43,7 +43,7 @@ const config_1 = __webpack_require__(6);
 const throttler_1 = __webpack_require__(7);
 const users_module_1 = __webpack_require__(8);
 const auth_module_1 = __webpack_require__(20);
-const health_controller_1 = __webpack_require__(31);
+const health_controller_1 = __webpack_require__(33);
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -346,6 +346,83 @@ let UsersService = class UsersService {
             throw new common_1.BadRequestException(`Erro ao remover usuário: ${error.message}`);
         }
     }
+    async deleteUserDataComplete(userId) {
+        try {
+            console.log(`🗑️ [UsersService] Iniciando limpeza completa dos dados do usuário: ${userId}`);
+            const userRef = this.db.collection('users').doc(userId);
+            const userDoc = await userRef.get();
+            if (!userDoc.exists) {
+                throw new common_1.NotFoundException('Usuário não encontrado no Firestore');
+            }
+            const userData = userDoc.data();
+            const ownerUid = userData['ownerUid'];
+            console.log(`📄 [UsersService] Documento encontrado. ownerUid: ${ownerUid || 'não vinculado'}`);
+            const results = {
+                storageDeleted: false,
+                authDeleted: false,
+                firestoreDeleted: false,
+            };
+            try {
+                console.log('📦 [UsersService] Deletando arquivos do Storage...');
+                const bucket = admin.storage().bucket();
+                const folderPath = `users/${userId}/kyc`;
+                const [files] = await bucket.getFiles({ prefix: folderPath });
+                if (files.length > 0) {
+                    await Promise.all(files.map(file => file.delete()));
+                    console.log(`✅ [UsersService] ${files.length} arquivo(s) do Storage deletado(s)`);
+                }
+                else {
+                    console.log('ℹ️ [UsersService] Nenhum arquivo encontrado no Storage');
+                }
+                results.storageDeleted = true;
+            }
+            catch (error) {
+                console.warn(`⚠️ [UsersService] Erro ao deletar arquivos do Storage (continuando): ${error.message}`);
+            }
+            if (ownerUid) {
+                try {
+                    console.log(`🔐 [UsersService] Deletando conta do Firebase Auth (UID: ${ownerUid})...`);
+                    await admin.auth().deleteUser(ownerUid);
+                    console.log('✅ [UsersService] Conta do Firebase Auth deletada');
+                    results.authDeleted = true;
+                }
+                catch (error) {
+                    if (error.code === 'auth/user-not-found') {
+                        console.log('ℹ️ [UsersService] Usuário não encontrado no Firebase Auth (pode já ter sido deletado)');
+                    }
+                    else {
+                        console.warn(`⚠️ [UsersService] Erro ao deletar conta do Firebase Auth (continuando): ${error.message}`);
+                    }
+                }
+            }
+            else {
+                console.log('ℹ️ [UsersService] Usuário não possui conta no Firebase Auth (ownerUid não encontrado)');
+            }
+            try {
+                console.log('🗄️ [UsersService] Deletando documento do Firestore...');
+                await userRef.delete();
+                console.log('✅ [UsersService] Documento do Firestore deletado');
+                results.firestoreDeleted = true;
+            }
+            catch (error) {
+                console.error(`❌ [UsersService] Erro ao deletar documento do Firestore: ${error.message}`);
+                throw new common_1.BadRequestException(`Erro ao deletar documento do Firestore: ${error.message}`);
+            }
+            console.log('✅ [UsersService] Limpeza completa dos dados do usuário concluída com sucesso');
+            return {
+                success: true,
+                message: 'Dados do usuário deletados com sucesso',
+                details: results,
+            };
+        }
+        catch (error) {
+            if (error instanceof common_1.NotFoundException) {
+                throw error;
+            }
+            console.error(`❌ [UsersService] Erro durante limpeza dos dados do usuário: ${error.message}`);
+            throw new common_1.BadRequestException(`Erro ao deletar dados do usuário: ${error.message}`);
+        }
+    }
     async verifyPassword(verifyPasswordDto) {
         throw new common_1.BadRequestException('Verificação de senha deve ser feita via Firebase Auth no frontend');
     }
@@ -551,6 +628,9 @@ let UsersController = class UsersController {
     remove(id) {
         return this.usersService.remove(id);
     }
+    deleteUserDataComplete(id) {
+        return this.usersService.deleteUserDataComplete(id);
+    }
     syncFirebaseEmail(body) {
         return this.usersService.syncFirebaseEmail(body.cpf, body.oldEmail);
     }
@@ -643,6 +723,20 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "remove", null);
+__decorate([
+    (0, common_1.Delete)(':id/complete'),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Deletar todos os dados do usuário (hard delete completo)',
+        description: 'Deleta permanentemente: documentos KYC no Storage, conta do Firebase Auth e documento no Firestore. **ATENÇÃO: Operação irreversível!**'
+    }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Dados do usuário deletados com sucesso' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'Usuário não encontrado' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Erro ao deletar dados do usuário' }),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], UsersController.prototype, "deleteUserDataComplete", null);
 __decorate([
     (0, common_1.Post)('sync-firebase-email'),
     (0, swagger_1.ApiOperation)({ summary: 'Sincronizar email do Firebase com Firestore' }),
@@ -1080,7 +1174,8 @@ const config_1 = __webpack_require__(6);
 const email_template_service_1 = __webpack_require__(21);
 const email_sender_service_1 = __webpack_require__(24);
 const simple_otp_service_1 = __webpack_require__(28);
-const auth_controller_1 = __webpack_require__(29);
+const whatsapp_service_1 = __webpack_require__(29);
+const auth_controller_1 = __webpack_require__(31);
 const users_module_1 = __webpack_require__(8);
 let AuthModule = class AuthModule {
 };
@@ -1093,8 +1188,9 @@ exports.AuthModule = AuthModule = __decorate([
             email_template_service_1.EmailTemplateService,
             email_sender_service_1.EmailSenderService,
             simple_otp_service_1.SimpleOtpService,
+            whatsapp_service_1.WhatsAppService,
         ],
-        exports: [email_template_service_1.EmailTemplateService, email_sender_service_1.EmailSenderService, simple_otp_service_1.SimpleOtpService],
+        exports: [email_template_service_1.EmailTemplateService, email_sender_service_1.EmailSenderService, simple_otp_service_1.SimpleOtpService, whatsapp_service_1.WhatsAppService],
     })
 ], AuthModule);
 
@@ -1435,7 +1531,7 @@ let SimpleOtpService = class SimpleOtpService {
         this.maxAttempts = 5;
     }
     generateOtpCode() {
-        return Math.floor(100000 + Math.random() * 900000).toString();
+        return Math.floor(1000 + Math.random() * 9000).toString();
     }
     async sendOtp(phone) {
         try {
@@ -1465,8 +1561,10 @@ let SimpleOtpService = class SimpleOtpService {
             oldOtps.docs.forEach((doc) => {
                 batch.delete(doc.ref);
             });
-            await batch.commit();
-            await this.db.collection(this.otpCollection).add(otpDoc);
+            await Promise.all([
+                batch.commit(),
+                this.db.collection(this.otpCollection).add(otpDoc),
+            ]);
             return {
                 success: true,
                 code,
@@ -1581,10 +1679,88 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var WhatsAppService_1;
+var _a;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.WhatsAppService = void 0;
+const common_1 = __webpack_require__(2);
+const config_1 = __webpack_require__(6);
+const client_api_whatsapp_1 = __webpack_require__(30);
+let WhatsAppService = WhatsAppService_1 = class WhatsAppService {
+    constructor(configService) {
+        this.configService = configService;
+        this.logger = new common_1.Logger(WhatsAppService_1.name);
+        const server = this.configService.get('WHATSAPP_API_SERVER', 'https://us.api-wa.me');
+        const key = this.configService.get('WHATSAPP_API_KEY', '');
+        this.whatsapp = new client_api_whatsapp_1.WhatsApp({ server, key });
+        this.logger.log(`WhatsApp service initialized (server: ${server})`);
+    }
+    async sendOtpMessage(phone, code) {
+        try {
+            const cleanPhone = phone.replace(/\D/g, '');
+            if (cleanPhone.length < 12) {
+                this.logger.error(`Telefone inválido para WhatsApp: ${cleanPhone.substring(0, 4)}***`);
+                return false;
+            }
+            this.logger.log(`Enviando OTP via WhatsApp para: ${cleanPhone.substring(0, 4)}***`);
+            const response = await this.whatsapp.sendMessage({
+                type: client_api_whatsapp_1.TypeMessage.TEXT,
+                body: {
+                    to: cleanPhone,
+                    text: `${code} é o seu código de verificação PagPag.`,
+                },
+            });
+            this.logger.log(`WhatsApp OTP enviado com sucesso: ${JSON.stringify(response)}`);
+            return true;
+        }
+        catch (error) {
+            this.logger.error(`Erro ao enviar OTP via WhatsApp: ${error.message}`, error.stack);
+            return false;
+        }
+    }
+    async checkConnection() {
+        try {
+            const info = await this.whatsapp.info();
+            this.logger.log(`WhatsApp connection info: ${JSON.stringify(info)}`);
+            return true;
+        }
+        catch (error) {
+            this.logger.error(`WhatsApp connection check failed: ${error.message}`);
+            return false;
+        }
+    }
+};
+exports.WhatsAppService = WhatsAppService;
+exports.WhatsAppService = WhatsAppService = WhatsAppService_1 = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [typeof (_a = typeof config_1.ConfigService !== "undefined" && config_1.ConfigService) === "function" ? _a : Object])
+], WhatsAppService);
+
+
+/***/ }),
+/* 30 */
+/***/ ((module) => {
+
+module.exports = require("@raphaelvserafim/client-api-whatsapp");
+
+/***/ }),
+/* 31 */
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-var _a, _b, _c, _d;
+var _a, _b, _c, _d, _e;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AuthController = void 0;
 const common_1 = __webpack_require__(2);
@@ -1594,12 +1770,14 @@ const api_key_guard_1 = __webpack_require__(19);
 const admin = __webpack_require__(10);
 const email_sender_service_1 = __webpack_require__(24);
 const simple_otp_service_1 = __webpack_require__(28);
+const whatsapp_service_1 = __webpack_require__(29);
 const users_service_1 = __webpack_require__(9);
-const reset_password_dto_1 = __webpack_require__(30);
+const reset_password_dto_1 = __webpack_require__(32);
 let AuthController = class AuthController {
-    constructor(emailSenderService, simpleOtpService, usersService) {
+    constructor(emailSenderService, simpleOtpService, whatsAppService, usersService) {
         this.emailSenderService = emailSenderService;
         this.simpleOtpService = simpleOtpService;
+        this.whatsAppService = whatsAppService;
         this.usersService = usersService;
     }
     async resetPassword(resetPasswordDto) {
@@ -1640,6 +1818,109 @@ let AuthController = class AuthController {
             success: true,
             message: result.message,
         };
+    }
+    async sendOtpWhatsApp(body) {
+        if (!body.phone) {
+            throw new common_1.BadRequestException('Telefone é obrigatório');
+        }
+        const result = await this.simpleOtpService.sendOtp(body.phone);
+        if (!result.success) {
+            throw new common_1.BadRequestException(result.message);
+        }
+        if (result.code) {
+            this.whatsAppService.sendOtpMessage(body.phone, result.code)
+                .then((sent) => {
+                if (!sent) {
+                    console.warn(`⚠️ [AuthController] Falha ao enviar OTP via WhatsApp para ${body.phone.substring(0, 4)}***`);
+                }
+            })
+                .catch((err) => {
+                console.error(`❌ [AuthController] Erro ao enviar OTP via WhatsApp: ${err.message}`);
+            });
+        }
+        return {
+            success: true,
+            message: 'Código de verificação enviado via WhatsApp',
+        };
+    }
+    async verifyOtpLogin(body) {
+        if (!body.phone || !body.code) {
+            throw new common_1.BadRequestException('Telefone e código são obrigatórios');
+        }
+        const otpResult = await this.simpleOtpService.verifyOtp(body.phone, body.code);
+        if (!otpResult.success) {
+            throw new common_1.BadRequestException(otpResult.message);
+        }
+        const normalizedPhone = body.phone.replace(/\D/g, '');
+        console.log(`✅ [AuthController] OTP verificado para ${normalizedPhone.substring(0, 4)}***`);
+        const user = await this.usersService.findByPhone(normalizedPhone);
+        if (user) {
+            const isComplete = this.isRegistrationComplete(user);
+            if (!isComplete) {
+                console.log(`⚠️ [AuthController] Usuário encontrado mas cadastro incompleto. ID: ${user.id}`);
+                return {
+                    success: true,
+                    status: 'REGISTER',
+                    message: 'Cadastro incompleto. Redirecionando para finalizar cadastro.',
+                    phone: normalizedPhone,
+                };
+            }
+            console.log(`✅ [AuthController] Usuário completo encontrado. ID: ${user.id}`);
+            try {
+                let firebaseUid;
+                try {
+                    const firebaseUser = await admin.auth().getUserByPhoneNumber('+' + normalizedPhone);
+                    firebaseUid = firebaseUser.uid;
+                }
+                catch (e) {
+                    if (e.code === 'auth/user-not-found') {
+                        const newUser = await admin.auth().createUser({
+                            phoneNumber: '+' + normalizedPhone,
+                        });
+                        firebaseUid = newUser.uid;
+                        console.log(`📝 [AuthController] Firebase Auth user criado: ${firebaseUid}`);
+                    }
+                    else {
+                        throw e;
+                    }
+                }
+                const customToken = await admin.auth().createCustomToken(firebaseUid);
+                console.log(`🔑 [AuthController] Custom token gerado para UID: ${firebaseUid}`);
+                try {
+                    await this.usersService.updateLastLogin(user.id);
+                }
+                catch (error) {
+                    console.warn(`⚠️ [AuthController] Erro ao registrar login (não crítico): ${error.message}`);
+                }
+                return {
+                    success: true,
+                    status: 'LOGGED_IN',
+                    message: 'Login realizado com sucesso.',
+                    customToken,
+                    userId: user.id,
+                    phone: normalizedPhone,
+                    user: {
+                        id: user.id,
+                        full_name: user.full_name,
+                        email: user.email,
+                        phone: user.phone,
+                    },
+                };
+            }
+            catch (error) {
+                console.error(`❌ [AuthController] Erro ao gerar custom token: ${error.message}`);
+                throw new common_1.BadRequestException('Erro ao processar login. Tente novamente.');
+            }
+        }
+        else {
+            console.log(`📝 [AuthController] Usuário não encontrado para ${normalizedPhone.substring(0, 4)}***`);
+            return {
+                success: true,
+                status: 'REGISTER',
+                message: 'Usuário não encontrado. Redirecionando para cadastro.',
+                phone: normalizedPhone,
+            };
+        }
     }
     async checkUserStatus(body) {
         if (!body.token) {
@@ -1774,7 +2055,7 @@ __decorate([
     (0, swagger_1.ApiResponse)({ status: 404, description: 'Usuário não encontrado no Firebase' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [typeof (_d = typeof reset_password_dto_1.ResetPasswordDto !== "undefined" && reset_password_dto_1.ResetPasswordDto) === "function" ? _d : Object]),
+    __metadata("design:paramtypes", [typeof (_e = typeof reset_password_dto_1.ResetPasswordDto !== "undefined" && reset_password_dto_1.ResetPasswordDto) === "function" ? _e : Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "resetPassword", null);
 __decorate([
@@ -1806,6 +2087,34 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "verifyOtp", null);
 __decorate([
+    (0, common_1.Post)('send-otp-whatsapp'),
+    (0, throttler_1.Throttle)({ default: { limit: 3, ttl: 60000 } }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Enviar código OTP via WhatsApp',
+        description: 'Gera código OTP de 4 dígitos e envia via WhatsApp para o telefone informado'
+    }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'OTP enviado via WhatsApp com sucesso' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Telefone inválido ou falha no envio' }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "sendOtpWhatsApp", null);
+__decorate([
+    (0, common_1.Post)('verify-otp-login'),
+    (0, throttler_1.Throttle)({ default: { limit: 10, ttl: 60000 } }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Verificar OTP e fazer login',
+        description: 'Valida o código OTP, busca usuário pelo telefone e retorna status + custom token para login'
+    }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'OTP verificado e status do usuário retornado' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Código inválido, expirado ou telefone inválido' }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "verifyOtpLogin", null);
+__decorate([
     (0, common_1.Post)('check-user-status'),
     (0, throttler_1.Throttle)({ default: { limit: 10, ttl: 60000 } }),
     (0, swagger_1.ApiOperation)({
@@ -1825,12 +2134,12 @@ exports.AuthController = AuthController = __decorate([
     (0, common_1.Controller)('api/auth'),
     (0, common_1.UseGuards)(api_key_guard_1.ApiKeyGuard),
     (0, swagger_1.ApiSecurity)('api-key'),
-    __metadata("design:paramtypes", [typeof (_a = typeof email_sender_service_1.EmailSenderService !== "undefined" && email_sender_service_1.EmailSenderService) === "function" ? _a : Object, typeof (_b = typeof simple_otp_service_1.SimpleOtpService !== "undefined" && simple_otp_service_1.SimpleOtpService) === "function" ? _b : Object, typeof (_c = typeof users_service_1.UsersService !== "undefined" && users_service_1.UsersService) === "function" ? _c : Object])
+    __metadata("design:paramtypes", [typeof (_a = typeof email_sender_service_1.EmailSenderService !== "undefined" && email_sender_service_1.EmailSenderService) === "function" ? _a : Object, typeof (_b = typeof simple_otp_service_1.SimpleOtpService !== "undefined" && simple_otp_service_1.SimpleOtpService) === "function" ? _b : Object, typeof (_c = typeof whatsapp_service_1.WhatsAppService !== "undefined" && whatsapp_service_1.WhatsAppService) === "function" ? _c : Object, typeof (_d = typeof users_service_1.UsersService !== "undefined" && users_service_1.UsersService) === "function" ? _d : Object])
 ], AuthController);
 
 
 /***/ }),
-/* 30 */
+/* 32 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -1873,7 +2182,7 @@ __decorate([
 
 
 /***/ }),
-/* 31 */
+/* 33 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 

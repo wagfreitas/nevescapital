@@ -261,6 +261,104 @@ class AuthApiService {
     }
   }
 
+  /// Envia código OTP via WhatsApp (4 dígitos)
+  static Future<Map<String, dynamic>> sendOtpWhatsApp(String phone) async {
+    final url = Uri.parse('$_baseUrl/api/auth/send-otp-whatsapp');
+
+    try {
+      AppLogger.info('🚀 [API] Enviando OTP via WhatsApp para: ${phone.substring(0, 4)}***');
+
+      final response = await http
+          .post(
+        url,
+        headers: _headers,
+        body: jsonEncode({'phone': phone}),
+      )
+          .timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw Exception('Timeout na requisição');
+        },
+      );
+
+      AppLogger.debug('📡 [API] Response status: ${response.statusCode}');
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Código enviado via WhatsApp',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Erro ao enviar código via WhatsApp',
+        };
+      }
+    } catch (e) {
+      AppLogger.error('❌ [API] Erro em sendOtpWhatsApp: $e');
+      return {
+        'success': false,
+        'message': 'Erro de conexão. Tente novamente.',
+      };
+    }
+  }
+
+  /// Verifica OTP e faz login em uma única chamada
+  /// Retorna: { success, status (LOGGED_IN/REGISTER), customToken?, userId?, phone? }
+  static Future<Map<String, dynamic>> verifyOtpLogin(
+      String phone, String code) async {
+    final url = Uri.parse('$_baseUrl/api/auth/verify-otp-login');
+
+    try {
+      AppLogger.info('🚀 [API] Verificando OTP e login...');
+
+      final response = await http
+          .post(
+        url,
+        headers: _headers,
+        body: jsonEncode({
+          'phone': phone,
+          'code': code,
+        }),
+      )
+          .timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw Exception('Timeout na requisição');
+        },
+      );
+
+      AppLogger.debug('📡 [API] Response status: ${response.statusCode}');
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return {
+          'success': true,
+          'status': data['status'],
+          'message': data['message'],
+          'customToken': data['customToken'],
+          'userId': data['userId'],
+          'phone': data['phone'],
+          'user': data['user'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Código inválido',
+        };
+      }
+    } catch (e) {
+      AppLogger.error('❌ [API] Erro em verifyOtpLogin: $e');
+      return {
+        'success': false,
+        'message': 'Erro de conexão. Tente novamente.',
+      };
+    }
+  }
+
   /// Verifica usuário pelo CPF completo após validação OTP
   /// Retorna o status do usuário e determina o fluxo (login, cadastro, etc)
   static Future<Map<String, dynamic>> checkUserByCpf(
