@@ -282,66 +282,70 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
               ),
             )
           : SafeArea(
-              top: false,
               child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  24.0,
-                  MediaQuery.of(context).padding.top + kToolbarHeight + 40,
-                  24.0,
-                  0,
-                ),
+                padding: const EdgeInsets.fromLTRB(24.0, kToolbarHeight, 24.0, 0),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Campo: Banco
-                      _buildBankField(),
-                      const SizedBox(height: 24),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Campo: Banco
+                              _buildBankField(),
+                              const SizedBox(height: 24),
 
-                      // Campo: Agência
-                      _buildTextField(
-                        label: 'Agência',
-                        controller: _branchController,
-                        focusNode: _branchFocusNode,
-                        keyboardType: TextInputType.number,
-                        maxLength: 4,
-                        prefixIcon: Icons.location_on,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Informe sua Agência';
-                          }
-                          if (value.length != 4) {
-                            return 'Agência deve ter 4 dígitos';
-                          }
-                          return null;
-                        },
-                        helpText: 'Informe sua Agência',
+                              // Campo: Agência
+                              _buildTextField(
+                                label: 'Agência',
+                                controller: _branchController,
+                                focusNode: _branchFocusNode,
+                                keyboardType: TextInputType.number,
+                                maxLength: 4,
+                                prefixIcon: Icons.location_on,
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Informe sua Agência';
+                                  }
+                                  if (value.length != 4) {
+                                    return 'Agência deve ter 4 dígitos';
+                                  }
+                                  return null;
+                                },
+                                helpText: 'Informe sua Agência',
+                              ),
+                              const SizedBox(height: 24),
+
+                              // Campo: Conta
+                              _buildTextField(
+                                label: 'Conta com Dígito',
+                                controller: _accountController,
+                                focusNode: _accountFocusNode,
+                                keyboardType: TextInputType.number,
+                                maxLength: 10,
+                                prefixIcon: Icons.account_balance_wallet,
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Informe sua Conta com Dígito';
+                                  }
+                                  return null;
+                                },
+                                helpText: 'Informe sua Conta com Dígito',
+                              ),
+                              const SizedBox(height: 32),
+
+                              // Aviso sobre regras de preenchimento
+                              _buildRulesWarning(),
+                            ],
+                          ),
+                        ),
                       ),
-                      const SizedBox(height: 24),
-
-                      // Campo: Conta
-                      _buildTextField(
-                        label: 'Conta com Dígito',
-                        controller: _accountController,
-                        focusNode: _accountFocusNode,
-                        keyboardType: TextInputType.number,
-                        maxLength: 10,
-                        prefixIcon: Icons.account_balance_wallet,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Informe sua Conta com Dígito';
-                          }
-                          return null;
-                        },
-                        helpText: 'Informe sua Conta com Dígito',
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Aviso sobre regras de preenchimento
-                      _buildRulesWarning(),
-                      const Spacer(),
-                      // Botão Atualizar (altura padrão: 24px abaixo)
+                      const SizedBox(height: 16),
+                      // Botão Atualizar
                       CustomButton(
                         text: 'Atualizar',
                         onPressed: (_isLoading || !_hasChanges) ? null : _handleConfirm,
@@ -581,16 +585,12 @@ class _BankSearchScreenState extends State<_BankSearchScreen> {
           style: TextStyle(color: Colors.white, fontSize: 18),
         ),
       ),
-      body: Container(
-        color: AppTheme.backgroundColor,
-        child: Builder(
-          builder: (context) {
-            // Mesmo padrão da tela Ramo: pouco espaço entre título e caixa de busca
-            final topPadding = MediaQuery.of(context).padding.top;
-            return Column(
-              children: [
+      resizeToAvoidBottomInset: true,
+      body: SafeArea(
+        child: Column(
+          children: [
                 Padding(
-                  padding: EdgeInsets.only(left: 16.0, right: 16.0, top: topPadding, bottom: 4.0),
+                  padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 4.0),
                   child: TextField(
               controller: _searchController,
               style: const TextStyle(color: Colors.white),
@@ -645,9 +645,7 @@ class _BankSearchScreenState extends State<_BankSearchScreen> {
                         },
                       ),
               ),
-            ],
-            );
-          },
+          ],
         ),
       ),
     );

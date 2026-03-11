@@ -265,15 +265,9 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
               child: CircularProgressIndicator(color: AppTheme.primaryColor),
             )
           : SafeArea(
-              top: false,
               child: KeyboardDismissWrapper(
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    24.0,
-                    MediaQuery.of(context).padding.top + kToolbarHeight + 40,
-                    24.0,
-                    0,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(24.0, kToolbarHeight, 24.0, 0),
                   child: Form(
                     key: _formKey,
                     child: Column(
@@ -447,7 +441,6 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
         color: AppTheme.backgroundColor,
         child: Builder(
           builder: (context) {
-            // Pouco espaço entre o título e a caixa de busca (mais próximo)
             final topPadding = MediaQuery.of(context).padding.top;
             return Column(
               children: [

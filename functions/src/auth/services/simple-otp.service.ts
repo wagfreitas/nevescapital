@@ -17,10 +17,10 @@ export class SimpleOtpService {
   private readonly maxAttempts = 5;
 
   /**
-   * Gera um código OTP de 6 dígitos
+   * Gera um código OTP de 4 dígitos
    */
   private generateOtpCode(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return Math.floor(1000 + Math.random() * 9000).toString();
   }
 
   /**
@@ -64,10 +64,12 @@ export class SimpleOtpService {
       oldOtps.docs.forEach((doc) => {
         batch.delete(doc.ref);
       });
-      await batch.commit();
 
-      // Criar novo OTP
-      await this.db.collection(this.otpCollection).add(otpDoc);
+      // Executar delete e create em paralelo (operam em documentos diferentes)
+      await Promise.all([
+        batch.commit(),
+        this.db.collection(this.otpCollection).add(otpDoc),
+      ]);
 
       // ⚠️ MODO TESTE: Retornar código no response
       // Em produção, você pode integrar com um serviço de SMS real aqui

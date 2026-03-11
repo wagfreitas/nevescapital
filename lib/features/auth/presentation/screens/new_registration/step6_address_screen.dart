@@ -346,7 +346,6 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
-      extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
         title: const Text(
           'Endereço',
@@ -386,21 +385,21 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
       body: Container(
         color: AppTheme.backgroundColor,
         child: SafeArea(
-          top: false,
           child: KeyboardDismissWrapper(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                24.0,
-                MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40,
-                24.0,
-                0,
-              ),
+              padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 0),
               child: Form(
                 key: _formKey,
                 autovalidateMode: AutovalidateMode.disabled,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                     // CEP
                     TextFormField(
                       controller: _cepController,
@@ -532,9 +531,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                             children: [
                               Expanded(
                                 flex: 2,
-                                child: SizedBox(
-                                  height: 76,
-                                  child: TextFormField(
+                                child: TextFormField(
                                     controller: _numberController,
                                     focusNode: _numberFocusNode,
                                     keyboardType: TextInputType.number,
@@ -578,15 +575,12 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                       }
                                       return null;
                                     },
-                                  ),
                                 ),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
                                 flex: 3,
-                                child: SizedBox(
-                                  height: 76,
-                                  child: TextFormField(
+                                child: TextFormField(
                                     controller: _complementController,
                                     focusNode: _complementFocusNode,
                                     keyboardType: TextInputType.text,
@@ -616,7 +610,6 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                       ),
                                       prefixIcon: const Icon(Icons.apartment, color: Colors.white70),
                                     ),
-                                  ),
                                 ),
                               ),
                       ],
@@ -744,7 +737,11 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                         ),
                       ),
                     ],
-                    const Spacer(),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
                       height: 56,
