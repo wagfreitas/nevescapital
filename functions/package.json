@@ -26,7 +26,6 @@
     "@nestjs/platform-express": "^10.3.0",
     "@nestjs/swagger": "^7.1.17",
     "@nestjs/throttler": "^5.1.1",
-    "@raphaelvserafim/client-api-whatsapp": "^1.0.9",
     "axios": "^1.13.2",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
@@ -36,7 +35,8 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "twilio": "^5.13.0"
   },
   "optionalDependencies": {
     "@aws-sdk/client-ses": "^3.490.0",

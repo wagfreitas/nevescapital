@@ -18,6 +18,7 @@ class PaymentStep4Screen extends StatefulWidget {
   final int valorCentavos;
   final String chavePix;
   final String tipoChavePix;
+  final bool hasAccount;
 
   const PaymentStep4Screen({
     super.key,
@@ -26,6 +27,7 @@ class PaymentStep4Screen extends StatefulWidget {
     required this.valorCentavos,
     required this.chavePix,
     required this.tipoChavePix,
+    required this.hasAccount,
   });
 
   @override
@@ -39,8 +41,6 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
   final _cvvController = TextEditingController();
   final _vencimentoController = TextEditingController();
   CardBrand _detectedBrand = CardBrand.unknown;
-  bool _hasAccount = false;
-  bool _isLoadingAccount = true;
   bool _submitted = false;
 
   @override
@@ -48,21 +48,6 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
     super.initState();
     // Escutar mudanças no número do cartão para detectar a bandeira
     _numeroCartaoController.addListener(_detectCardBrand);
-    _checkUserAccount();
-  }
-
-  Future<void> _checkUserAccount() async {
-    setState(() {
-      _isLoadingAccount = true;
-    });
-    
-    final hasAccount = await PaymentStepHelper.hasUserAccount();
-    if (mounted) {
-      setState(() {
-        _hasAccount = hasAccount;
-        _isLoadingAccount = false;
-      });
-    }
   }
 
   @override
@@ -133,6 +118,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
             numeroCartao: _numeroCartaoController.text.replaceAll(' ', ''),
             cvv: _cvvController.text,
             vencimento: _vencimentoController.text,
+            hasAccount: widget.hasAccount,
           ),
         ),
       );
@@ -142,8 +128,8 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
   @override
   Widget build(BuildContext context) {
     // Calcular passo atual baseado se tem conta ou não
-    final currentStep = PaymentStepHelper.calculateCurrentStep(4, _hasAccount);
-    final totalSteps = PaymentStepHelper.getTotalSteps(_hasAccount);
+    final currentStep = PaymentStepHelper.calculateCurrentStep(4, widget.hasAccount);
+    final totalSteps = PaymentStepHelper.getTotalSteps(widget.hasAccount);
     
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -164,13 +150,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
           ),
         ),
       ),
-      body: _isLoadingAccount
-          ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-              ),
-            )
-          : Container(
+      body: Container(
               color: AppTheme.backgroundColor,
               child: SafeArea(
                 top: false,

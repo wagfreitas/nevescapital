@@ -1,18 +1,61 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { WhatsApp, TypeMessage } from '@raphaelvserafim/client-api-whatsapp';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const Twilio = require('twilio');
 
 @Injectable()
 export class WhatsAppService {
   private readonly logger = new Logger(WhatsAppService.name);
-  private whatsapp: WhatsApp;
+  private client: any;
+  private fromNumber: string;
 
   constructor(private readonly configService: ConfigService) {
-    const server = this.configService.get<string>('WHATSAPP_API_SERVER', 'https://us.api-wa.me');
-    const key = this.configService.get<string>('WHATSAPP_API_KEY', '');
+    const accountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID', '');
+    const authToken = this.configService.get<string>('TWILIO_AUTH_TOKEN', '');
+    this.fromNumber = this.configService.get<string>('TWILIO_WHATSAPP_FROM', '');
 
-    this.whatsapp = new WhatsApp({ server, key });
-    this.logger.log(`WhatsApp service initialized (server: ${server})`);
+    this.client = Twilio(accountSid, authToken);
+    this.logger.log(`WhatsApp service initialized (Twilio, from: ${this.fromNumber})`);
+  }
+
+  /** Mensagem fixa enviada quando o usuário envia qualquer mensagem no canal (apenas OTP). */
+  static readonly AUTO_REPLY_MESSAGE =
+    'Esse canal é destinado apenas ao envio de codigo OTP e nao está preparado para receber qualquer mensagem.';
+
+  /**
+   * Formata o telefone para o padrão Twilio WhatsApp: whatsapp:+XXXXXXXXXXX
+   */
+  private formatPhone(phone: string): string {
+    const clean = phone.replace(/\D/g, '');
+    return `whatsapp:+${clean}`;
+  }
+
+  /**
+   * Envia uma mensagem de texto genérica para um número.
+   * @param phone Telefone no formato 55XXXXXXXXXXX (apenas dígitos, com código do país)
+   * @param text Texto da mensagem
+   * @returns true se enviou com sucesso
+   */
+  async sendTextMessage(phone: string, text: string): Promise<boolean> {
+    try {
+      const cleanPhone = phone.replace(/\D/g, '');
+      if (cleanPhone.length < 12) {
+        this.logger.error(`Telefone inválido para WhatsApp: ${cleanPhone.substring(0, 4)}***`);
+        return false;
+      }
+
+      const message = await this.client.messages.create({
+        body: text,
+        from: `whatsapp:${this.fromNumber}`,
+        to: this.formatPhone(cleanPhone),
+      });
+
+      this.logger.log(`WhatsApp mensagem enviada para ${cleanPhone.substring(0, 4)}*** (SID: ${message.sid})`);
+      return true;
+    } catch (error: any) {
+      this.logger.error(`Erro ao enviar mensagem WhatsApp: ${error.message}`, error.stack);
+      return false;
+    }
   }
 
   /**
@@ -23,7 +66,6 @@ export class WhatsAppService {
    */
   async sendOtpMessage(phone: string, code: string): Promise<boolean> {
     try {
-      // Garantir que o phone está no formato correto (apenas dígitos)
       const cleanPhone = phone.replace(/\D/g, '');
 
       if (cleanPhone.length < 12) {
@@ -33,32 +75,31 @@ export class WhatsAppService {
 
       this.logger.log(`Enviando OTP via WhatsApp para: ${cleanPhone.substring(0, 4)}***`);
 
-      const response = await this.whatsapp.sendMessage({
-        type: TypeMessage.TEXT,
-        body: {
-          to: cleanPhone,
-          text: `${code} é o seu código de verificação PagPag.`,
-        },
+      const message = await this.client.messages.create({
+        body: `${code} é o seu código de verificação PagPag.`,
+        from: `whatsapp:${this.fromNumber}`,
+        to: this.formatPhone(cleanPhone),
       });
 
-      this.logger.log(`WhatsApp OTP enviado com sucesso: ${JSON.stringify(response)}`);
+      this.logger.log(`WhatsApp OTP enviado com sucesso (SID: ${message.sid})`);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Erro ao enviar OTP via WhatsApp: ${error.message}`, error.stack);
       return false;
     }
   }
 
   /**
-   * Verifica se a conexão com o WhatsApp está ativa
+   * Verifica se a conexão com o Twilio está ativa
    */
   async checkConnection(): Promise<boolean> {
     try {
-      const info = await this.whatsapp.info();
-      this.logger.log(`WhatsApp connection info: ${JSON.stringify(info)}`);
-      return true;
-    } catch (error) {
-      this.logger.error(`WhatsApp connection check failed: ${error.message}`);
+      const sid = this.configService.get<string>('TWILIO_ACCOUNT_SID', '');
+      const account = await this.client.api.accounts(sid).fetch();
+      this.logger.log(`Twilio connection OK: ${account.friendlyName} (status: ${account.status})`);
+      return account.status === 'active';
+    } catch (error: any) {
+      this.logger.error(`Twilio connection check failed: ${error.message}`);
       return false;
     }
   }

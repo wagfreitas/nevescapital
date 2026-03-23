@@ -479,7 +479,7 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      resizeToAvoidBottomInset: true,
+      resizeToAvoidBottomInset: false,
       extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
         title: const Text(

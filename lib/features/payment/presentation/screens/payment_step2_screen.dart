@@ -105,6 +105,7 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
           .trim();
       final valorCentavos = int.tryParse(valorTextoFinal) ?? 0;
 
+      final hasAccount = widget.isFirstSale ? false : _hasAccount;
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -112,6 +113,7 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
             nomeEstabelecimento: widget.nomeEstabelecimento,
             ramoAtuacao: widget.ramoAtuacao,
             valorCentavos: valorCentavos,
+            hasAccount: hasAccount,
           ),
         ),
       );

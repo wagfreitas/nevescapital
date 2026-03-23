@@ -27,6 +27,7 @@ class PaymentStep5Screen extends StatefulWidget {
   final String numeroCartao;
   final String cvv;
   final String vencimento;
+  final bool hasAccount;
 
   const PaymentStep5Screen({
     super.key,
@@ -39,6 +40,7 @@ class PaymentStep5Screen extends StatefulWidget {
     required this.numeroCartao,
     required this.cvv,
     required this.vencimento,
+    required this.hasAccount,
   });
 
   @override
@@ -47,10 +49,8 @@ class PaymentStep5Screen extends StatefulWidget {
 
 class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
   bool _isProcessing = false;
-  bool _hasAccount = false;
-  bool _isLoadingAccount = true;
   bool _isLoadingBankData = true;
-  
+
   // Dados bancários
   String? _bankName;
   String? _bankCode;
@@ -60,16 +60,7 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
   @override
   void initState() {
     super.initState();
-    _checkUserAccount();
     _loadBankAccountData();
-  }
-
-  Future<void> _checkUserAccount() async {
-    final hasAccount = await PaymentStepHelper.hasUserAccount();
-    setState(() {
-      _hasAccount = hasAccount;
-      _isLoadingAccount = false;
-    });
   }
 
   /// Carregar dados bancários do usuário
@@ -228,8 +219,8 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
     final valorLiquidoFormatado = FormatHelpers.formatCurrency(valorLiquido);
     
     // Calcular passo atual baseado se tem conta ou não
-    final currentStep = PaymentStepHelper.calculateCurrentStep(5, _hasAccount);
-    final totalSteps = PaymentStepHelper.getTotalSteps(_hasAccount);
+    final currentStep = PaymentStepHelper.calculateCurrentStep(5, widget.hasAccount);
+    final totalSteps = PaymentStepHelper.getTotalSteps(widget.hasAccount);
     
     // Detectar bandeira do cartão (mostrar somente se tiver 6+ dígitos)
     final digitsOnly = widget.numeroCartao.replaceAll(RegExp(r'\D'), '');
@@ -280,7 +271,7 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
                 ],
               ),
             )
-          : (_isLoadingAccount || _isLoadingBankData)
+          : _isLoadingBankData
               ? const Center(
                   child: CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
