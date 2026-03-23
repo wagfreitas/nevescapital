@@ -15,12 +15,14 @@ class PaymentStep3Screen extends StatefulWidget {
   final String nomeEstabelecimento;
   final String ramoAtuacao;
   final int valorCentavos;
+  final bool hasAccount;
 
   const PaymentStep3Screen({
     super.key,
     required this.nomeEstabelecimento,
     required this.ramoAtuacao,
     required this.valorCentavos,
+    required this.hasAccount,
   });
 
   @override
@@ -34,11 +36,9 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
   final _accountController = TextEditingController();
   
   BrazilianBank? _selectedBank;
-  bool _hasAccount = false;
-  bool _isLoadingAccount = true;
   bool _isLoadingBankData = true;
   bool _isSaving = false;
-  
+
   // Armazenar dados originais para comparar alterações
   String? _originalBankCode;
   String? _originalBranch;
@@ -47,16 +47,7 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
   @override
   void initState() {
     super.initState();
-    _checkUserAccount();
     _loadBankAccountData();
-  }
-
-  Future<void> _checkUserAccount() async {
-    final hasAccount = await PaymentStepHelper.hasUserAccount();
-    setState(() {
-      _hasAccount = hasAccount;
-      _isLoadingAccount = false;
-    });
   }
 
   /// Carregar dados bancários existentes (se houver)
@@ -270,6 +261,7 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
           valorCentavos: widget.valorCentavos,
           chavePix: '', // Não usado mais, mas mantido para compatibilidade
           tipoChavePix: 'conta_bancaria',
+          hasAccount: widget.hasAccount,
         ),
       ),
     );
@@ -278,8 +270,8 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
   @override
   Widget build(BuildContext context) {
     // Calcular passo atual baseado se tem conta ou não
-    final currentStep = PaymentStepHelper.calculateCurrentStep(3, _hasAccount);
-    final totalSteps = PaymentStepHelper.getTotalSteps(_hasAccount);
+    final currentStep = PaymentStepHelper.calculateCurrentStep(3, widget.hasAccount);
+    final totalSteps = PaymentStepHelper.getTotalSteps(widget.hasAccount);
     
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -300,7 +292,7 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
           ),
         ),
       ),
-      body: (_isLoadingBankData || _isLoadingAccount)
+      body: _isLoadingBankData
           ? const Center(
               child: CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
@@ -310,83 +302,89 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
               color: AppTheme.backgroundColor,
               child: SafeArea(
                 top: false,
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    24.0,
-                    MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40,
-                    24.0,
-                    0,
-                  ),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Texto de instrução (mesma altura que Valor da Venda: 40px do fim da app bar)
-                        const Text(
-                          'Confirme a conta em que receberá a venda:',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white70,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.fromLTRB(
+                          24.0,
+                          MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40,
+                          24.0,
+                          24.0,
+                        ),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Texto de instrução
+                              const Text(
+                                'Confirme a conta em que receberá a venda:',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+
+                              // Campo: Banco
+                              GestureDetector(
+                                onTap: _openBankSearch,
+                                child: _buildBankField(),
+                              ),
+                              const SizedBox(height: 24),
+
+                              // Campo: Agência
+                              _buildTextField(
+                                label: 'Agência',
+                                controller: _branchController,
+                                keyboardType: TextInputType.number,
+                                maxLength: 4,
+                                prefixIcon: Icons.location_on,
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Informe sua Agência';
+                                  }
+                                  if (value.length != 4) {
+                                    return 'Agência deve ter 4 dígitos';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 24),
+
+                              // Campo: Conta com dígito
+                              _buildTextField(
+                                label: 'Conta com Dígito',
+                                controller: _accountController,
+                                keyboardType: TextInputType.number,
+                                maxLength: 10,
+                                prefixIcon: Icons.account_balance_wallet,
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Informe sua Conta com Dígito';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 32),
+
+                              // Aviso sobre regras de preenchimento
+                              _buildRulesWarning(),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 24),
-
-                        // Campo: Banco
-                        GestureDetector(
-                          onTap: _openBankSearch,
-                          child: _buildBankField(),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Campo: Agência
-                        _buildTextField(
-                          label: 'Agência',
-                          controller: _branchController,
-                          keyboardType: TextInputType.number,
-                          maxLength: 4,
-                          prefixIcon: Icons.location_on,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Informe sua Agência';
-                            }
-                            if (value.length != 4) {
-                              return 'Agência deve ter 4 dígitos';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Campo: Conta com dígito
-                        _buildTextField(
-                          label: 'Conta com Dígito',
-                          controller: _accountController,
-                          keyboardType: TextInputType.number,
-                          maxLength: 10,
-                          prefixIcon: Icons.account_balance_wallet,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Informe sua Conta com Dígito';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 32),
-
-                        // Aviso sobre regras de preenchimento
-                        _buildRulesWarning(),
-                        const SizedBox(height: 32),
-                        const Spacer(),
-                        // Botão Avançar
-                        CustomButton(
-                          text: _isSaving ? 'Salvando...' : 'Avançar',
-                          onPressed: _isSaving ? null : _continuar,
-                        ),
-                        const SizedBox(height: 24),
-                      ],
+                      ),
                     ),
-                  ),
+                    // Botão Avançar fixo na parte inferior
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 24.0),
+                      child: CustomButton(
+                        text: _isSaving ? 'Salvando...' : 'Avançar',
+                        onPressed: _isSaving ? null : _continuar,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

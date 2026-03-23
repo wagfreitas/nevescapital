@@ -5,11 +5,12 @@ import { EmailSenderService } from './email-sender.service';
 import { SimpleOtpService } from './services/simple-otp.service';
 import { WhatsAppService } from './services/whatsapp.service';
 import { AuthController } from './auth.controller';
+import { WhatsAppWebhookController } from './whatsapp-webhook.controller';
 import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [ConfigModule, UsersModule],
-  controllers: [AuthController],
+  controllers: [AuthController, WhatsAppWebhookController],
   providers: [
     EmailTemplateService,
     EmailSenderService,

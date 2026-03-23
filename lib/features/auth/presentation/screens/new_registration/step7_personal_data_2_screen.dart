@@ -452,7 +452,7 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      resizeToAvoidBottomInset: true,
+      resizeToAvoidBottomInset: false,
       extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
         title: const Text(
@@ -503,12 +503,14 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
         child: SafeArea(
           top: false,
           child: KeyboardDismissWrapper(
-            child: Padding(
+            child: AnimatedPadding(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
               padding: EdgeInsets.fromLTRB(
                 24.0,
                 MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40,
                 24.0,
-                0,
+                MediaQuery.of(context).viewInsets.bottom,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,

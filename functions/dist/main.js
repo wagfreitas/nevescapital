@@ -43,7 +43,7 @@ const config_1 = __webpack_require__(6);
 const throttler_1 = __webpack_require__(7);
 const users_module_1 = __webpack_require__(8);
 const auth_module_1 = __webpack_require__(20);
-const health_controller_1 = __webpack_require__(33);
+const health_controller_1 = __webpack_require__(34);
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -1176,6 +1176,7 @@ const email_sender_service_1 = __webpack_require__(24);
 const simple_otp_service_1 = __webpack_require__(28);
 const whatsapp_service_1 = __webpack_require__(29);
 const auth_controller_1 = __webpack_require__(31);
+const whatsapp_webhook_controller_1 = __webpack_require__(33);
 const users_module_1 = __webpack_require__(8);
 let AuthModule = class AuthModule {
 };
@@ -1183,7 +1184,7 @@ exports.AuthModule = AuthModule;
 exports.AuthModule = AuthModule = __decorate([
     (0, common_1.Module)({
         imports: [config_1.ConfigModule, users_module_1.UsersModule],
-        controllers: [auth_controller_1.AuthController],
+        controllers: [auth_controller_1.AuthController, whatsapp_webhook_controller_1.WhatsAppWebhookController],
         providers: [
             email_template_service_1.EmailTemplateService,
             email_sender_service_1.EmailSenderService,
@@ -1685,15 +1686,40 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.WhatsAppService = void 0;
 const common_1 = __webpack_require__(2);
 const config_1 = __webpack_require__(6);
-const client_api_whatsapp_1 = __webpack_require__(30);
+const Twilio = __webpack_require__(30);
 let WhatsAppService = WhatsAppService_1 = class WhatsAppService {
     constructor(configService) {
         this.configService = configService;
         this.logger = new common_1.Logger(WhatsAppService_1.name);
-        const server = this.configService.get('WHATSAPP_API_SERVER', 'https://us.api-wa.me');
-        const key = this.configService.get('WHATSAPP_API_KEY', '');
-        this.whatsapp = new client_api_whatsapp_1.WhatsApp({ server, key });
-        this.logger.log(`WhatsApp service initialized (server: ${server})`);
+        const accountSid = this.configService.get('TWILIO_ACCOUNT_SID', '');
+        const authToken = this.configService.get('TWILIO_AUTH_TOKEN', '');
+        this.fromNumber = this.configService.get('TWILIO_WHATSAPP_FROM', '');
+        this.client = Twilio(accountSid, authToken);
+        this.logger.log(`WhatsApp service initialized (Twilio, from: ${this.fromNumber})`);
+    }
+    formatPhone(phone) {
+        const clean = phone.replace(/\D/g, '');
+        return `whatsapp:+${clean}`;
+    }
+    async sendTextMessage(phone, text) {
+        try {
+            const cleanPhone = phone.replace(/\D/g, '');
+            if (cleanPhone.length < 12) {
+                this.logger.error(`Telefone inválido para WhatsApp: ${cleanPhone.substring(0, 4)}***`);
+                return false;
+            }
+            const message = await this.client.messages.create({
+                body: text,
+                from: `whatsapp:${this.fromNumber}`,
+                to: this.formatPhone(cleanPhone),
+            });
+            this.logger.log(`WhatsApp mensagem enviada para ${cleanPhone.substring(0, 4)}*** (SID: ${message.sid})`);
+            return true;
+        }
+        catch (error) {
+            this.logger.error(`Erro ao enviar mensagem WhatsApp: ${error.message}`, error.stack);
+            return false;
+        }
     }
     async sendOtpMessage(phone, code) {
         try {
@@ -1703,14 +1729,12 @@ let WhatsAppService = WhatsAppService_1 = class WhatsAppService {
                 return false;
             }
             this.logger.log(`Enviando OTP via WhatsApp para: ${cleanPhone.substring(0, 4)}***`);
-            const response = await this.whatsapp.sendMessage({
-                type: client_api_whatsapp_1.TypeMessage.TEXT,
-                body: {
-                    to: cleanPhone,
-                    text: `${code} é o seu código de verificação PagPag.`,
-                },
+            const message = await this.client.messages.create({
+                body: `${code} é o seu código de verificação PagPag.`,
+                from: `whatsapp:${this.fromNumber}`,
+                to: this.formatPhone(cleanPhone),
             });
-            this.logger.log(`WhatsApp OTP enviado com sucesso: ${JSON.stringify(response)}`);
+            this.logger.log(`WhatsApp OTP enviado com sucesso (SID: ${message.sid})`);
             return true;
         }
         catch (error) {
@@ -1720,17 +1744,19 @@ let WhatsAppService = WhatsAppService_1 = class WhatsAppService {
     }
     async checkConnection() {
         try {
-            const info = await this.whatsapp.info();
-            this.logger.log(`WhatsApp connection info: ${JSON.stringify(info)}`);
-            return true;
+            const sid = this.configService.get('TWILIO_ACCOUNT_SID', '');
+            const account = await this.client.api.accounts(sid).fetch();
+            this.logger.log(`Twilio connection OK: ${account.friendlyName} (status: ${account.status})`);
+            return account.status === 'active';
         }
         catch (error) {
-            this.logger.error(`WhatsApp connection check failed: ${error.message}`);
+            this.logger.error(`Twilio connection check failed: ${error.message}`);
             return false;
         }
     }
 };
 exports.WhatsAppService = WhatsAppService;
+WhatsAppService.AUTO_REPLY_MESSAGE = 'Esse canal é destinado apenas ao envio de codigo OTP e nao está preparado para receber qualquer mensagem.';
 exports.WhatsAppService = WhatsAppService = WhatsAppService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [typeof (_a = typeof config_1.ConfigService !== "undefined" && config_1.ConfigService) === "function" ? _a : Object])
@@ -1741,7 +1767,7 @@ exports.WhatsAppService = WhatsAppService = WhatsAppService_1 = __decorate([
 /* 30 */
 /***/ ((module) => {
 
-module.exports = require("@raphaelvserafim/client-api-whatsapp");
+module.exports = require("twilio");
 
 /***/ }),
 /* 31 */
@@ -2183,6 +2209,82 @@ __decorate([
 
 /***/ }),
 /* 33 */
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+var WhatsAppWebhookController_1;
+var _a, _b;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.WhatsAppWebhookController = void 0;
+const common_1 = __webpack_require__(2);
+const whatsapp_service_1 = __webpack_require__(29);
+let WhatsAppWebhookController = WhatsAppWebhookController_1 = class WhatsAppWebhookController {
+    constructor(whatsAppService) {
+        this.whatsAppService = whatsAppService;
+        this.logger = new common_1.Logger(WhatsAppWebhookController_1.name);
+    }
+    async handleIncomingMessage(body) {
+        try {
+            const phone = this.extractPhone(body);
+            const hasMessage = body.Body != null && String(body.Body).trim().length > 0;
+            if (!phone || !hasMessage) {
+                this.logger.debug(`Webhook ignorado (sem telefone ou sem mensagem): ${JSON.stringify(body).substring(0, 200)}`);
+                return { received: true };
+            }
+            if (phone.length < 12) {
+                this.logger.warn(`Webhook: telefone inválido ${phone.substring(0, 4)}***`);
+                return { received: true };
+            }
+            this.logger.log(`Mensagem recebida de ${phone.substring(0, 4)}*** - enviando resposta automática`);
+            const sent = await this.whatsAppService.sendTextMessage(phone, whatsapp_service_1.WhatsAppService.AUTO_REPLY_MESSAGE);
+            if (!sent) {
+                this.logger.warn(`Falha ao enviar resposta automática para ${phone.substring(0, 4)}***`);
+            }
+            return { received: true };
+        }
+        catch (error) {
+            this.logger.error(`Erro no webhook WhatsApp: ${error.message}`, error.stack);
+            return { received: true };
+        }
+    }
+    extractPhone(body) {
+        if (body.From) {
+            return String(body.From).replace('whatsapp:', '').replace(/\D/g, '');
+        }
+        const raw = body.from ?? body.contact_id ?? body.sender ?? body.from_number ?? body.phone;
+        if (raw == null)
+            return null;
+        return String(raw).replace(/\D/g, '');
+    }
+};
+exports.WhatsAppWebhookController = WhatsAppWebhookController;
+__decorate([
+    (0, common_1.Post)('whatsapp'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [typeof (_b = typeof Record !== "undefined" && Record) === "function" ? _b : Object]),
+    __metadata("design:returntype", Promise)
+], WhatsAppWebhookController.prototype, "handleIncomingMessage", null);
+exports.WhatsAppWebhookController = WhatsAppWebhookController = WhatsAppWebhookController_1 = __decorate([
+    (0, common_1.Controller)('api/webhooks'),
+    __metadata("design:paramtypes", [typeof (_a = typeof whatsapp_service_1.WhatsAppService !== "undefined" && whatsapp_service_1.WhatsAppService) === "function" ? _a : Object])
+], WhatsAppWebhookController);
+
+
+/***/ }),
+/* 34 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
