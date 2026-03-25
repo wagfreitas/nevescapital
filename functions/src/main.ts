@@ -4,77 +4,61 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import * as admin from 'firebase-admin';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
 // Inicializar Firebase Admin
 if (!admin.apps.length) {
   try {
-    // No Cloud Run, o Admin SDK usa automaticamente as credenciais do serviço via Application Default Credentials (ADC)
-    // Em desenvolvimento local, precisa de: gcloud auth application-default login
-    // O projectId deve corresponder ao projeto do Firebase/Google Cloud
-    // Project ID deve ser 'pagpagapp' (conforme deploy script)
     const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || 'pagpagapp';
-    
+    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+    const googleCredentialsJson = process.env.GOOGLE_CREDENTIALS_JSON;
+    const isCloudRun = !!process.env.K_SERVICE;
+
     console.log('🔧 Inicializando Firebase Admin...');
     console.log(`📋 Project ID: ${projectId}`);
-    console.log(`📋 GOOGLE_CLOUD_PROJECT: ${process.env.GOOGLE_CLOUD_PROJECT || 'não definido'}`);
-    console.log(`📋 GCLOUD_PROJECT: ${process.env.GCLOUD_PROJECT || 'não definido'}`);
-    console.log(`📋 GOOGLE_APPLICATION_CREDENTIALS: ${process.env.GOOGLE_APPLICATION_CREDENTIALS || 'não definido (usando ADC)'}`);
-    
-    // Verificar se está em ambiente local ou Cloud Run
-    const isLocal = !process.env.K_SERVICE && !process.env.GOOGLE_CLOUD_PROJECT;
-    console.log(`📋 Ambiente: ${isLocal ? 'LOCAL (desenvolvimento)' : 'CLOUD RUN (produção)'}`);
-    
-    // Inicializar com projectId explícito
-    // No Cloud Run, as credenciais são obtidas automaticamente via ADC
-    // Em local, também usa ADC se configurado via: gcloud auth application-default login
-    admin.initializeApp({
-      projectId: projectId,
-      // Não especificar credential - usa ADC automaticamente (Cloud Run ou local com ADC configurado)
-    });
-    
-    // Verificar se o Firestore está acessível
-    const db = admin.firestore();
-    console.log('✅ Firebase Admin inicializado com sucesso');
-    console.log('✅ Firestore instance criada');
-    
-    // Verificar credenciais sendo usadas
-    const app = admin.app();
-    console.log(`📋 App name: ${app.name}`);
-    console.log(`📋 App options: ${JSON.stringify({ projectId: app.options.projectId, credential: app.options.credential ? 'definido' : 'não definido' })}`);
-    
-    // Testar acesso ao Firestore (apenas em desenvolvimento, não bloqueia inicialização)
-    if (process.env.NODE_ENV !== 'production' && !process.env.K_SERVICE) {
-      console.log('🧪 Testando acesso ao Firestore (assíncrono)...');
-      // Tentar uma operação simples de leitura para verificar permissões (não bloqueia)
-      const testRef = db.collection('_test').doc('_connection_test');
-      testRef.get()
-        .then(() => {
-          console.log('✅ Teste de conexão ao Firestore: OK');
-        })
-        .catch((testError: any) => {
-          console.error('❌ Erro ao testar conexão com Firestore:', testError.message);
-          console.error('💡 Verifique se você tem permissões IAM no projeto pagpagapp');
-          console.error('💡 Execute: gcloud projects get-iam-policy pagpagapp');
-          // Não lançar erro aqui, apenas logar - pode ser que o teste falhe mas o app funcione
-        });
+
+    if (serviceAccountJson) {
+      // Opção 1: Service Account JSON
+      console.log('📋 Modo: SERVICE_ACCOUNT');
+      admin.initializeApp({
+        credential: admin.credential.cert(JSON.parse(serviceAccountJson)),
+        projectId,
+      });
+    } else if (googleCredentialsJson) {
+      // Opção 2: ADC JSON via env var (Railway / hosting externo)
+      // Escreve o JSON num arquivo temporário e aponta GOOGLE_APPLICATION_CREDENTIALS
+      console.log('📋 Modo: GOOGLE_CREDENTIALS_JSON (Railway/externo)');
+      const credPath = path.join(os.tmpdir(), 'gcloud-credentials.json');
+      fs.writeFileSync(credPath, googleCredentialsJson, { mode: 0o600 });
+      process.env.GOOGLE_APPLICATION_CREDENTIALS = credPath;
+      admin.initializeApp({ projectId });
+      // Habilitar Firestore em modo REST (necessário para credenciais authorized_user)
+      admin.firestore().settings({ preferRest: true });
+    } else if (isCloudRun) {
+      // Opção 3: Cloud Run ADC
+      console.log('📋 Modo: ADC (Cloud Run)');
+      admin.initializeApp({ projectId });
+    } else {
+      // Opção 4: Dev local ADC
+      console.log('📋 Modo: ADC (desenvolvimento local)');
+      admin.initializeApp({ projectId });
     }
-    
+
+    admin.firestore();
+    console.log('✅ Firebase Admin inicializado com sucesso');
   } catch (error: any) {
     console.error('❌ Erro ao inicializar Firebase Admin:', error.message);
-    console.error('❌ Stack:', error.stack);
-    
-    // Tentar inicializar sem opções (usa credenciais padrão do ambiente)
     try {
-      console.log('🔄 Tentando inicializar com credenciais padrão...');
       admin.initializeApp();
-      console.log('✅ Firebase Admin inicializado com credenciais padrão');
+      console.log('✅ Firebase Admin inicializado com credenciais padrão (fallback)');
     } catch (fallbackError: any) {
-      console.error('❌ Erro ao inicializar Firebase Admin (fallback):', fallbackError.message);
-      console.error('❌ Stack:', fallbackError.stack);
-      console.error('');
-      console.error('💡 SOLUÇÃO: Para desenvolvimento local, execute:');
-      console.error('   gcloud auth application-default login');
-      console.error('   gcloud config set project pagpagapp');
+      console.error('❌ Falha total ao inicializar Firebase Admin:', fallbackError.message);
+      console.error('💡 Opções de autenticação:');
+      console.error('   1. FIREBASE_SERVICE_ACCOUNT=<json> (Service Account Key)');
+      console.error('   2. GOOGLE_CREDENTIALS_JSON=<json> (ADC JSON para Railway)');
+      console.error('   3. gcloud auth application-default login (dev local)');
       throw fallbackError;
     }
   }
