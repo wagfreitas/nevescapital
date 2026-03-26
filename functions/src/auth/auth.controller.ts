@@ -103,12 +103,16 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'OTP enviado via WhatsApp com sucesso' })
   @ApiResponse({ status: 400, description: 'Telefone inválido ou falha no envio' })
   async sendOtpWhatsApp(@Body() body: { phone: string }) {
+    const t0 = Date.now();
     if (!body.phone) {
       throw new BadRequestException('Telefone é obrigatório');
     }
 
     // 1. Gerar e salvar OTP no Firestore
+    const t1 = Date.now();
     const result = await this.simpleOtpService.sendOtp(body.phone);
+    const t2 = Date.now();
+    console.log(`⏱️ [OTP-TIMING] Firestore (gerar+salvar OTP): ${t2 - t1}ms`);
 
     if (!result.success) {
       throw new BadRequestException(result.message);
@@ -116,8 +120,10 @@ export class AuthController {
 
     // 2. Enviar OTP via WhatsApp (fire-and-forget — não bloqueia a resposta)
     if (result.code) {
+      const t3 = Date.now();
       this.whatsAppService.sendOtpMessage(body.phone, result.code)
         .then((sent) => {
+          console.log(`⏱️ [OTP-TIMING] Twilio WhatsApp: ${Date.now() - t3}ms`);
           if (!sent) {
             console.warn(`⚠️ [AuthController] Falha ao enviar OTP via WhatsApp para ${body.phone.substring(0, 4)}***`);
           }
@@ -126,6 +132,8 @@ export class AuthController {
           console.error(`❌ [AuthController] Erro ao enviar OTP via WhatsApp: ${err.message}`);
         });
     }
+
+    console.log(`⏱️ [OTP-TIMING] TOTAL (até response): ${Date.now() - t0}ms`);
 
     return {
       success: true,

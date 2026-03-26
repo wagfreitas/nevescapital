@@ -55,21 +55,25 @@ export class SimpleOtpService {
       };
 
       // Deletar OTPs antigos do mesmo telefone
+      const tQuery = Date.now();
       const oldOtps = await this.db
         .collection(this.otpCollection)
         .where('phone', '==', normalizedPhone)
         .get();
+      console.log(`⏱️ [OTP-TIMING]   query OTPs antigos: ${Date.now() - tQuery}ms (found: ${oldOtps.size})`);
 
       const batch = this.db.batch();
       oldOtps.docs.forEach((doc) => {
         batch.delete(doc.ref);
       });
 
-      // Executar delete e create em paralelo (operam em documentos diferentes)
+      // Executar delete e create em paralelo
+      const tWrite = Date.now();
       await Promise.all([
         batch.commit(),
         this.db.collection(this.otpCollection).add(otpDoc),
       ]);
+      console.log(`⏱️ [OTP-TIMING]   batch+add: ${Date.now() - tWrite}ms`);
 
       // ⚠️ MODO TESTE: Retornar código no response
       // Em produção, você pode integrar com um serviço de SMS real aqui
