@@ -1554,18 +1554,22 @@ let SimpleOtpService = class SimpleOtpService {
                 verified: false,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
             };
+            const tQuery = Date.now();
             const oldOtps = await this.db
                 .collection(this.otpCollection)
                 .where('phone', '==', normalizedPhone)
                 .get();
+            console.log(`⏱️ [OTP-TIMING]   query OTPs antigos: ${Date.now() - tQuery}ms (found: ${oldOtps.size})`);
             const batch = this.db.batch();
             oldOtps.docs.forEach((doc) => {
                 batch.delete(doc.ref);
             });
+            const tWrite = Date.now();
             await Promise.all([
                 batch.commit(),
                 this.db.collection(this.otpCollection).add(otpDoc),
             ]);
+            console.log(`⏱️ [OTP-TIMING]   batch+add: ${Date.now() - tWrite}ms`);
             return {
                 success: true,
                 code,
@@ -1846,16 +1850,22 @@ let AuthController = class AuthController {
         };
     }
     async sendOtpWhatsApp(body) {
+        const t0 = Date.now();
         if (!body.phone) {
             throw new common_1.BadRequestException('Telefone é obrigatório');
         }
+        const t1 = Date.now();
         const result = await this.simpleOtpService.sendOtp(body.phone);
+        const t2 = Date.now();
+        console.log(`⏱️ [OTP-TIMING] Firestore (gerar+salvar OTP): ${t2 - t1}ms`);
         if (!result.success) {
             throw new common_1.BadRequestException(result.message);
         }
         if (result.code) {
+            const t3 = Date.now();
             this.whatsAppService.sendOtpMessage(body.phone, result.code)
                 .then((sent) => {
+                console.log(`⏱️ [OTP-TIMING] Twilio WhatsApp: ${Date.now() - t3}ms`);
                 if (!sent) {
                     console.warn(`⚠️ [AuthController] Falha ao enviar OTP via WhatsApp para ${body.phone.substring(0, 4)}***`);
                 }
@@ -1864,6 +1874,7 @@ let AuthController = class AuthController {
                 console.error(`❌ [AuthController] Erro ao enviar OTP via WhatsApp: ${err.message}`);
             });
         }
+        console.log(`⏱️ [OTP-TIMING] TOTAL (até response): ${Date.now() - t0}ms`);
         return {
             success: true,
             message: 'Código de verificação enviado via WhatsApp',
