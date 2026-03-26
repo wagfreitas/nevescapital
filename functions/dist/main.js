@@ -2297,11 +2297,31 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var HealthController_1;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.HealthController = void 0;
 const common_1 = __webpack_require__(2);
 const swagger_1 = __webpack_require__(3);
-let HealthController = class HealthController {
+const admin = __webpack_require__(10);
+let HealthController = HealthController_1 = class HealthController {
+    constructor() {
+        this.logger = new common_1.Logger(HealthController_1.name);
+        this.KEEP_ALIVE_INTERVAL = 30 * 60 * 1000;
+    }
+    onModuleInit() {
+        this.warmUpFirestore();
+        setInterval(() => this.warmUpFirestore(), this.KEEP_ALIVE_INTERVAL);
+    }
+    async warmUpFirestore() {
+        try {
+            const start = Date.now();
+            await admin.firestore().collection('_health').doc('ping').set({ timestamp: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            this.logger.log(`🔥 Firestore keep-alive OK (${Date.now() - start}ms)`);
+        }
+        catch (error) {
+            this.logger.warn(`⚠️ Firestore keep-alive falhou: ${error.message}`);
+        }
+    }
     check() {
         return {
             status: 'OK',
@@ -2319,7 +2339,7 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], HealthController.prototype, "check", null);
-exports.HealthController = HealthController = __decorate([
+exports.HealthController = HealthController = HealthController_1 = __decorate([
     (0, swagger_1.ApiTags)('Health'),
     (0, common_1.Controller)('health')
 ], HealthController);
