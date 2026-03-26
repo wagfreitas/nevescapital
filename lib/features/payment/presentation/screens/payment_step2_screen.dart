@@ -12,12 +12,14 @@ class PaymentStep2Screen extends StatefulWidget {
   final String nomeEstabelecimento;
   final String ramoAtuacao;
   final bool isFirstSale; // Indica se é a primeira venda (veio da tela 1)
+  final bool? hasAccount; // Se fornecido, pula a verificação async
 
   const PaymentStep2Screen({
     super.key,
     required this.nomeEstabelecimento,
     required this.ramoAtuacao,
     this.isFirstSale = false,
+    this.hasAccount,
   });
 
   @override
@@ -38,18 +40,29 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
   void initState() {
     super.initState();
     _valorController.addListener(_calcularValorLiquido);
-    _checkUserAccount();
+
+    // Se hasAccount já foi fornecido, usa direto (sem flash nos tracinhos)
+    if (widget.hasAccount != null) {
+      _hasAccount = widget.hasAccount!;
+      _isLoadingAccount = false;
+      _requestFocusDelayed();
+    } else {
+      _checkUserAccount();
+    }
   }
 
   Future<void> _checkUserAccount() async {
     final hasAccount = await PaymentStepHelper.hasUserAccount();
     if (!mounted) return;
-    
+
     setState(() {
       _hasAccount = hasAccount;
       _isLoadingAccount = false;
     });
-    // Teclado já aberto ao entrar na tela (Valor da Venda)
+    _requestFocusDelayed();
+  }
+
+  void _requestFocusDelayed() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 400), () {
         if (mounted && _valorFocusNode.canRequestFocus) {
@@ -128,11 +141,11 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
     // para fins de numeração dos passos (mostrar 2/5 ao invés de 1/4)
     final shouldTreatAsNoAccount = widget.isFirstSale;
     final effectiveHasAccount = shouldTreatAsNoAccount ? false : _hasAccount;
-    
+
     // Calcular passo atual baseado se tem conta ou não
     final currentStep = PaymentStepHelper.calculateCurrentStep(2, effectiveHasAccount);
     final totalSteps = PaymentStepHelper.getTotalSteps(effectiveHasAccount);
-    
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
@@ -148,7 +161,9 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
           preferredSize: const Size.fromHeight(28),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
+            child: _isLoadingAccount
+                ? const SizedBox.shrink()
+                : PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
           ),
         ),
       ),

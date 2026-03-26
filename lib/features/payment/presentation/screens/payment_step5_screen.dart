@@ -281,171 +281,152 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
                   color: AppTheme.backgroundColor,
                   child: SafeArea(
                     top: false,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Conteúdo rolável (altura inicial igual às outras: 40px do fim da app bar)
-                        Expanded(
-                          child: SingleChildScrollView(
-                            padding: EdgeInsets.fromLTRB(
-                              24.0,
-                              MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40,
-                              24.0,
-                              24.0,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // Card de resumo
-                                Card(
-                                elevation: 2,
-                                color: AppTheme.cardColor,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(20.0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      // Valor da Venda
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        24.0,
+                        MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40,
+                        24.0,
+                        24.0,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Card de resumo
+                          Expanded(
+                            child: Card(
+                              elevation: 2,
+                              color: AppTheme.cardColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(20.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Valor da Venda
+                                    const Text(
+                                      'VALOR DA VENDA',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    TextFormField(
+                                      readOnly: true,
+                                      initialValue: valorFormatado,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: AppTheme.primaryColor,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      decoration: InputDecoration(
+                                        filled: true,
+                                        fillColor: AppTheme.inputEditableBackgroundColor,
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                          borderSide: BorderSide.none,
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                                        ),
+                                        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+
+                                    // Valor Líquido
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        'Valor Líquido: $valorLiquidoFormatado',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 32),
+
+                                    // Meio de Pagamento
+                                    const Text(
+                                      'MEIO DE PAGAMENTO',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.inputEditableBackgroundColor,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: Colors.white.withValues(alpha: 0.2),
+                                        ),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                      child: Row(
                                         children: [
-                                          const Text(
-                                            'VALOR DA VENDA',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
+                                          Text(
+                                            _getCardDisplay(widget.numeroCartao),
+                                            style: const TextStyle(
                                               color: Colors.white,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          TextFormField(
-                                            readOnly: true,
-                                            initialValue: valorFormatado,
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: AppTheme.primaryColor,
                                               fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            decoration: InputDecoration(
-                                              filled: true,
-                                              fillColor: AppTheme.inputEditableBackgroundColor,
-                                              border: OutlineInputBorder(
-                                                borderRadius: BorderRadius.circular(12),
-                                                borderSide: BorderSide.none,
-                                              ),
-                                              enabledBorder: OutlineInputBorder(
-                                                borderRadius: BorderRadius.circular(12),
-                                                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                                              ),
-                                              focusedBorder: OutlineInputBorder(
-                                                borderRadius: BorderRadius.circular(12),
-                                                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                                              ),
-                                              contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                                             ),
                                           ),
+                                          const SizedBox(width: 8),
+                                          if (showBrand && CardBrandImageLoader.getBrandImage(detectedBrand) != null)
+                                            SizedBox(
+                                              width: 40,
+                                              height: 24,
+                                              child: CardBrandImageLoader.getBrandImage(detectedBrand),
+                                            ),
                                         ],
                                       ),
-                                      const SizedBox(height: 8),
-                                      
-                                      // Valor Líquido (texto simples abaixo do campo)
-                                      Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: Text(
-                                          'Valor Líquido: $valorLiquidoFormatado',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 14,
-                                          ),
+                                    ),
+                                    const SizedBox(height: 24),
+
+                                    // Dados Bancários
+                                    const Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        'DADOS BANCÁRIOS',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
                                         ),
                                       ),
-                                      const SizedBox(height: 32),
-                                      
-                                      // Meio de Pagamento
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          const Text(
-                                            'MEIO DE PAGAMENTO',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Container(
-                                            decoration: BoxDecoration(
-                                              color: AppTheme.inputEditableBackgroundColor,
-                                              borderRadius: BorderRadius.circular(12),
-                                              border: Border.all(
-                                                color: Colors.white.withValues(alpha: 0.2),
-                                              ),
-                                            ),
-                                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                            child: Row(
-                                              children: [
-                                                Text(
-                                                  _getCardDisplay(widget.numeroCartao),
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 16,
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                if (showBrand && CardBrandImageLoader.getBrandImage(detectedBrand) != null)
-                                                  SizedBox(
-                                                    width: 40,
-                                                    height: 24,
-                                                    child: CardBrandImageLoader.getBrandImage(detectedBrand),
-                                                  ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 24),
-                                      
-                                      // Título DADOS BANCÁRIOS à esquerda
-                                      const Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: Text(
-                                          'DADOS BANCÁRIOS',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      
-                                      // Dados Bancários
-                                      _buildBankAccountInfo(),
-                                    ],
-                                  ),
+                                    ),
+                                    const SizedBox(height: 16),
+
+                                    _buildBankAccountInfo(),
+                                  ],
                                 ),
-                                ),
-                                const SizedBox(height: 24),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
-                        // Botão Finalizar a Venda (mesma posição do Avançar: 24px acima e abaixo)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 24.0),
-                          child: CustomButton(
+                          const SizedBox(height: 24),
+                          // Botão Finalizar a Venda
+                          CustomButton(
                             text: 'Finalizar a Venda',
                             icon: Icons.lock,
                             onPressed: _concluirVenda,
                             capitalizeText: false,
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

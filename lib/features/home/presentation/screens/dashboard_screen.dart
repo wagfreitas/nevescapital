@@ -245,17 +245,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
               }
             }
             
-            if (storeName != null && 
-                storeName.isNotEmpty && 
-                businessType != null && 
+            if (storeName != null &&
+                storeName.isNotEmpty &&
+                businessType != null &&
                 businessType.isNotEmpty) {
               // Usuário já tem estabelecimento - ir direto para step 2
+              // hasAccount = true pois já tem storeName e businessType
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => PaymentStep2Screen(
                     nomeEstabelecimento: storeName!,
                     ramoAtuacao: businessType!,
+                    hasAccount: true,
                   ),
                 ),
               );

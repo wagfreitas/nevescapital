@@ -4,6 +4,7 @@ import 'package:neves_capital/shared/components/custom_button.dart';
 import 'package:neves_capital/shared/helpers/card_brand_detector.dart';
 import 'package:neves_capital/shared/helpers/card_brand_image_loader.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/core/utils/card_validator.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/glass_app_bar.dart';
@@ -42,17 +43,30 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
   final _vencimentoController = TextEditingController();
   CardBrand _detectedBrand = CardBrand.unknown;
   bool _submitted = false;
+  bool _cardNumberTouched = false;
+  final _cardNumberFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     // Escutar mudanças no número do cartão para detectar a bandeira
     _numeroCartaoController.addListener(_detectCardBrand);
+    // Marcar como tocado quando o campo do cartão perde o foco
+    _cardNumberFocusNode.addListener(() {
+      if (!_cardNumberFocusNode.hasFocus && !_cardNumberTouched) {
+        setState(() => _cardNumberTouched = true);
+      }
+      // Revalidar o campo quando perde o foco
+      if (!_cardNumberFocusNode.hasFocus && _cardNumberTouched) {
+        _formKey.currentState?.validate();
+      }
+    });
   }
 
   @override
   void dispose() {
     _numeroCartaoController.removeListener(_detectCardBrand);
+    _cardNumberFocusNode.dispose();
     _nomeTitularController.dispose();
     _numeroCartaoController.dispose();
     _cvvController.dispose();
@@ -217,6 +231,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                 // Número do Cartão
                 TextFormField(
                   controller: _numeroCartaoController,
+                  focusNode: _cardNumberFocusNode,
                   keyboardType: TextInputType.number,
                   keyboardAppearance: Brightness.dark,
                   textInputAction: TextInputAction.next,
@@ -258,12 +273,16 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                     ),
                   ),
                   validator: (value) {
+                    if (!_cardNumberTouched && !_submitted) return null;
                     if (value == null || value.isEmpty) {
-                      return _submitted ? 'Insira o número do cartão' : null;
+                      return 'Insira o número do cartão';
                     }
                     final digits = value.replaceAll(' ', '');
                     if (digits.length < 16) {
-                      return _submitted ? 'O número do cartão deve ter 16 dígitos' : null;
+                      return 'O número do cartão deve ter 16 dígitos';
+                    }
+                    if (!CardValidator.isValidLuhn(digits)) {
+                      return 'Número do cartão inválido';
                     }
                     return null;
                   },
