@@ -2325,6 +2325,12 @@ exports.HealthController = HealthController = __decorate([
 ], HealthController);
 
 
+/***/ }),
+/* 35 */
+/***/ ((module) => {
+
+module.exports = require("os");
+
 /***/ })
 /******/ 	]);
 /************************************************************************/
@@ -2365,54 +2371,55 @@ const swagger_1 = __webpack_require__(3);
 const helmet_1 = __webpack_require__(4);
 const app_module_1 = __webpack_require__(5);
 const admin = __webpack_require__(10);
+const fs = __webpack_require__(22);
+const os = __webpack_require__(35);
+const path = __webpack_require__(23);
 if (!admin.apps.length) {
     try {
         const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || 'pagpagapp';
+        const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+        const googleCredentialsJson = process.env.GOOGLE_CREDENTIALS_JSON;
+        const isCloudRun = !!process.env.K_SERVICE;
         console.log('🔧 Inicializando Firebase Admin...');
         console.log(`📋 Project ID: ${projectId}`);
-        console.log(`📋 GOOGLE_CLOUD_PROJECT: ${process.env.GOOGLE_CLOUD_PROJECT || 'não definido'}`);
-        console.log(`📋 GCLOUD_PROJECT: ${process.env.GCLOUD_PROJECT || 'não definido'}`);
-        console.log(`📋 GOOGLE_APPLICATION_CREDENTIALS: ${process.env.GOOGLE_APPLICATION_CREDENTIALS || 'não definido (usando ADC)'}`);
-        const isLocal = !process.env.K_SERVICE && !process.env.GOOGLE_CLOUD_PROJECT;
-        console.log(`📋 Ambiente: ${isLocal ? 'LOCAL (desenvolvimento)' : 'CLOUD RUN (produção)'}`);
-        admin.initializeApp({
-            projectId: projectId,
-        });
-        const db = admin.firestore();
-        console.log('✅ Firebase Admin inicializado com sucesso');
-        console.log('✅ Firestore instance criada');
-        const app = admin.app();
-        console.log(`📋 App name: ${app.name}`);
-        console.log(`📋 App options: ${JSON.stringify({ projectId: app.options.projectId, credential: app.options.credential ? 'definido' : 'não definido' })}`);
-        if (process.env.NODE_ENV !== 'production' && !process.env.K_SERVICE) {
-            console.log('🧪 Testando acesso ao Firestore (assíncrono)...');
-            const testRef = db.collection('_test').doc('_connection_test');
-            testRef.get()
-                .then(() => {
-                console.log('✅ Teste de conexão ao Firestore: OK');
-            })
-                .catch((testError) => {
-                console.error('❌ Erro ao testar conexão com Firestore:', testError.message);
-                console.error('💡 Verifique se você tem permissões IAM no projeto pagpagapp');
-                console.error('💡 Execute: gcloud projects get-iam-policy pagpagapp');
+        if (serviceAccountJson) {
+            console.log('📋 Modo: SERVICE_ACCOUNT');
+            admin.initializeApp({
+                credential: admin.credential.cert(JSON.parse(serviceAccountJson)),
+                projectId,
             });
         }
+        else if (googleCredentialsJson) {
+            console.log('📋 Modo: GOOGLE_CREDENTIALS_JSON (Railway/externo)');
+            const credPath = path.join(os.tmpdir(), 'gcloud-credentials.json');
+            fs.writeFileSync(credPath, googleCredentialsJson, { mode: 0o600 });
+            process.env.GOOGLE_APPLICATION_CREDENTIALS = credPath;
+            admin.initializeApp({ projectId });
+            admin.firestore().settings({ preferRest: true });
+        }
+        else if (isCloudRun) {
+            console.log('📋 Modo: ADC (Cloud Run)');
+            admin.initializeApp({ projectId });
+        }
+        else {
+            console.log('📋 Modo: ADC (desenvolvimento local)');
+            admin.initializeApp({ projectId });
+        }
+        admin.firestore();
+        console.log('✅ Firebase Admin inicializado com sucesso');
     }
     catch (error) {
         console.error('❌ Erro ao inicializar Firebase Admin:', error.message);
-        console.error('❌ Stack:', error.stack);
         try {
-            console.log('🔄 Tentando inicializar com credenciais padrão...');
             admin.initializeApp();
-            console.log('✅ Firebase Admin inicializado com credenciais padrão');
+            console.log('✅ Firebase Admin inicializado com credenciais padrão (fallback)');
         }
         catch (fallbackError) {
-            console.error('❌ Erro ao inicializar Firebase Admin (fallback):', fallbackError.message);
-            console.error('❌ Stack:', fallbackError.stack);
-            console.error('');
-            console.error('💡 SOLUÇÃO: Para desenvolvimento local, execute:');
-            console.error('   gcloud auth application-default login');
-            console.error('   gcloud config set project pagpagapp');
+            console.error('❌ Falha total ao inicializar Firebase Admin:', fallbackError.message);
+            console.error('💡 Opções de autenticação:');
+            console.error('   1. FIREBASE_SERVICE_ACCOUNT=<json> (Service Account Key)');
+            console.error('   2. GOOGLE_CREDENTIALS_JSON=<json> (ADC JSON para Railway)');
+            console.error('   3. gcloud auth application-default login (dev local)');
             throw fallbackError;
         }
     }
