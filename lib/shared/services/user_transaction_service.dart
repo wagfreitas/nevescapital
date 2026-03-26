@@ -4,7 +4,7 @@ import 'package:neves_capital/shared/helpers/user_helper.dart';
 
 /// Service para gerenciar transações do usuário
 class UserTransactionService {
-  static const String _baseUrl = 'https://neves-capital-api-124871515546.us-central1.run.app/api';
+  static const String _baseUrl = 'https://nevescapital-production.up.railway.app/api';
   
   /// Busca saldo do usuário logado
   static Future<Map<String, dynamic>> getSaldoUsuario() async {
