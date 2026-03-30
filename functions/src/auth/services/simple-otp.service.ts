@@ -67,12 +67,10 @@ export class SimpleOtpService {
         batch.delete(doc.ref);
       });
 
-      // Executar delete e create em paralelo
+      // Commit dos deletes antes de criar o novo documento (evita condição de corrida)
       const tWrite = Date.now();
-      await Promise.all([
-        batch.commit(),
-        this.db.collection(this.otpCollection).add(otpDoc),
-      ]);
+      await batch.commit();
+      await this.db.collection(this.otpCollection).add(otpDoc);
       console.log(`⏱️ [OTP-TIMING]   batch+add: ${Date.now() - tWrite}ms`);
 
       // ⚠️ MODO TESTE: Retornar código no response
@@ -82,11 +80,31 @@ export class SimpleOtpService {
         code, // ⚠️ APENAS PARA TESTES - remover em produção
         message: `Código OTP gerado. Para testes, use: ${code}`,
       };
-    } catch (error) {
-      console.error('Erro ao enviar OTP:', error);
+    } catch (error: any) {
+      const code = error?.code;
+      const msg = error?.message ?? String(error);
+      console.error('Erro ao enviar OTP:', { code, msg });
+
+      const permissionDenied =
+        code === 7 ||
+        code === 'PERMISSION_DENIED' ||
+        String(msg).includes('PERMISSION_DENIED');
+      const unavailable =
+        code === 14 ||
+        code === 'UNAVAILABLE' ||
+        String(msg).includes('UNAVAILABLE');
+
+      let userMessage = 'Erro ao gerar código OTP';
+      if (permissionDenied) {
+        userMessage =
+          'Firestore recusou gravação. Confira FIREBASE_SERVICE_ACCOUNT / GOOGLE_CREDENTIALS_JSON e o projectId no Railway.';
+      } else if (unavailable) {
+        userMessage = 'Firestore temporariamente indisponível. Tente novamente em instantes.';
+      }
+
       return {
         success: false,
-        message: 'Erro ao gerar código OTP',
+        message: userMessage,
       };
     }
   }

@@ -43,7 +43,7 @@ const config_1 = __webpack_require__(6);
 const throttler_1 = __webpack_require__(7);
 const users_module_1 = __webpack_require__(8);
 const auth_module_1 = __webpack_require__(20);
-const health_controller_1 = __webpack_require__(34);
+const health_controller_1 = __webpack_require__(35);
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -1176,7 +1176,7 @@ const email_sender_service_1 = __webpack_require__(24);
 const simple_otp_service_1 = __webpack_require__(28);
 const whatsapp_service_1 = __webpack_require__(29);
 const auth_controller_1 = __webpack_require__(31);
-const whatsapp_webhook_controller_1 = __webpack_require__(33);
+const whatsapp_webhook_controller_1 = __webpack_require__(34);
 const users_module_1 = __webpack_require__(8);
 let AuthModule = class AuthModule {
 };
@@ -1565,10 +1565,8 @@ let SimpleOtpService = class SimpleOtpService {
                 batch.delete(doc.ref);
             });
             const tWrite = Date.now();
-            await Promise.all([
-                batch.commit(),
-                this.db.collection(this.otpCollection).add(otpDoc),
-            ]);
+            await batch.commit();
+            await this.db.collection(this.otpCollection).add(otpDoc);
             console.log(`⏱️ [OTP-TIMING]   batch+add: ${Date.now() - tWrite}ms`);
             return {
                 success: true,
@@ -1577,10 +1575,26 @@ let SimpleOtpService = class SimpleOtpService {
             };
         }
         catch (error) {
-            console.error('Erro ao enviar OTP:', error);
+            const code = error?.code;
+            const msg = error?.message ?? String(error);
+            console.error('Erro ao enviar OTP:', { code, msg });
+            const permissionDenied = code === 7 ||
+                code === 'PERMISSION_DENIED' ||
+                String(msg).includes('PERMISSION_DENIED');
+            const unavailable = code === 14 ||
+                code === 'UNAVAILABLE' ||
+                String(msg).includes('UNAVAILABLE');
+            let userMessage = 'Erro ao gerar código OTP';
+            if (permissionDenied) {
+                userMessage =
+                    'Firestore recusou gravação. Confira FIREBASE_SERVICE_ACCOUNT / GOOGLE_CREDENTIALS_JSON e o projectId no Railway.';
+            }
+            else if (unavailable) {
+                userMessage = 'Firestore temporariamente indisponível. Tente novamente em instantes.';
+            }
             return {
                 success: false,
-                message: 'Erro ao gerar código OTP',
+                message: userMessage,
             };
         }
     }
@@ -1790,7 +1804,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-var _a, _b, _c, _d, _e;
+var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AuthController = void 0;
 const common_1 = __webpack_require__(2);
@@ -1803,6 +1817,7 @@ const simple_otp_service_1 = __webpack_require__(28);
 const whatsapp_service_1 = __webpack_require__(29);
 const users_service_1 = __webpack_require__(9);
 const reset_password_dto_1 = __webpack_require__(32);
+const send_phone_otp_dto_1 = __webpack_require__(33);
 let AuthController = class AuthController {
     constructor(emailSenderService, simpleOtpService, whatsAppService, usersService) {
         this.emailSenderService = emailSenderService;
@@ -1823,9 +1838,6 @@ let AuthController = class AuthController {
         }
     }
     async sendOtp(body) {
-        if (!body.phone) {
-            throw new common_1.BadRequestException('Telefone é obrigatório');
-        }
         const result = await this.simpleOtpService.sendOtp(body.phone);
         if (!result.success) {
             throw new common_1.BadRequestException(result.message);
@@ -1837,9 +1849,6 @@ let AuthController = class AuthController {
         };
     }
     async verifyOtp(body) {
-        if (!body.phone || !body.code) {
-            throw new common_1.BadRequestException('Telefone e código são obrigatórios');
-        }
         const result = await this.simpleOtpService.verifyOtp(body.phone, body.code);
         if (!result.success) {
             throw new common_1.BadRequestException(result.message);
@@ -1851,9 +1860,6 @@ let AuthController = class AuthController {
     }
     async sendOtpWhatsApp(body) {
         const t0 = Date.now();
-        if (!body.phone) {
-            throw new common_1.BadRequestException('Telefone é obrigatório');
-        }
         const t1 = Date.now();
         const result = await this.simpleOtpService.sendOtp(body.phone);
         const t2 = Date.now();
@@ -1881,9 +1887,6 @@ let AuthController = class AuthController {
         };
     }
     async verifyOtpLogin(body) {
-        if (!body.phone || !body.code) {
-            throw new common_1.BadRequestException('Telefone e código são obrigatórios');
-        }
         const otpResult = await this.simpleOtpService.verifyOtp(body.phone, body.code);
         if (!otpResult.success) {
             throw new common_1.BadRequestException(otpResult.message);
@@ -1960,9 +1963,6 @@ let AuthController = class AuthController {
         }
     }
     async checkUserStatus(body) {
-        if (!body.token) {
-            throw new common_1.BadRequestException('Token é obrigatório');
-        }
         try {
             console.log('🔐 [AuthController] Verificando status do usuário...');
             const decodedToken = await admin.auth().verifyIdToken(body.token);
@@ -2106,7 +2106,7 @@ __decorate([
     (0, swagger_1.ApiResponse)({ status: 400, description: 'Telefone inválido' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [typeof (_f = typeof send_phone_otp_dto_1.SendPhoneOtpDto !== "undefined" && send_phone_otp_dto_1.SendPhoneOtpDto) === "function" ? _f : Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "sendOtp", null);
 __decorate([
@@ -2120,7 +2120,7 @@ __decorate([
     (0, swagger_1.ApiResponse)({ status: 400, description: 'Código inválido ou expirado' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [typeof (_g = typeof send_phone_otp_dto_1.VerifyPhoneOtpDto !== "undefined" && send_phone_otp_dto_1.VerifyPhoneOtpDto) === "function" ? _g : Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "verifyOtp", null);
 __decorate([
@@ -2134,7 +2134,7 @@ __decorate([
     (0, swagger_1.ApiResponse)({ status: 400, description: 'Telefone inválido ou falha no envio' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [typeof (_h = typeof send_phone_otp_dto_1.SendPhoneOtpDto !== "undefined" && send_phone_otp_dto_1.SendPhoneOtpDto) === "function" ? _h : Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "sendOtpWhatsApp", null);
 __decorate([
@@ -2148,7 +2148,7 @@ __decorate([
     (0, swagger_1.ApiResponse)({ status: 400, description: 'Código inválido, expirado ou telefone inválido' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [typeof (_j = typeof send_phone_otp_dto_1.VerifyPhoneOtpDto !== "undefined" && send_phone_otp_dto_1.VerifyPhoneOtpDto) === "function" ? _j : Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "verifyOtpLogin", null);
 __decorate([
@@ -2163,7 +2163,7 @@ __decorate([
     (0, swagger_1.ApiResponse)({ status: 401, description: 'Token não autorizado' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [typeof (_k = typeof send_phone_otp_dto_1.CheckUserStatusDto !== "undefined" && send_phone_otp_dto_1.CheckUserStatusDto) === "function" ? _k : Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "checkUserStatus", null);
 exports.AuthController = AuthController = __decorate([
@@ -2220,6 +2220,62 @@ __decorate([
 
 /***/ }),
 /* 33 */
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.CheckUserStatusDto = exports.VerifyPhoneOtpDto = exports.SendPhoneOtpDto = void 0;
+const swagger_1 = __webpack_require__(3);
+const class_validator_1 = __webpack_require__(14);
+class SendPhoneOtpDto {
+}
+exports.SendPhoneOtpDto = SendPhoneOtpDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: '5511989630454' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)({ message: 'Telefone é obrigatório' }),
+    (0, class_validator_1.Matches)(/^\d{10,15}$/, { message: 'Número de telefone inválido' }),
+    __metadata("design:type", String)
+], SendPhoneOtpDto.prototype, "phone", void 0);
+class VerifyPhoneOtpDto {
+}
+exports.VerifyPhoneOtpDto = VerifyPhoneOtpDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: '5511989630454' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.Matches)(/^\d{10,15}$/, { message: 'Número de telefone inválido' }),
+    __metadata("design:type", String)
+], VerifyPhoneOtpDto.prototype, "phone", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Código OTP (4 dígitos no fluxo WhatsApp)', example: '1234' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.Matches)(/^\d{4,6}$/, { message: 'Código OTP inválido' }),
+    __metadata("design:type", String)
+], VerifyPhoneOtpDto.prototype, "code", void 0);
+class CheckUserStatusDto {
+}
+exports.CheckUserStatusDto = CheckUserStatusDto;
+__decorate([
+    (0, swagger_1.ApiProperty)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)({ message: 'Token é obrigatório' }),
+    __metadata("design:type", String)
+], CheckUserStatusDto.prototype, "token", void 0);
+
+
+/***/ }),
+/* 34 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -2295,7 +2351,7 @@ exports.WhatsAppWebhookController = WhatsAppWebhookController = WhatsAppWebhookC
 
 
 /***/ }),
-/* 34 */
+/* 35 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -2357,7 +2413,7 @@ exports.HealthController = HealthController = HealthController_1 = __decorate([
 
 
 /***/ }),
-/* 35 */
+/* 36 */
 /***/ ((module) => {
 
 module.exports = require("os");
@@ -2403,7 +2459,7 @@ const helmet_1 = __webpack_require__(4);
 const app_module_1 = __webpack_require__(5);
 const admin = __webpack_require__(10);
 const fs = __webpack_require__(22);
-const os = __webpack_require__(35);
+const os = __webpack_require__(36);
 const path = __webpack_require__(23);
 if (!admin.apps.length) {
     try {
