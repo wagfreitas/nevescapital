@@ -8,6 +8,7 @@ import { SimpleOtpService } from './services/simple-otp.service';
 import { WhatsAppService } from './services/whatsapp.service';
 import { UsersService } from '../users/users.service';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SendPhoneOtpDto, VerifyPhoneOtpDto, CheckUserStatusDto } from './dto/send-phone-otp.dto';
 
 @ApiTags('Auth')
 @Controller('api/auth')
@@ -51,11 +52,7 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'OTP gerado com sucesso' })
   @ApiResponse({ status: 400, description: 'Telefone inválido' })
-  async sendOtp(@Body() body: { phone: string }) {
-    if (!body.phone) {
-      throw new BadRequestException('Telefone é obrigatório');
-    }
-
+  async sendOtp(@Body() body: SendPhoneOtpDto) {
     const result = await this.simpleOtpService.sendOtp(body.phone);
 
     if (!result.success) {
@@ -77,11 +74,7 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'OTP verificado com sucesso' })
   @ApiResponse({ status: 400, description: 'Código inválido ou expirado' })
-  async verifyOtp(@Body() body: { phone: string; code: string }) {
-    if (!body.phone || !body.code) {
-      throw new BadRequestException('Telefone e código são obrigatórios');
-    }
-
+  async verifyOtp(@Body() body: VerifyPhoneOtpDto) {
     const result = await this.simpleOtpService.verifyOtp(body.phone, body.code);
 
     if (!result.success) {
@@ -102,11 +95,8 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'OTP enviado via WhatsApp com sucesso' })
   @ApiResponse({ status: 400, description: 'Telefone inválido ou falha no envio' })
-  async sendOtpWhatsApp(@Body() body: { phone: string }) {
+  async sendOtpWhatsApp(@Body() body: SendPhoneOtpDto) {
     const t0 = Date.now();
-    if (!body.phone) {
-      throw new BadRequestException('Telefone é obrigatório');
-    }
 
     // 1. Gerar e salvar OTP no Firestore
     const t1 = Date.now();
@@ -149,11 +139,7 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'OTP verificado e status do usuário retornado' })
   @ApiResponse({ status: 400, description: 'Código inválido, expirado ou telefone inválido' })
-  async verifyOtpLogin(@Body() body: { phone: string; code: string }) {
-    if (!body.phone || !body.code) {
-      throw new BadRequestException('Telefone e código são obrigatórios');
-    }
-
+  async verifyOtpLogin(@Body() body: VerifyPhoneOtpDto) {
     // 1. Verificar OTP
     const otpResult = await this.simpleOtpService.verifyOtp(body.phone, body.code);
 
@@ -254,11 +240,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Status do usuário retornado com sucesso' })
   @ApiResponse({ status: 400, description: 'Token inválido' })
   @ApiResponse({ status: 401, description: 'Token não autorizado' })
-  async checkUserStatus(@Body() body: { token: string }) {
-    if (!body.token) {
-      throw new BadRequestException('Token é obrigatório');
-    }
-
+  async checkUserStatus(@Body() body: CheckUserStatusDto) {
     try {
       console.log('🔐 [AuthController] Verificando status do usuário...');
 
