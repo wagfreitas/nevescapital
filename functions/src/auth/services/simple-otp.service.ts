@@ -67,12 +67,10 @@ export class SimpleOtpService {
         batch.delete(doc.ref);
       });
 
-      // Executar delete e create em paralelo
+      // Delete antigos primeiro, depois grava o novo (evita condição de corrida no Firestore)
       const tWrite = Date.now();
-      await Promise.all([
-        batch.commit(),
-        this.db.collection(this.otpCollection).add(otpDoc),
-      ]);
+      await batch.commit();
+      await this.db.collection(this.otpCollection).add(otpDoc);
       console.log(`⏱️ [OTP-TIMING]   batch+add: ${Date.now() - tWrite}ms`);
 
       // ⚠️ MODO TESTE: Retornar código no response
@@ -82,11 +80,14 @@ export class SimpleOtpService {
         code, // ⚠️ APENAS PARA TESTES - remover em produção
         message: `Código OTP gerado. Para testes, use: ${code}`,
       };
-    } catch (error) {
-      console.error('Erro ao enviar OTP:', error);
+    } catch (error: any) {
+      console.error('Erro ao enviar OTP:', error?.message || error, error?.code);
       return {
         success: false,
-        message: 'Erro ao gerar código OTP',
+        message:
+          process.env.NODE_ENV === 'development'
+            ? `Erro ao gerar código OTP: ${error?.message || String(error)}`
+            : 'Erro ao gerar código OTP',
       };
     }
   }
