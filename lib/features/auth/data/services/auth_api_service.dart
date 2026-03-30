@@ -12,6 +12,14 @@ class AuthApiService {
         'x-api-key': _apiKey,
       };
 
+  /// Mensagem de erro do Nest (string ou lista do class-validator).
+  static String? _parseApiErrorMessage(Map<String, dynamic> data) {
+    final raw = data['message'];
+    if (raw == null) return null;
+    if (raw is List) return raw.map((e) => e.toString()).join(', ');
+    return raw.toString();
+  }
+
   // 🎭 MODO MOCK PARA TESTES
   static const bool _useMockData = true;
 
@@ -293,11 +301,10 @@ class AuthApiService {
           'message': data['message'] ?? 'Código enviado via WhatsApp',
         };
       } else {
-        final msg = data['message'];
-        final detail = msg is List ? msg.join(', ') : (msg?.toString());
         return {
           'success': false,
-          'message': detail ?? 'Erro ao enviar código via WhatsApp',
+          'message': _parseApiErrorMessage(data) ??
+              'Erro ao enviar código via WhatsApp',
         };
       }
     } catch (e) {

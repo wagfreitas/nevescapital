@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, Matches } from 'class-validator';
 
-/** Telefone só com dígitos (ex.: 5511999999999 com código do país) */
+/** Telefone só com dígitos (ex.: 5511999999999 com código do país). */
 export class SendPhoneOtpDto {
   @ApiProperty({
     description: 'Telefone apenas dígitos (código do país + DDD + número)',
