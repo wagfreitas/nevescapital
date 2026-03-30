@@ -266,6 +266,7 @@ class AuthApiService {
     final url = Uri.parse('$_baseUrl/api/auth/send-otp-whatsapp');
 
     try {
+      AppLogger.info('🎯 [API] URL: $url');
       AppLogger.info('🚀 [API] Enviando OTP via WhatsApp para: ${phone.substring(0, 4)}***');
 
       final response = await http
@@ -282,8 +283,9 @@ class AuthApiService {
       );
 
       AppLogger.debug('📡 [API] Response status: ${response.statusCode}');
+      AppLogger.debug('📡 [API] Response body: ${response.body}');
 
-      final data = jsonDecode(response.body);
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return {
@@ -291,9 +293,11 @@ class AuthApiService {
           'message': data['message'] ?? 'Código enviado via WhatsApp',
         };
       } else {
+        final msg = data['message'];
+        final detail = msg is List ? msg.join(', ') : (msg?.toString());
         return {
           'success': false,
-          'message': data['message'] ?? 'Erro ao enviar código via WhatsApp',
+          'message': detail ?? 'Erro ao enviar código via WhatsApp',
         };
       }
     } catch (e) {
