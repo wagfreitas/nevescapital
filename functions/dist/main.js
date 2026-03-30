@@ -2430,58 +2430,6 @@ exports.HealthController = HealthController = HealthController_1 = __decorate([
 
 module.exports = require("os");
 
-/***/ }),
-/* 37 */
-/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
-
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.FirebaseCICredential = void 0;
-const axios_1 = __webpack_require__(38);
-class FirebaseCICredential {
-    constructor(refreshToken) {
-        this.refreshToken = refreshToken;
-        this.cachedToken = null;
-    }
-    async getAccessToken() {
-        if (this.cachedToken && Date.now() < this.cachedToken.expiresAt - 5 * 60 * 1000) {
-            const remainingSecs = Math.floor((this.cachedToken.expiresAt - Date.now()) / 1000);
-            return { access_token: this.cachedToken.accessToken, expires_in: remainingSecs };
-        }
-        try {
-            const response = await axios_1.default.post(FirebaseCICredential.TOKEN_URL, new URLSearchParams({
-                grant_type: 'refresh_token',
-                client_id: FirebaseCICredential.CLIENT_ID,
-                client_secret: FirebaseCICredential.CLIENT_SECRET,
-                refresh_token: this.refreshToken,
-            }).toString(), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-            const { access_token, expires_in } = response.data;
-            this.cachedToken = {
-                accessToken: access_token,
-                expiresAt: Date.now() + expires_in * 1000,
-            };
-            console.log(`🔑 Firebase CI token refreshed (expires in ${expires_in}s)`);
-            return { access_token, expires_in };
-        }
-        catch (error) {
-            const msg = error.response?.data?.error_description || error.message;
-            console.error('❌ Falha ao renovar Firebase CI token:', msg);
-            throw new Error(`Firebase CI credential refresh failed: ${msg}`);
-        }
-    }
-}
-exports.FirebaseCICredential = FirebaseCICredential;
-FirebaseCICredential.CLIENT_ID = '563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com';
-FirebaseCICredential.CLIENT_SECRET = 'j9iVZfS8kkCEFUPaAeJV0sAi';
-FirebaseCICredential.TOKEN_URL = 'https://oauth2.googleapis.com/token';
-
-
-/***/ }),
-/* 38 */
-/***/ ((module) => {
-
-module.exports = require("axios");
-
 /***/ })
 /******/ 	]);
 /************************************************************************/
@@ -2525,7 +2473,6 @@ const admin = __webpack_require__(10);
 const fs = __webpack_require__(22);
 const os = __webpack_require__(36);
 const path = __webpack_require__(23);
-const firebase_ci_credential_1 = __webpack_require__(37);
 if (!admin.apps.length) {
     try {
         const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || 'pagpagapp';
@@ -2543,12 +2490,17 @@ if (!admin.apps.length) {
             });
         }
         else if (firebaseCiToken) {
-            console.log('📋 Modo: FIREBASE_CI_TOKEN');
-            const ciCredential = new firebase_ci_credential_1.FirebaseCICredential(firebaseCiToken);
-            admin.initializeApp({
-                credential: ciCredential,
-                projectId,
+            console.log('📋 Modo: FIREBASE_CI_TOKEN (convertido para ADC)');
+            const adcJson = JSON.stringify({
+                type: 'authorized_user',
+                client_id: '563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com',
+                client_secret: 'j9iVZfS8kkCEFUPaAeJV0sAi',
+                refresh_token: firebaseCiToken,
             });
+            const credPath = path.join(os.tmpdir(), 'firebase-ci-credentials.json');
+            fs.writeFileSync(credPath, adcJson, { mode: 0o600 });
+            process.env.GOOGLE_APPLICATION_CREDENTIALS = credPath;
+            admin.initializeApp({ projectId });
             admin.firestore().settings({ preferRest: true });
         }
         else if (googleCredentialsJson) {

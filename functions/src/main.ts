@@ -7,8 +7,6 @@ import * as admin from 'firebase-admin';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { FirebaseCICredential } from './firebase-ci-credential';
-
 // Inicializar Firebase Admin
 if (!admin.apps.length) {
   try {
@@ -29,15 +27,19 @@ if (!admin.apps.length) {
         projectId,
       });
     } else if (firebaseCiToken) {
-      // Opção 2: Firebase CI Token (gerado via `npx firebase login:ci`)
-      // Não expira por RAPT e não requer Service Account key
-      console.log('📋 Modo: FIREBASE_CI_TOKEN');
-      const ciCredential = new FirebaseCICredential(firebaseCiToken);
-      admin.initializeApp({
-        credential: ciCredential as any,
-        projectId,
+      // Opção 2: Firebase CI Token → converte para ADC authorized_user
+      // Firebase CLI public OAuth2 client (não é segredo — está no source do CLI)
+      console.log('📋 Modo: FIREBASE_CI_TOKEN (convertido para ADC)');
+      const adcJson = JSON.stringify({
+        type: 'authorized_user',
+        client_id: '563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com',
+        client_secret: 'j9iVZfS8kkCEFUPaAeJV0sAi',
+        refresh_token: firebaseCiToken,
       });
-      // Modo REST necessário para credenciais OAuth-based
+      const credPath = path.join(os.tmpdir(), 'firebase-ci-credentials.json');
+      fs.writeFileSync(credPath, adcJson, { mode: 0o600 });
+      process.env.GOOGLE_APPLICATION_CREDENTIALS = credPath;
+      admin.initializeApp({ projectId });
       admin.firestore().settings({ preferRest: true });
     } else if (googleCredentialsJson) {
       // Opção 3: ADC JSON via env var (Railway / hosting externo)
