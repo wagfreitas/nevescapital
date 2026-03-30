@@ -1575,12 +1575,29 @@ let SimpleOtpService = class SimpleOtpService {
             };
         }
         catch (error) {
-            console.error('Erro ao enviar OTP:', error?.message || error, error?.code);
+            const code = error?.code;
+            const msg = error?.message ?? String(error);
+            console.error('Erro ao enviar OTP:', { code, msg });
+            const permissionDenied = code === 7 ||
+                code === 'PERMISSION_DENIED' ||
+                String(msg).includes('PERMISSION_DENIED');
+            const unavailable = code === 14 ||
+                code === 'UNAVAILABLE' ||
+                String(msg).includes('UNAVAILABLE');
+            let userMessage = 'Erro ao gerar código OTP';
+            if (permissionDenied) {
+                userMessage =
+                    'Firestore recusou gravação. Confira FIREBASE_SERVICE_ACCOUNT / GOOGLE_CREDENTIALS_JSON e o projectId no Railway.';
+            }
+            else if (unavailable) {
+                userMessage = 'Firestore temporariamente indisponível. Tente novamente em instantes.';
+            }
+            else if (process.env.NODE_ENV === 'development') {
+                userMessage = `Erro ao gerar código OTP: ${msg}`;
+            }
             return {
                 success: false,
-                message: process.env.NODE_ENV === 'development'
-                    ? `Erro ao gerar código OTP: ${error?.message || String(error)}`
-                    : 'Erro ao gerar código OTP',
+                message: userMessage,
             };
         }
     }
