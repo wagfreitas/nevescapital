@@ -7,12 +7,14 @@ import * as admin from 'firebase-admin';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { FirebaseCICredential } from './firebase-ci-credential';
 
 // Inicializar Firebase Admin
 if (!admin.apps.length) {
   try {
     const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || 'pagpagapp';
     const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+    const firebaseCiToken = process.env.FIREBASE_CI_TOKEN;
     const googleCredentialsJson = process.env.GOOGLE_CREDENTIALS_JSON;
     const isCloudRun = !!process.env.K_SERVICE;
 
@@ -20,28 +22,38 @@ if (!admin.apps.length) {
     console.log(`📋 Project ID: ${projectId}`);
 
     if (serviceAccountJson) {
-      // Opção 1: Service Account JSON
+      // Opção 1: Service Account JSON (melhor para produção)
       console.log('📋 Modo: SERVICE_ACCOUNT');
       admin.initializeApp({
         credential: admin.credential.cert(JSON.parse(serviceAccountJson)),
         projectId,
       });
+    } else if (firebaseCiToken) {
+      // Opção 2: Firebase CI Token (gerado via `npx firebase login:ci`)
+      // Não expira por RAPT e não requer Service Account key
+      console.log('📋 Modo: FIREBASE_CI_TOKEN');
+      const ciCredential = new FirebaseCICredential(firebaseCiToken);
+      admin.initializeApp({
+        credential: ciCredential as any,
+        projectId,
+      });
+      // Modo REST necessário para credenciais OAuth-based
+      admin.firestore().settings({ preferRest: true });
     } else if (googleCredentialsJson) {
-      // Opção 2: ADC JSON via env var (Railway / hosting externo)
-      // Escreve o JSON num arquivo temporário e aponta GOOGLE_APPLICATION_CREDENTIALS
+      // Opção 3: ADC JSON via env var (Railway / hosting externo)
       console.log('📋 Modo: GOOGLE_CREDENTIALS_JSON (Railway/externo)');
+      console.warn('⚠️ Credencial de usuário OAuth — pode expirar por RAPT. Prefira FIREBASE_CI_TOKEN.');
       const credPath = path.join(os.tmpdir(), 'gcloud-credentials.json');
       fs.writeFileSync(credPath, googleCredentialsJson, { mode: 0o600 });
       process.env.GOOGLE_APPLICATION_CREDENTIALS = credPath;
       admin.initializeApp({ projectId });
-      // Habilitar Firestore em modo REST (necessário para credenciais authorized_user)
       admin.firestore().settings({ preferRest: true });
     } else if (isCloudRun) {
-      // Opção 3: Cloud Run ADC
+      // Opção 4: Cloud Run ADC
       console.log('📋 Modo: ADC (Cloud Run)');
       admin.initializeApp({ projectId });
     } else {
-      // Opção 4: Dev local ADC
+      // Opção 5: Dev local ADC
       console.log('📋 Modo: ADC (desenvolvimento local)');
       admin.initializeApp({ projectId });
     }
@@ -57,8 +69,9 @@ if (!admin.apps.length) {
       console.error('❌ Falha total ao inicializar Firebase Admin:', fallbackError.message);
       console.error('💡 Opções de autenticação:');
       console.error('   1. FIREBASE_SERVICE_ACCOUNT=<json> (Service Account Key)');
-      console.error('   2. GOOGLE_CREDENTIALS_JSON=<json> (ADC JSON para Railway)');
-      console.error('   3. gcloud auth application-default login (dev local)');
+      console.error('   2. FIREBASE_CI_TOKEN=<token> (via npx firebase login:ci)');
+      console.error('   3. GOOGLE_CREDENTIALS_JSON=<json> (ADC JSON - pode expirar)');
+      console.error('   4. gcloud auth application-default login (dev local)');
       throw fallbackError;
     }
   }

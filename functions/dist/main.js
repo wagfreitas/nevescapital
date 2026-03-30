@@ -1584,10 +1584,16 @@ let SimpleOtpService = class SimpleOtpService {
             const unavailable = code === 14 ||
                 code === 'UNAVAILABLE' ||
                 String(msg).includes('UNAVAILABLE');
+            const oauthUserCredentialExpired = String(msg).includes('invalid_grant') ||
+                String(msg).includes('invalid_rapt');
             let userMessage = 'Erro ao gerar código OTP';
-            if (permissionDenied) {
+            if (oauthUserCredentialExpired) {
                 userMessage =
-                    'Firestore recusou gravação. Confira FIREBASE_SERVICE_ACCOUNT / GOOGLE_CREDENTIALS_JSON e o projectId no Railway.';
+                    'Credenciais OAuth expiradas ou revogadas. No Railway remova GOOGLE_CREDENTIALS_JSON e configure FIREBASE_SERVICE_ACCOUNT com o JSON da service account (Firebase Console → Project settings → Service accounts → Generate new private key).';
+            }
+            else if (permissionDenied) {
+                userMessage =
+                    'Firestore recusou gravação. Confira FIREBASE_SERVICE_ACCOUNT e GOOGLE_CLOUD_PROJECT no Railway.';
             }
             else if (unavailable) {
                 userMessage = 'Firestore temporariamente indisponível. Tente novamente em instantes.';
@@ -2424,6 +2430,58 @@ exports.HealthController = HealthController = HealthController_1 = __decorate([
 
 module.exports = require("os");
 
+/***/ }),
+/* 37 */
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.FirebaseCICredential = void 0;
+const axios_1 = __webpack_require__(38);
+class FirebaseCICredential {
+    constructor(refreshToken) {
+        this.refreshToken = refreshToken;
+        this.cachedToken = null;
+    }
+    async getAccessToken() {
+        if (this.cachedToken && Date.now() < this.cachedToken.expiresAt - 5 * 60 * 1000) {
+            const remainingSecs = Math.floor((this.cachedToken.expiresAt - Date.now()) / 1000);
+            return { access_token: this.cachedToken.accessToken, expires_in: remainingSecs };
+        }
+        try {
+            const response = await axios_1.default.post(FirebaseCICredential.TOKEN_URL, new URLSearchParams({
+                grant_type: 'refresh_token',
+                client_id: FirebaseCICredential.CLIENT_ID,
+                client_secret: FirebaseCICredential.CLIENT_SECRET,
+                refresh_token: this.refreshToken,
+            }).toString(), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+            const { access_token, expires_in } = response.data;
+            this.cachedToken = {
+                accessToken: access_token,
+                expiresAt: Date.now() + expires_in * 1000,
+            };
+            console.log(`🔑 Firebase CI token refreshed (expires in ${expires_in}s)`);
+            return { access_token, expires_in };
+        }
+        catch (error) {
+            const msg = error.response?.data?.error_description || error.message;
+            console.error('❌ Falha ao renovar Firebase CI token:', msg);
+            throw new Error(`Firebase CI credential refresh failed: ${msg}`);
+        }
+    }
+}
+exports.FirebaseCICredential = FirebaseCICredential;
+FirebaseCICredential.CLIENT_ID = '563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com';
+FirebaseCICredential.CLIENT_SECRET = 'j9iVZfS8kkCEFUPaAeJV0sAi';
+FirebaseCICredential.TOKEN_URL = 'https://oauth2.googleapis.com/token';
+
+
+/***/ }),
+/* 38 */
+/***/ ((module) => {
+
+module.exports = require("axios");
+
 /***/ })
 /******/ 	]);
 /************************************************************************/
@@ -2467,10 +2525,12 @@ const admin = __webpack_require__(10);
 const fs = __webpack_require__(22);
 const os = __webpack_require__(36);
 const path = __webpack_require__(23);
+const firebase_ci_credential_1 = __webpack_require__(37);
 if (!admin.apps.length) {
     try {
         const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || 'pagpagapp';
         const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+        const firebaseCiToken = process.env.FIREBASE_CI_TOKEN;
         const googleCredentialsJson = process.env.GOOGLE_CREDENTIALS_JSON;
         const isCloudRun = !!process.env.K_SERVICE;
         console.log('🔧 Inicializando Firebase Admin...');
@@ -2482,8 +2542,18 @@ if (!admin.apps.length) {
                 projectId,
             });
         }
+        else if (firebaseCiToken) {
+            console.log('📋 Modo: FIREBASE_CI_TOKEN');
+            const ciCredential = new firebase_ci_credential_1.FirebaseCICredential(firebaseCiToken);
+            admin.initializeApp({
+                credential: ciCredential,
+                projectId,
+            });
+            admin.firestore().settings({ preferRest: true });
+        }
         else if (googleCredentialsJson) {
             console.log('📋 Modo: GOOGLE_CREDENTIALS_JSON (Railway/externo)');
+            console.warn('⚠️ Credencial de usuário OAuth — pode expirar por RAPT. Prefira FIREBASE_CI_TOKEN.');
             const credPath = path.join(os.tmpdir(), 'gcloud-credentials.json');
             fs.writeFileSync(credPath, googleCredentialsJson, { mode: 0o600 });
             process.env.GOOGLE_APPLICATION_CREDENTIALS = credPath;
@@ -2511,8 +2581,9 @@ if (!admin.apps.length) {
             console.error('❌ Falha total ao inicializar Firebase Admin:', fallbackError.message);
             console.error('💡 Opções de autenticação:');
             console.error('   1. FIREBASE_SERVICE_ACCOUNT=<json> (Service Account Key)');
-            console.error('   2. GOOGLE_CREDENTIALS_JSON=<json> (ADC JSON para Railway)');
-            console.error('   3. gcloud auth application-default login (dev local)');
+            console.error('   2. FIREBASE_CI_TOKEN=<token> (via npx firebase login:ci)');
+            console.error('   3. GOOGLE_CREDENTIALS_JSON=<json> (ADC JSON - pode expirar)');
+            console.error('   4. gcloud auth application-default login (dev local)');
             throw fallbackError;
         }
     }

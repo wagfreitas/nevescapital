@@ -93,11 +93,17 @@ export class SimpleOtpService {
         code === 14 ||
         code === 'UNAVAILABLE' ||
         String(msg).includes('UNAVAILABLE');
+      const oauthUserCredentialExpired =
+        String(msg).includes('invalid_grant') ||
+        String(msg).includes('invalid_rapt');
 
       let userMessage = 'Erro ao gerar código OTP';
-      if (permissionDenied) {
+      if (oauthUserCredentialExpired) {
         userMessage =
-          'Firestore recusou gravação. Confira FIREBASE_SERVICE_ACCOUNT / GOOGLE_CREDENTIALS_JSON e o projectId no Railway.';
+          'Credenciais OAuth expiradas ou revogadas. No Railway remova GOOGLE_CREDENTIALS_JSON e configure FIREBASE_SERVICE_ACCOUNT com o JSON da service account (Firebase Console → Project settings → Service accounts → Generate new private key).';
+      } else if (permissionDenied) {
+        userMessage =
+          'Firestore recusou gravação. Confira FIREBASE_SERVICE_ACCOUNT e GOOGLE_CLOUD_PROJECT no Railway.';
       } else if (unavailable) {
         userMessage = 'Firestore temporariamente indisponível. Tente novamente em instantes.';
       } else if (process.env.NODE_ENV === 'development') {
