@@ -80,32 +80,30 @@ export class SimpleOtpService {
         message: `Codigo OTP gerado. Para testes, use: ${code}`,
       };
     } catch (error: any) {
-      const code = error?.code;
+      const code = error?.code || error?.response?.status;
       const msg = error?.message ?? String(error);
-      console.error('Erro ao enviar OTP:', { code, msg });
+      const responseData = error?.response?.data ? JSON.stringify(error.response.data) : '';
+      console.error('Erro ao enviar OTP:', { code, msg, responseData });
 
+      const fullError = `${msg} ${responseData}`;
       const permissionDenied =
+        code === 403 ||
         code === 7 ||
         code === 'PERMISSION_DENIED' ||
-        String(msg).includes('PERMISSION_DENIED');
+        fullError.includes('PERMISSION_DENIED') ||
+        fullError.includes('Missing or insufficient permissions');
       const unavailable =
         code === 14 ||
         code === 'UNAVAILABLE' ||
-        String(msg).includes('UNAVAILABLE');
-      const oauthUserCredentialExpired =
-        String(msg).includes('invalid_grant') ||
-        String(msg).includes('invalid_rapt');
+        fullError.includes('UNAVAILABLE');
 
       let userMessage = 'Erro ao gerar codigo OTP';
-      if (oauthUserCredentialExpired) {
+      if (permissionDenied) {
         userMessage =
-          'Credenciais expiradas ou revogadas. Verifique FIREBASE_SERVICE_ACCOUNT ou GOOGLE_APPLICATION_CREDENTIALS no ambiente.';
-      } else if (permissionDenied) {
-        userMessage =
-          'Firestore recusou gravacao. Confira FIREBASE_SERVICE_ACCOUNT e GOOGLE_CLOUD_PROJECT no Railway.';
+          'Firestore recusou gravacao. Verifique as Security Rules do Firestore e a FIREBASE_WEB_API_KEY.';
       } else if (unavailable) {
         userMessage = 'Firestore temporariamente indisponivel. Tente novamente em instantes.';
-      } else if (process.env.NODE_ENV === 'development') {
+      } else {
         userMessage = `Erro ao gerar codigo OTP: ${msg}`;
       }
 
