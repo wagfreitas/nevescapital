@@ -8,14 +8,19 @@ export class WhatsAppService {
   private readonly logger = new Logger(WhatsAppService.name);
   private client: any;
   private fromNumber: string;
+  private otpContentSid: string;
 
   constructor(private readonly configService: ConfigService) {
     const accountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID', '');
     const authToken = this.configService.get<string>('TWILIO_AUTH_TOKEN', '');
     this.fromNumber = this.configService.get<string>('TWILIO_WHATSAPP_FROM', '');
+    this.otpContentSid = this.configService.get<string>(
+      'TWILIO_OTP_CONTENT_SID',
+      'HXc63e56630589f6a10de0d304c0ee09f1',
+    );
 
     this.client = Twilio(accountSid, authToken);
-    this.logger.log(`WhatsApp service initialized (Twilio, from: ${this.fromNumber})`);
+    this.logger.log(`WhatsApp service initialized (Twilio, from: ${this.fromNumber}, otpTemplate: ${this.otpContentSid})`);
   }
 
   /** Mensagem fixa enviada quando o usuário envia qualquer mensagem no canal (apenas OTP). */
@@ -76,9 +81,10 @@ export class WhatsAppService {
       this.logger.log(`Enviando OTP via WhatsApp para: ${cleanPhone.substring(0, 4)}***`);
 
       const message = await this.client.messages.create({
-        body: `${code} é o seu código de verificação PagPag.`,
         from: `whatsapp:${this.fromNumber}`,
         to: this.formatPhone(cleanPhone),
+        contentSid: this.otpContentSid,
+        contentVariables: JSON.stringify({ '1': code }),
       });
 
       this.logger.log(`WhatsApp OTP enviado com sucesso (SID: ${message.sid})`);
