@@ -97,15 +97,8 @@ export class SimpleOtpService {
         code === 'UNAVAILABLE' ||
         fullError.includes('UNAVAILABLE');
 
-      let userMessage = 'Erro ao gerar codigo OTP';
-      if (permissionDenied) {
-        userMessage =
-          'Firestore recusou gravacao. Verifique as Security Rules do Firestore e a FIREBASE_WEB_API_KEY.';
-      } else if (unavailable) {
-        userMessage = 'Firestore temporariamente indisponivel. Tente novamente em instantes.';
-      } else {
-        userMessage = `Erro ao gerar codigo OTP: ${msg}`;
-      }
+      // Temporariamente: sempre retornar erro detalhado para debug
+      const userMessage = `Erro OTP [${code}]: ${msg} | ${responseData}`;
 
       return {
         success: false,
