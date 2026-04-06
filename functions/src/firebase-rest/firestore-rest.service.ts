@@ -62,40 +62,26 @@ export class FirestoreRestService {
   async addDocument(collection: string, data: Record<string, any>): Promise<FirestoreDocument> {
     const { fields, transforms } = this.separateTransforms(collection, '', data);
 
-    // If we have transforms, use commit API
     if (transforms.length > 0) {
-      const docPath = `${this.baseUrl}/${collection}`; // Auto-generate ID
-      const writes: any[] = [];
+      // Two-step: create doc first, then apply transforms
+      const res = await this.http.post(`/${collection}`, { fields });
+      const docId = extractDocId(res.data.name);
 
-      // First write: update with fields
-      const tempDocName = `projects/${this.projectId}/databases/(default)/documents/${collection}/__temp__`;
-
-      // Use commit with a create + transforms
-      const commitUrl = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents:commit`;
-      const apiKey = this.configService.get<string>('FIREBASE_WEB_API_KEY', '');
-
-      const res = await axios.post(
-        commitUrl,
+      // Apply transforms (serverTimestamp, increment) via commit
+      await this.commitWrites([
         {
-          writes: [
-            {
-              update: {
-                fields,
-              },
-              currentDocument: { exists: false },
-              updateTransforms: transforms,
-            },
-          ],
+          transform: {
+            document: `projects/${this.projectId}/databases/(default)/documents/${collection}/${docId}`,
+            fieldTransforms: transforms,
+          },
         },
-        { params: apiKey ? { key: apiKey } : {} },
-      );
+      ]);
 
-      const docName = res.data.writeResults[0]?.updateTime
-        ? res.data.commitTime
-        : '';
-
-      // Fallback: create without transforms, then update with transforms
-      // Actually, for addDocument we need a simpler approach
+      return {
+        id: docId,
+        data: { ...data, id: docId },
+        ref: { path: `${collection}/${docId}` },
+      };
     }
 
     // Simple add without transforms

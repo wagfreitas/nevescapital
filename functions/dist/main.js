@@ -602,25 +602,21 @@ let FirestoreRestService = FirestoreRestService_1 = class FirestoreRestService {
     async addDocument(collection, data) {
         const { fields, transforms } = this.separateTransforms(collection, '', data);
         if (transforms.length > 0) {
-            const docPath = `${this.baseUrl}/${collection}`;
-            const writes = [];
-            const tempDocName = `projects/${this.projectId}/databases/(default)/documents/${collection}/__temp__`;
-            const commitUrl = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents:commit`;
-            const apiKey = this.configService.get('FIREBASE_WEB_API_KEY', '');
-            const res = await axios_1.default.post(commitUrl, {
-                writes: [
-                    {
-                        update: {
-                            fields,
-                        },
-                        currentDocument: { exists: false },
-                        updateTransforms: transforms,
+            const res = await this.http.post(`/${collection}`, { fields });
+            const docId = (0, firestore_rest_utils_1.extractDocId)(res.data.name);
+            await this.commitWrites([
+                {
+                    transform: {
+                        document: `projects/${this.projectId}/databases/(default)/documents/${collection}/${docId}`,
+                        fieldTransforms: transforms,
                     },
-                ],
-            }, { params: apiKey ? { key: apiKey } : {} });
-            const docName = res.data.writeResults[0]?.updateTime
-                ? res.data.commitTime
-                : '';
+                },
+            ]);
+            return {
+                id: docId,
+                data: { ...data, id: docId },
+                ref: { path: `${collection}/${docId}` },
+            };
         }
         const res = await this.http.post(`/${collection}`, { fields });
         const docId = (0, firestore_rest_utils_1.extractDocId)(res.data.name);
