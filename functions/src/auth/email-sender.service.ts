@@ -1,11 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EmailTemplateService } from './email-template.service';
-import * as admin from 'firebase-admin';
 
 /**
  * Serviço para enviar emails customizados
- * 
+ *
  * NOTA: Este serviço requer um provedor de email (SendGrid, AWS SES, etc.)
  * Configure as variáveis de ambiente no .env
  */
@@ -18,16 +17,10 @@ export class EmailSenderService {
 
   /**
    * Envia email de redefinição de senha customizado
-   * 
-   * Alternativas de provedores:
-   * 1. SendGrid (https://sendgrid.com) - Free tier: 100 emails/dia
-   * 2. AWS SES (https://aws.amazon.com/ses/) - Free tier: 62k emails/mês
-   * 3. Resend (https://resend.com) - Free tier: 3k emails/mês
-   * 4. Nodemailer com SMTP próprio
    */
   async sendPasswordResetEmail(
     email: string,
-    actionCodeSettings?: admin.auth.ActionCodeSettings,
+    actionCodeSettings?: any,
   ): Promise<void> {
     try {
       // 1. Gerar link de reset usando Firebase Admin SDK
