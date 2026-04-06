@@ -1,6 +1,7 @@
 import { Controller, Get, Logger, OnModuleInit } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import * as admin from 'firebase-admin';
+import { FirestoreRestService } from './firebase-rest/firestore-rest.service';
+import { serverTimestamp } from './firebase-rest/firestore-rest.utils';
 
 @ApiTags('Health')
 @Controller('health')
@@ -8,8 +9,10 @@ export class HealthController implements OnModuleInit {
   private readonly logger = new Logger(HealthController.name);
   private readonly KEEP_ALIVE_INTERVAL = 30 * 60 * 1000; // 30 minutos
 
+  constructor(private readonly firestore: FirestoreRestService) {}
+
   onModuleInit() {
-    // Keep-alive: faz uma escrita no Firestore a cada 30 min para manter o token OAuth ativo
+    // Keep-alive: faz uma escrita no Firestore a cada 30 min
     this.warmUpFirestore();
     setInterval(() => this.warmUpFirestore(), this.KEEP_ALIVE_INTERVAL);
   }
@@ -17,10 +20,9 @@ export class HealthController implements OnModuleInit {
   private async warmUpFirestore() {
     try {
       const start = Date.now();
-      await admin.firestore().collection('_health').doc('ping').set(
-        { timestamp: admin.firestore.FieldValue.serverTimestamp() },
-        { merge: true },
-      );
+      await this.firestore.setDocument('_health', 'ping', {
+        timestamp: serverTimestamp(),
+      }, true);
       this.logger.log(`🔥 Firestore keep-alive OK (${Date.now() - start}ms)`);
     } catch (error: any) {
       this.logger.warn(`⚠️ Firestore keep-alive falhou: ${error.message}`);
@@ -38,4 +40,3 @@ export class HealthController implements OnModuleInit {
     };
   }
 }
-

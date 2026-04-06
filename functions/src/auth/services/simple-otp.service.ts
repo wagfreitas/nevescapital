@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import * as admin from 'firebase-admin';
+import { FirestoreRestService } from '../../firebase-rest/firestore-rest.service';
+import { serverTimestamp, fieldIncrement } from '../../firebase-rest/firestore-rest.utils';
 
 interface OtpData {
   code: string;
@@ -11,13 +12,14 @@ interface OtpData {
 
 @Injectable()
 export class SimpleOtpService {
-  private readonly db = admin.firestore();
   private readonly otpCollection = 'otp_codes';
   private readonly otpExpirationMinutes = 10;
   private readonly maxAttempts = 5;
 
+  constructor(private readonly firestore: FirestoreRestService) {}
+
   /**
-   * Gera um código OTP de 4 dígitos
+   * Gera um codigo OTP de 4 digitos
    */
   private generateOtpCode(): string {
     return Math.floor(1000 + Math.random() * 9000).toString();
@@ -25,21 +27,21 @@ export class SimpleOtpService {
 
   /**
    * Envia OTP para um telefone
-   * Para testes: retorna o código no response (não envia SMS real)
+   * Para testes: retorna o codigo no response (nao envia SMS real)
    */
   async sendOtp(phone: string): Promise<{ success: boolean; code?: string; message: string }> {
     try {
       // Normalizar telefone
       const normalizedPhone = phone.replace(/\D/g, '');
-      
+
       if (normalizedPhone.length < 10) {
         return {
           success: false,
-          message: 'Número de telefone inválido',
+          message: 'Numero de telefone invalido',
         };
       }
 
-      // Gerar código
+      // Gerar codigo
       const code = this.generateOtpCode();
       const expiresAt = new Date();
       expiresAt.setMinutes(expiresAt.getMinutes() + this.otpExpirationMinutes);
@@ -48,37 +50,34 @@ export class SimpleOtpService {
       const otpDoc = {
         phone: normalizedPhone,
         code,
-        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+        expiresAt,
         attempts: 0,
         verified: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: serverTimestamp(),
       };
 
       // Deletar OTPs antigos do mesmo telefone
       const tQuery = Date.now();
-      const oldOtps = await this.db
-        .collection(this.otpCollection)
-        .where('phone', '==', normalizedPhone)
-        .get();
-      console.log(`⏱️ [OTP-TIMING]   query OTPs antigos: ${Date.now() - tQuery}ms (found: ${oldOtps.size})`);
-
-      const batch = this.db.batch();
-      oldOtps.docs.forEach((doc) => {
-        batch.delete(doc.ref);
+      const oldOtps = await this.firestore.query(this.otpCollection, {
+        where: [{ field: 'phone', op: 'EQUAL', value: normalizedPhone }],
       });
+      console.log(`[OTP-TIMING]   query OTPs antigos: ${Date.now() - tQuery}ms (found: ${oldOtps.length})`);
 
-      // Commit dos deletes antes de criar o novo documento (evita condição de corrida no Firestore)
+      // Commit dos deletes antes de criar o novo documento (evita condicao de corrida no Firestore)
       const tWrite = Date.now();
-      await batch.commit();
-      await this.db.collection(this.otpCollection).add(otpDoc);
-      console.log(`⏱️ [OTP-TIMING]   batch+add: ${Date.now() - tWrite}ms`);
+      if (oldOtps.length > 0) {
+        const paths = oldOtps.map((doc) => `${this.otpCollection}/${doc.id}`);
+        await this.firestore.batchDelete(paths);
+      }
+      await this.firestore.addDocument(this.otpCollection, otpDoc);
+      console.log(`[OTP-TIMING]   delete+add: ${Date.now() - tWrite}ms`);
 
-      // ⚠️ MODO TESTE: Retornar código no response
-      // Em produção, você pode integrar com um serviço de SMS real aqui
+      // MODO TESTE: Retornar codigo no response
+      // Em producao, voce pode integrar com um servico de SMS real aqui
       return {
         success: true,
-        code, // ⚠️ APENAS PARA TESTES - remover em produção
-        message: `Código OTP gerado. Para testes, use: ${code}`,
+        code, // APENAS PARA TESTES - remover em producao
+        message: `Codigo OTP gerado. Para testes, use: ${code}`,
       };
     } catch (error: any) {
       const code = error?.code;
@@ -97,17 +96,17 @@ export class SimpleOtpService {
         String(msg).includes('invalid_grant') ||
         String(msg).includes('invalid_rapt');
 
-      let userMessage = 'Erro ao gerar código OTP';
+      let userMessage = 'Erro ao gerar codigo OTP';
       if (oauthUserCredentialExpired) {
         userMessage =
-          'Credenciais OAuth expiradas ou revogadas. No Railway remova GOOGLE_CREDENTIALS_JSON e configure FIREBASE_SERVICE_ACCOUNT com o JSON da service account (Firebase Console → Project settings → Service accounts → Generate new private key).';
+          'Credenciais expiradas ou revogadas. Verifique FIREBASE_SERVICE_ACCOUNT ou GOOGLE_APPLICATION_CREDENTIALS no ambiente.';
       } else if (permissionDenied) {
         userMessage =
-          'Firestore recusou gravação. Confira FIREBASE_SERVICE_ACCOUNT e GOOGLE_CLOUD_PROJECT no Railway.';
+          'Firestore recusou gravacao. Confira FIREBASE_SERVICE_ACCOUNT e GOOGLE_CLOUD_PROJECT no Railway.';
       } else if (unavailable) {
-        userMessage = 'Firestore temporariamente indisponível. Tente novamente em instantes.';
+        userMessage = 'Firestore temporariamente indisponivel. Tente novamente em instantes.';
       } else if (process.env.NODE_ENV === 'development') {
-        userMessage = `Erro ao gerar código OTP: ${msg}`;
+        userMessage = `Erro ao gerar codigo OTP: ${msg}`;
       }
 
       return {
@@ -118,80 +117,82 @@ export class SimpleOtpService {
   }
 
   /**
-   * Verifica se o código OTP está correto
+   * Verifica se o codigo OTP esta correto
    */
   async verifyOtp(phone: string, code: string): Promise<{ success: boolean; message: string }> {
     try {
       const normalizedPhone = phone.replace(/\D/g, '');
 
       // Buscar OTP mais recente para este telefone
-      const otpQuery = await this.db
-        .collection(this.otpCollection)
-        .where('phone', '==', normalizedPhone)
-        .where('verified', '==', false)
-        .orderBy('createdAt', 'desc')
-        .limit(1)
-        .get();
+      const otpResults = await this.firestore.query(this.otpCollection, {
+        where: [
+          { field: 'phone', op: 'EQUAL', value: normalizedPhone },
+          { field: 'verified', op: 'EQUAL', value: false },
+        ],
+        orderBy: 'createdAt',
+        orderDirection: 'DESCENDING',
+        limit: 1,
+      });
 
-      if (otpQuery.empty) {
+      if (otpResults.length === 0) {
         return {
           success: false,
-          message: 'Código OTP não encontrado ou já utilizado',
+          message: 'Codigo OTP nao encontrado ou ja utilizado',
         };
       }
 
-      const otpDoc = otpQuery.docs[0];
-      const otpData = otpDoc.data();
+      const otpDoc = otpResults[0];
+      const otpData = otpDoc.data as OtpData;
 
-      // Verificar expiração
-      const expiresAt = otpData.expiresAt instanceof admin.firestore.Timestamp 
-        ? otpData.expiresAt.toDate() 
+      // Verificar expiracao - expiresAt vem como Date do decodeValue
+      const expiresAt = otpData.expiresAt instanceof Date
+        ? otpData.expiresAt
         : new Date(otpData.expiresAt);
       if (new Date() > expiresAt) {
-        await otpDoc.ref.delete();
+        await this.firestore.deleteDocument(this.otpCollection, otpDoc.id);
         return {
           success: false,
-          message: 'Código OTP expirado. Solicite um novo código.',
+          message: 'Codigo OTP expirado. Solicite um novo codigo.',
         };
       }
 
       // Verificar tentativas
       if (otpData.attempts >= this.maxAttempts) {
-        await otpDoc.ref.delete();
+        await this.firestore.deleteDocument(this.otpCollection, otpDoc.id);
         return {
           success: false,
-          message: 'Número máximo de tentativas excedido. Solicite um novo código.',
+          message: 'Numero maximo de tentativas excedido. Solicite um novo codigo.',
         };
       }
 
-      // Verificar código
+      // Verificar codigo
       if (otpData.code !== code) {
         // Incrementar tentativas
-        await otpDoc.ref.update({
-          attempts: admin.firestore.FieldValue.increment(1),
+        await this.firestore.updateDocument(this.otpCollection, otpDoc.id, {
+          attempts: fieldIncrement(1),
         });
 
         const remainingAttempts = this.maxAttempts - otpData.attempts - 1;
         return {
           success: false,
-          message: `Código incorreto. Tentativas restantes: ${remainingAttempts}`,
+          message: `Codigo incorreto. Tentativas restantes: ${remainingAttempts}`,
         };
       }
 
-      // Código correto - marcar como verificado
-      await otpDoc.ref.update({
+      // Codigo correto - marcar como verificado
+      await this.firestore.updateDocument(this.otpCollection, otpDoc.id, {
         verified: true,
       });
 
       return {
         success: true,
-        message: 'Código OTP verificado com sucesso',
+        message: 'Codigo OTP verificado com sucesso',
       };
     } catch (error) {
       console.error('Erro ao verificar OTP:', error);
       return {
         success: false,
-        message: 'Erro ao verificar código OTP',
+        message: 'Erro ao verificar codigo OTP',
       };
     }
   }
@@ -201,22 +202,19 @@ export class SimpleOtpService {
    */
   async cleanupExpiredOtps(): Promise<void> {
     try {
-      const now = admin.firestore.Timestamp.now();
-      const expiredOtps = await this.db
-        .collection(this.otpCollection)
-        .where('expiresAt', '<', now)
-        .get();
-
-      const batch = this.db.batch();
-      expiredOtps.docs.forEach((doc) => {
-        batch.delete(doc.ref);
+      const now = new Date();
+      const expiredOtps = await this.firestore.query(this.otpCollection, {
+        where: [{ field: 'expiresAt', op: 'LESS_THAN', value: now }],
       });
-      await batch.commit();
 
-      console.log(`Limpeza: ${expiredOtps.size} OTPs expirados removidos`);
+      if (expiredOtps.length > 0) {
+        const paths = expiredOtps.map((doc) => `${this.otpCollection}/${doc.id}`);
+        await this.firestore.batchDelete(paths);
+      }
+
+      console.log(`Limpeza: ${expiredOtps.length} OTPs expirados removidos`);
     } catch (error) {
       console.error('Erro ao limpar OTPs expirados:', error);
     }
   }
 }
-

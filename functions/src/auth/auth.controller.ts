@@ -1,8 +1,8 @@
-import { Controller, Post, Body, UseGuards, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiSecurity, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ApiKeyGuard } from '../common/guards/api-key.guard';
-import * as admin from 'firebase-admin';
+import { AuthJwtService } from '../firebase-rest/auth-jwt.service';
 import { EmailSenderService } from './email-sender.service';
 import { SimpleOtpService } from './services/simple-otp.service';
 import { WhatsAppService } from './services/whatsapp.service';
@@ -20,24 +20,25 @@ export class AuthController {
     private readonly simpleOtpService: SimpleOtpService,
     private readonly whatsAppService: WhatsAppService,
     private readonly usersService: UsersService,
+    private readonly authJwt: AuthJwtService,
   ) { }
 
   @Post('reset-password')
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests por minuto
   @ApiOperation({
-    summary: 'Enviar email de redefinição de senha (customizado)',
-    description: 'Envia email customizado com template personalizado usando Firebase Admin SDK para gerar o link'
+    summary: 'Enviar email de redefinicao de senha (customizado)',
+    description: 'Envia email customizado com template personalizado'
   })
   @ApiResponse({ status: 200, description: 'Email enviado com sucesso' })
-  @ApiResponse({ status: 400, description: 'Email inválido' })
-  @ApiResponse({ status: 404, description: 'Usuário não encontrado no Firebase' })
+  @ApiResponse({ status: 400, description: 'Email invalido' })
+  @ApiResponse({ status: 404, description: 'Usuario nao encontrado' })
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     try {
       await this.emailSenderService.sendPasswordResetEmail(resetPasswordDto.email);
 
       return {
         success: true,
-        message: 'Email de redefinição de senha enviado com sucesso',
+        message: 'Email de redefinicao de senha enviado com sucesso',
       };
     } catch (error) {
       throw error;
@@ -47,11 +48,11 @@ export class AuthController {
   @Post('send-otp')
   @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 requests por minuto
   @ApiOperation({
-    summary: 'Enviar código OTP para telefone (alternativa ao Firebase Phone Auth)',
-    description: 'Gera e retorna código OTP de 6 dígitos. Para testes, o código é retornado no response.'
+    summary: 'Enviar codigo OTP para telefone (alternativa ao Firebase Phone Auth)',
+    description: 'Gera e retorna codigo OTP de 6 digitos. Para testes, o codigo e retornado no response.'
   })
   @ApiResponse({ status: 200, description: 'OTP gerado com sucesso' })
-  @ApiResponse({ status: 400, description: 'Telefone inválido' })
+  @ApiResponse({ status: 400, description: 'Telefone invalido' })
   async sendOtp(@Body() body: SendPhoneOtpDto) {
     const result = await this.simpleOtpService.sendOtp(body.phone);
 
@@ -62,18 +63,18 @@ export class AuthController {
     return {
       success: true,
       message: result.message,
-      code: result.code, // ⚠️ APENAS PARA TESTES - remover em produção
+      code: result.code, // WARNING: APENAS PARA TESTES - remover em producao
     };
   }
 
   @Post('verify-otp')
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests por minuto
   @ApiOperation({
-    summary: 'Verificar código OTP',
-    description: 'Valida o código OTP enviado pelo usuário'
+    summary: 'Verificar codigo OTP',
+    description: 'Valida o codigo OTP enviado pelo usuario'
   })
   @ApiResponse({ status: 200, description: 'OTP verificado com sucesso' })
-  @ApiResponse({ status: 400, description: 'Código inválido ou expirado' })
+  @ApiResponse({ status: 400, description: 'Codigo invalido ou expirado' })
   async verifyOtp(@Body() body: VerifyPhoneOtpDto) {
     const result = await this.simpleOtpService.verifyOtp(body.phone, body.code);
 
@@ -90,11 +91,11 @@ export class AuthController {
   @Post('send-otp-whatsapp')
   @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 requests por minuto
   @ApiOperation({
-    summary: 'Enviar código OTP via WhatsApp',
-    description: 'Gera código OTP de 4 dígitos e envia via WhatsApp para o telefone informado'
+    summary: 'Enviar codigo OTP via WhatsApp',
+    description: 'Gera codigo OTP de 4 digitos e envia via WhatsApp para o telefone informado'
   })
   @ApiResponse({ status: 200, description: 'OTP enviado via WhatsApp com sucesso' })
-  @ApiResponse({ status: 400, description: 'Telefone inválido ou falha no envio' })
+  @ApiResponse({ status: 400, description: 'Telefone invalido ou falha no envio' })
   async sendOtpWhatsApp(@Body() body: SendPhoneOtpDto) {
     const t0 = Date.now();
 
@@ -102,32 +103,32 @@ export class AuthController {
     const t1 = Date.now();
     const result = await this.simpleOtpService.sendOtp(body.phone);
     const t2 = Date.now();
-    console.log(`⏱️ [OTP-TIMING] Firestore (gerar+salvar OTP): ${t2 - t1}ms`);
+    console.log(`[OTP-TIMING] Firestore (gerar+salvar OTP): ${t2 - t1}ms`);
 
     if (!result.success) {
       throw new BadRequestException(result.message);
     }
 
-    // 2. Enviar OTP via WhatsApp (fire-and-forget — não bloqueia a resposta)
+    // 2. Enviar OTP via WhatsApp (fire-and-forget -- nao bloqueia a resposta)
     if (result.code) {
       const t3 = Date.now();
       this.whatsAppService.sendOtpMessage(body.phone, result.code)
         .then((sent) => {
-          console.log(`⏱️ [OTP-TIMING] Twilio WhatsApp: ${Date.now() - t3}ms`);
+          console.log(`[OTP-TIMING] Twilio WhatsApp: ${Date.now() - t3}ms`);
           if (!sent) {
-            console.warn(`⚠️ [AuthController] Falha ao enviar OTP via WhatsApp para ${body.phone.substring(0, 4)}***`);
+            console.warn(`[AuthController] Falha ao enviar OTP via WhatsApp para ${body.phone.substring(0, 4)}***`);
           }
         })
         .catch((err) => {
-          console.error(`❌ [AuthController] Erro ao enviar OTP via WhatsApp: ${err.message}`);
+          console.error(`[AuthController] Erro ao enviar OTP via WhatsApp: ${err.message}`);
         });
     }
 
-    console.log(`⏱️ [OTP-TIMING] TOTAL (até response): ${Date.now() - t0}ms`);
+    console.log(`[OTP-TIMING] TOTAL (ate response): ${Date.now() - t0}ms`);
 
     return {
       success: true,
-      message: 'Código de verificação enviado via WhatsApp',
+      message: 'Codigo de verificacao enviado via WhatsApp',
     };
   }
 
@@ -135,10 +136,10 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests por minuto
   @ApiOperation({
     summary: 'Verificar OTP e fazer login',
-    description: 'Valida o código OTP, busca usuário pelo telefone e retorna status + custom token para login'
+    description: 'Valida o codigo OTP, busca usuario pelo telefone no Firestore e retorna status + JWT token para login'
   })
-  @ApiResponse({ status: 200, description: 'OTP verificado e status do usuário retornado' })
-  @ApiResponse({ status: 400, description: 'Código inválido, expirado ou telefone inválido' })
+  @ApiResponse({ status: 200, description: 'OTP verificado e status do usuario retornado' })
+  @ApiResponse({ status: 400, description: 'Codigo invalido, expirado ou telefone invalido' })
   async verifyOtpLogin(@Body() body: VerifyPhoneOtpDto) {
     // 1. Verificar OTP
     const otpResult = await this.simpleOtpService.verifyOtp(body.phone, body.code);
@@ -149,17 +150,17 @@ export class AuthController {
 
     // 2. Normalizar telefone
     const normalizedPhone = body.phone.replace(/\D/g, '');
-    console.log(`✅ [AuthController] OTP verificado para ${normalizedPhone.substring(0, 4)}***`);
+    console.log(`[AuthController] OTP verificado para ${normalizedPhone.substring(0, 4)}***`);
 
-    // 3. Buscar usuário no Firestore pelo telefone
+    // 3. Buscar usuario no Firestore pelo telefone (via phoneHash)
     const user = await this.usersService.findByPhone(normalizedPhone);
 
     if (user) {
-      // Verificar se o cadastro está completo
+      // Verificar se o cadastro esta completo
       const isComplete = this.isRegistrationComplete(user);
 
       if (!isComplete) {
-        console.log(`⚠️ [AuthController] Usuário encontrado mas cadastro incompleto. ID: ${user.id}`);
+        console.log(`[AuthController] Usuario encontrado mas cadastro incompleto. ID: ${user.id}`);
         return {
           success: true,
           status: 'REGISTER',
@@ -168,44 +169,29 @@ export class AuthController {
         };
       }
 
-      // Usuário com cadastro completo — gerar Custom Token
-      console.log(`✅ [AuthController] Usuário completo encontrado. ID: ${user.id}`);
+      // Usuario com cadastro completo -- gerar JWT token
+      console.log(`[AuthController] Usuario completo encontrado. ID: ${user.id}`);
 
       try {
-        // Obter ou criar Firebase Auth user para este telefone
-        let firebaseUid: string;
-        try {
-          const firebaseUser = await admin.auth().getUserByPhoneNumber('+' + normalizedPhone);
-          firebaseUid = firebaseUser.uid;
-        } catch (e: any) {
-          if (e.code === 'auth/user-not-found') {
-            // Criar Firebase Auth user
-            const newUser = await admin.auth().createUser({
-              phoneNumber: '+' + normalizedPhone,
-            });
-            firebaseUid = newUser.uid;
-            console.log(`📝 [AuthController] Firebase Auth user criado: ${firebaseUid}`);
-          } else {
-            throw e;
-          }
-        }
-
-        // Gerar Custom Token
-        const customToken = await admin.auth().createCustomToken(firebaseUid);
-        console.log(`🔑 [AuthController] Custom token gerado para UID: ${firebaseUid}`);
+        // Gerar JWT token (substitui admin.auth().createCustomToken)
+        const token = this.authJwt.signToken({
+          sub: user.id,
+          phone: normalizedPhone,
+        });
+        console.log(`[AuthController] JWT token gerado para userId: ${user.id}`);
 
         // Registrar login
         try {
           await this.usersService.updateLastLogin(user.id);
         } catch (error) {
-          console.warn(`⚠️ [AuthController] Erro ao registrar login (não crítico): ${error.message}`);
+          console.warn(`[AuthController] Erro ao registrar login (nao critico): ${error.message}`);
         }
 
         return {
           success: true,
           status: 'LOGGED_IN',
           message: 'Login realizado com sucesso.',
-          customToken,
+          token,
           userId: user.id,
           phone: normalizedPhone,
           user: {
@@ -216,16 +202,16 @@ export class AuthController {
           },
         };
       } catch (error: any) {
-        console.error(`❌ [AuthController] Erro ao gerar custom token: ${error.message}`);
+        console.error(`[AuthController] Erro ao gerar JWT token: ${error.message}`);
         throw new BadRequestException('Erro ao processar login. Tente novamente.');
       }
     } else {
-      // Usuário não encontrado — cadastro necessário
-      console.log(`📝 [AuthController] Usuário não encontrado para ${normalizedPhone.substring(0, 4)}***`);
+      // Usuario nao encontrado -- cadastro necessario
+      console.log(`[AuthController] Usuario nao encontrado para ${normalizedPhone.substring(0, 4)}***`);
       return {
         success: true,
         status: 'REGISTER',
-        message: 'Usuário não encontrado. Redirecionando para cadastro.',
+        message: 'Usuario nao encontrado. Redirecionando para cadastro.',
         phone: normalizedPhone,
       };
     }
@@ -234,41 +220,47 @@ export class AuthController {
   @Post('check-user-status')
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests por minuto
   @ApiOperation({
-    summary: 'Verificar status do usuário após autenticação Firebase',
-    description: 'Verifica se o usuário existe no sistema e retorna o status (LOGGED_IN, REQUIRE_CPF_CHECK ou REGISTER)'
+    summary: 'Verificar status do usuario apos autenticacao',
+    description: 'Verifica o JWT token, busca o usuario no Firestore e retorna o status (LOGGED_IN ou REGISTER)'
   })
-  @ApiResponse({ status: 200, description: 'Status do usuário retornado com sucesso' })
-  @ApiResponse({ status: 400, description: 'Token inválido' })
-  @ApiResponse({ status: 401, description: 'Token não autorizado' })
+  @ApiResponse({ status: 200, description: 'Status do usuario retornado com sucesso' })
+  @ApiResponse({ status: 400, description: 'Token invalido' })
+  @ApiResponse({ status: 401, description: 'Token nao autorizado' })
   async checkUserStatus(@Body() body: CheckUserStatusDto) {
     try {
-      console.log('🔐 [AuthController] Verificando status do usuário...');
+      console.log('[AuthController] Verificando status do usuario...');
 
-      // 1. Verificar e decodificar o token do Firebase
-      const decodedToken = await admin.auth().verifyIdToken(body.token);
-      const firebaseUid = decodedToken.uid;
-      const phoneNumber = decodedToken.phone_number;
-
-      console.log(`📱 [AuthController] Token verificado. UID: ${firebaseUid}, Phone: ${phoneNumber?.substring(0, 4)}****`);
-
-      if (!phoneNumber) {
-        throw new BadRequestException('Token não contém número de telefone');
+      // 1. Verificar e decodificar o JWT token (substitui admin.auth().verifyIdToken)
+      let decoded: { sub: string; phone?: string; email?: string };
+      try {
+        decoded = this.authJwt.verifyToken(body.token);
+      } catch (error: any) {
+        throw new UnauthorizedException('Token invalido ou expirado');
       }
 
-      // 2. Normalizar telefone (remover formatação)
+      const userId = decoded.sub;
+      const phoneNumber = decoded.phone;
+
+      console.log(`[AuthController] Token verificado. userId: ${userId}, Phone: ${phoneNumber?.substring(0, 4)}****`);
+
+      if (!phoneNumber) {
+        throw new BadRequestException('Token nao contem numero de telefone');
+      }
+
+      // 2. Normalizar telefone (remover formatacao)
       const normalizedPhone = phoneNumber.replace(/\D/g, '');
 
-      // 3. Buscar usuário no Firestore pelo telefone
-      console.log(`🔍 [AuthController] Buscando usuário no Firestore...`);
+      // 3. Buscar usuario no Firestore pelo telefone
+      console.log(`[AuthController] Buscando usuario no Firestore...`);
       const user = await this.usersService.findByPhone(normalizedPhone);
 
       if (user) {
-        // Verificar se o cadastro está completo (todos os campos obrigatórios preenchidos)
+        // Verificar se o cadastro esta completo (todos os campos obrigatorios preenchidos)
         const isRegistrationComplete = this.isRegistrationComplete(user);
-        
+
         if (!isRegistrationComplete) {
-          // Usuário existe mas cadastro incompleto - redirecionar para cadastro
-          console.log(`⚠️ [AuthController] Usuário encontrado mas cadastro incompleto. ID: ${user.id}`);
+          // Usuario existe mas cadastro incompleto - redirecionar para cadastro
+          console.log(`[AuthController] Usuario encontrado mas cadastro incompleto. ID: ${user.id}`);
           return {
             success: true,
             status: 'REGISTER',
@@ -277,22 +269,22 @@ export class AuthController {
           };
         }
 
-        // Usuário existe na collection users = cadastro completo
-        console.log(`✅ [AuthController] Usuário encontrado com cadastro completo. ID: ${user.id}`);
+        // Usuario existe na collection users = cadastro completo
+        console.log(`[AuthController] Usuario encontrado com cadastro completo. ID: ${user.id}`);
 
-        // Registrar login (atualizar último login)
+        // Registrar login (atualizar ultimo login)
         try {
           await this.usersService.updateLastLogin(user.id);
-          console.log(`📝 [AuthController] Login registrado para usuário ${user.id}`);
+          console.log(`[AuthController] Login registrado para usuario ${user.id}`);
         } catch (error) {
-          console.warn(`⚠️ [AuthController] Erro ao registrar login (não crítico): ${error.message}`);
+          console.warn(`[AuthController] Erro ao registrar login (nao critico): ${error.message}`);
         }
 
         // Retornar status LOGGED_IN para redirecionar ao Dashboard
         return {
           success: true,
           status: 'LOGGED_IN',
-          message: 'Usuário autenticado com sucesso. Redirecionando para o dashboard.',
+          message: 'Usuario autenticado com sucesso. Redirecionando para o dashboard.',
           phone: normalizedPhone,
           userId: user.id,
           user: {
@@ -303,29 +295,24 @@ export class AuthController {
           },
         };
       } else {
-        // Usuário não existe - precisa se cadastrar
-        console.log(`📝 [AuthController] Usuário não encontrado. Redirecionando para cadastro.`);
+        // Usuario nao existe - precisa se cadastrar
+        console.log(`[AuthController] Usuario nao encontrado. Redirecionando para cadastro.`);
         return {
           success: true,
           status: 'REGISTER',
-          message: 'Usuário não encontrado. Redirecionando para cadastro.',
+          message: 'Usuario nao encontrado. Redirecionando para cadastro.',
           phone: normalizedPhone,
         };
       }
     } catch (error: any) {
-      console.error(`❌ [AuthController] Erro ao verificar status:`, {
+      console.error(`[AuthController] Erro ao verificar status:`, {
         message: error.message,
         code: error.code,
         stack: error.stack,
       });
 
-      if (error instanceof BadRequestException) {
+      if (error instanceof BadRequestException || error instanceof UnauthorizedException) {
         throw error;
-      }
-
-      // Se o erro for de verificação de token
-      if (error.code === 'auth/argument-error' || error.code === 'auth/id-token-expired') {
-        throw new UnauthorizedException('Token inválido ou expirado');
       }
 
       throw new BadRequestException(`Erro ao verificar status: ${error.message}`);
@@ -333,15 +320,15 @@ export class AuthController {
   }
 
   /**
-   * Verifica se o cadastro do usuário está completo
-   * Campos obrigatórios conforme estrutura do Firestore:
+   * Verifica se o cadastro do usuario esta completo
+   * Campos obrigatorios conforme estrutura do Firestore:
    * - cpfEncrypted ou cpfHash (CPF criptografado ou hash)
    * - emailEncrypted ou emailHash (Email criptografado ou hash)
    * - displayName ou full_name (Nome completo)
    * - phone ou phoneHash (Telefone ou hash)
    * - birthDate (Data de nascimento)
-   * - motherName (Nome da mãe)
-   * - occupation (Ocupação)
+   * - motherName (Nome da mae)
+   * - occupation (Ocupacao)
    * - incomeRange (Faixa de renda)
    * - kycDocuments.documentType (Tipo de documento dentro de kycDocuments)
    */
@@ -349,63 +336,63 @@ export class AuthController {
     // Verificar CPF (pode estar como cpfEncrypted, cpfHash ou cpf)
     const hasCpf = !!(user.cpfEncrypted || user.cpfHash || user.cpf);
     if (!hasCpf) {
-      console.log(`⚠️ [AuthController] Campo obrigatório ausente: CPF (cpfEncrypted/cpfHash/cpf)`);
+      console.log(`[AuthController] Campo obrigatorio ausente: CPF (cpfEncrypted/cpfHash/cpf)`);
       return false;
     }
 
     // Verificar Email (pode estar como emailEncrypted, emailHash ou email)
     const hasEmail = !!(user.emailEncrypted || user.emailHash || user.email);
     if (!hasEmail) {
-      console.log(`⚠️ [AuthController] Campo obrigatório ausente: Email (emailEncrypted/emailHash/email)`);
+      console.log(`[AuthController] Campo obrigatorio ausente: Email (emailEncrypted/emailHash/email)`);
       return false;
     }
 
     // Verificar Nome Completo (pode estar como displayName ou full_name)
     const hasFullName = !!(user.displayName || user.full_name);
     if (!hasFullName) {
-      console.log(`⚠️ [AuthController] Campo obrigatório ausente: Nome Completo (displayName/full_name)`);
+      console.log(`[AuthController] Campo obrigatorio ausente: Nome Completo (displayName/full_name)`);
       return false;
     }
 
     // Verificar Telefone (pode estar como phone ou phoneHash)
     const hasPhone = !!(user.phone || user.phoneHash);
     if (!hasPhone) {
-      console.log(`⚠️ [AuthController] Campo obrigatório ausente: Telefone (phone/phoneHash)`);
+      console.log(`[AuthController] Campo obrigatorio ausente: Telefone (phone/phoneHash)`);
       return false;
     }
 
     // Verificar Data de Nascimento
     if (!user.birthDate) {
-      console.log(`⚠️ [AuthController] Campo obrigatório ausente: birthDate`);
+      console.log(`[AuthController] Campo obrigatorio ausente: birthDate`);
       return false;
     }
 
-    // Verificar Nome da Mãe
+    // Verificar Nome da Mae
     if (!user.motherName || user.motherName === '') {
-      console.log(`⚠️ [AuthController] Campo obrigatório ausente: motherName`);
+      console.log(`[AuthController] Campo obrigatorio ausente: motherName`);
       return false;
     }
 
-    // Verificar Ocupação
+    // Verificar Ocupacao
     if (!user.occupation || user.occupation === '') {
-      console.log(`⚠️ [AuthController] Campo obrigatório ausente: occupation`);
+      console.log(`[AuthController] Campo obrigatorio ausente: occupation`);
       return false;
     }
 
     // Verificar Faixa de Renda
     if (!user.incomeRange || user.incomeRange === '') {
-      console.log(`⚠️ [AuthController] Campo obrigatório ausente: incomeRange`);
+      console.log(`[AuthController] Campo obrigatorio ausente: incomeRange`);
       return false;
     }
 
     // Verificar Tipo de Documento (pode estar dentro de kycDocuments ou como campo direto)
     const hasDocumentType = !!(user.kycDocuments?.documentType || user.documentType);
     if (!hasDocumentType) {
-      console.log(`⚠️ [AuthController] Campo obrigatório ausente: documentType (kycDocuments.documentType/documentType)`);
+      console.log(`[AuthController] Campo obrigatorio ausente: documentType (kycDocuments.documentType/documentType)`);
       return false;
     }
 
-    console.log(`✅ [AuthController] Todos os campos obrigatórios estão presentes`);
+    console.log(`[AuthController] Todos os campos obrigatorios estao presentes`);
     return true;
   }
 

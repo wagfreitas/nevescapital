@@ -42,8 +42,9 @@ const common_1 = __webpack_require__(2);
 const config_1 = __webpack_require__(6);
 const throttler_1 = __webpack_require__(7);
 const users_module_1 = __webpack_require__(8);
-const auth_module_1 = __webpack_require__(20);
-const health_controller_1 = __webpack_require__(35);
+const auth_module_1 = __webpack_require__(25);
+const health_controller_1 = __webpack_require__(40);
+const firebase_rest_module_1 = __webpack_require__(41);
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -58,6 +59,7 @@ exports.AppModule = AppModule = __decorate([
                     ttl: 60000,
                     limit: 100,
                 }]),
+            firebase_rest_module_1.FirebaseRestModule,
             users_module_1.UsersModule,
             auth_module_1.AuthModule,
         ],
@@ -94,7 +96,7 @@ exports.UsersModule = void 0;
 const common_1 = __webpack_require__(2);
 const config_1 = __webpack_require__(6);
 const users_service_1 = __webpack_require__(9);
-const users_controller_1 = __webpack_require__(12);
+const users_controller_1 = __webpack_require__(17);
 let UsersModule = class UsersModule {
 };
 exports.UsersModule = UsersModule;
@@ -119,25 +121,38 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var _a, _b, _c, _d;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.UsersService = void 0;
 const common_1 = __webpack_require__(2);
-const admin = __webpack_require__(10);
-const crypto = __webpack_require__(11);
+const crypto = __webpack_require__(10);
+const firestore_rest_service_1 = __webpack_require__(11);
+const auth_jwt_service_1 = __webpack_require__(14);
+const storage_rest_service_1 = __webpack_require__(16);
+const firestore_rest_utils_1 = __webpack_require__(13);
+const config_1 = __webpack_require__(6);
 let UsersService = class UsersService {
-    constructor() {
-        this.db = admin.firestore();
+    constructor(firestore, authJwt, storage, configService) {
+        this.firestore = firestore;
+        this.authJwt = authJwt;
+        this.storage = storage;
+        this.configService = configService;
     }
     async findByCpf(cpf) {
         try {
             const normalizedCpf = cpf.replace(/\D/g, '');
-            const usersRef = this.db.collection('users');
-            const snapshot = await usersRef.where('cpf', '==', normalizedCpf).limit(1).get();
-            if (snapshot.empty) {
-                throw new common_1.NotFoundException('Usuário não encontrado');
+            const results = await this.firestore.query('users', {
+                where: [{ field: 'cpf', op: '==', value: normalizedCpf }],
+                limit: 1,
+            });
+            if (results.length === 0) {
+                throw new common_1.NotFoundException('Usuario nao encontrado');
             }
-            const userDoc = snapshot.docs[0];
-            const userData = userDoc.data();
+            const userDoc = results[0];
+            const userData = userDoc.data;
             return {
                 id: userDoc.id,
                 cpf: userData.cpf,
@@ -151,18 +166,20 @@ let UsersService = class UsersService {
             if (error instanceof common_1.NotFoundException) {
                 throw error;
             }
-            throw new common_1.BadRequestException(`Erro ao buscar usuário: ${error.message}`);
+            throw new common_1.BadRequestException(`Erro ao buscar usuario: ${error.message}`);
         }
     }
     async findByEmail(email) {
         try {
-            const usersRef = this.db.collection('users');
-            const snapshot = await usersRef.where('email', '==', email.toLowerCase()).limit(1).get();
-            if (snapshot.empty) {
-                throw new common_1.NotFoundException('Usuário não encontrado');
+            const results = await this.firestore.query('users', {
+                where: [{ field: 'email', op: '==', value: email.toLowerCase() }],
+                limit: 1,
+            });
+            if (results.length === 0) {
+                throw new common_1.NotFoundException('Usuario nao encontrado');
             }
-            const userDoc = snapshot.docs[0];
-            const userData = userDoc.data();
+            const userDoc = results[0];
+            const userData = userDoc.data;
             return {
                 id: userDoc.id,
                 ...userData,
@@ -172,40 +189,30 @@ let UsersService = class UsersService {
             if (error instanceof common_1.NotFoundException) {
                 throw error;
             }
-            throw new common_1.BadRequestException(`Erro ao buscar usuário: ${error.message}`);
+            throw new common_1.BadRequestException(`Erro ao buscar usuario: ${error.message}`);
         }
     }
     async findByPhone(phone) {
         try {
             const normalizedPhone = phone.replace(/\D/g, '');
-            console.log(`🔍 [UsersService] Buscando usuário por telefone: ${normalizedPhone.substring(0, 4)}****`);
-            console.log(`📋 [UsersService] Firestore instance: ${this.db ? 'OK' : 'NULL'}`);
-            const adminModule = __webpack_require__(10);
-            if (!adminModule.apps.length) {
-                throw new Error('Firebase Admin SDK não está inicializado');
-            }
-            console.log(`📋 [UsersService] Firebase Admin apps: ${adminModule.apps.length}`);
-            console.log(`📋 [UsersService] Project ID: ${adminModule.app().options.projectId}`);
-            const adminFirestoreType = adminModule.firestore.Firestore;
-            const isAdminSdk = this.db.constructor.name === 'Firestore' || this.db instanceof adminFirestoreType;
-            console.log(`📋 [UsersService] Usando Admin SDK: ${isAdminSdk} (tipo: ${this.db.constructor.name})`);
-            if (!isAdminSdk) {
-                console.error('🚨 ERRO CRÍTICO: Não está usando Admin SDK! As regras do Firestore serão aplicadas.');
-                throw new Error('ERRO CRÍTICO: Não está usando Admin SDK! As regras do Firestore serão aplicadas.');
-            }
-            const usersRef = this.db.collection('users');
+            console.log(`[UsersService] Buscando usuario por telefone: ${normalizedPhone.substring(0, 4)}****`);
+            const projectId = this.configService.get('FIREBASE_PROJECT_ID', 'pagpagapp');
+            console.log(`[UsersService] Project ID: ${projectId}`);
             const phoneHash = crypto.createHash('sha256').update(normalizedPhone).digest('hex');
-            console.log(`🔍 [UsersService] Hash do telefone gerado: ${phoneHash.substring(0, 16)}...`);
-            console.log(`🔍 [UsersService] Executando query no Firestore por phoneHash (Admin SDK bypassa regras)...`);
-            const snapshot = await usersRef.where('phoneHash', '==', phoneHash).limit(1).get();
-            console.log(`📊 [UsersService] Query executada. Documentos encontrados: ${snapshot.size}`);
-            if (snapshot.empty) {
-                console.log(`❌ [UsersService] Usuário não encontrado para telefone: ${normalizedPhone.substring(0, 4)}****`);
+            console.log(`[UsersService] Hash do telefone gerado: ${phoneHash.substring(0, 16)}...`);
+            console.log(`[UsersService] Executando query no Firestore por phoneHash...`);
+            const results = await this.firestore.query('users', {
+                where: [{ field: 'phoneHash', op: '==', value: phoneHash }],
+                limit: 1,
+            });
+            console.log(`[UsersService] Query executada. Documentos encontrados: ${results.length}`);
+            if (results.length === 0) {
+                console.log(`[UsersService] Usuario nao encontrado para telefone: ${normalizedPhone.substring(0, 4)}****`);
                 return null;
             }
-            const userDoc = snapshot.docs[0];
-            const userData = userDoc.data();
-            console.log(`✅ [UsersService] Usuário encontrado: ${userDoc.id}`);
+            const userDoc = results[0];
+            const userData = userDoc.data;
+            console.log(`[UsersService] Usuario encontrado: ${userDoc.id}`);
             return {
                 id: userDoc.id,
                 cpf: userData.cpf,
@@ -216,39 +223,35 @@ let UsersService = class UsersService {
             };
         }
         catch (error) {
-            console.error(`❌ [UsersService] Erro ao buscar usuário por telefone:`, {
+            console.error(`[UsersService] Erro ao buscar usuario por telefone:`, {
                 message: error.message,
                 code: error.code,
                 details: error.details,
                 stack: error.stack,
             });
             if (error.code === 7 || error.code === 'PERMISSION_DENIED' || error.message?.includes('Permission denied') || error.message?.includes('PERMISSION_DENIED')) {
-                console.error(`🚨 [UsersService] ERRO DE PERMISSÃO DETECTADO`);
-                console.error(`🚨 [UsersService] Possíveis causas:`);
-                console.error(`   1. Serviço Cloud Run não tem permissão IAM (roles/datastore.user)`);
-                console.error(`   2. ProjectId incorreto`);
-                console.error(`   3. Admin SDK não inicializado corretamente`);
-                throw new common_1.BadRequestException('Erro de permissão ao acessar Firestore. Verifique as permissões IAM do serviço Cloud Run e a configuração do Admin SDK.');
+                console.error(`[UsersService] ERRO DE PERMISSAO DETECTADO`);
+                throw new common_1.BadRequestException('Erro de permissao ao acessar Firestore. Verifique as permissoes IAM do servico Cloud Run e a configuracao do Admin SDK.');
             }
-            throw new common_1.BadRequestException(`Erro ao buscar usuário: ${error.message}`);
+            throw new common_1.BadRequestException(`Erro ao buscar usuario: ${error.message}`);
         }
     }
     async findById(userId) {
         try {
-            const userDoc = await this.db.collection('users').doc(userId).get();
-            if (!userDoc.exists) {
-                throw new common_1.NotFoundException('Usuário não encontrado');
+            const userDoc = await this.firestore.getDocument('users', userId);
+            if (!userDoc) {
+                throw new common_1.NotFoundException('Usuario nao encontrado');
             }
             return {
                 id: userDoc.id,
-                ...userDoc.data(),
+                ...userDoc.data,
             };
         }
         catch (error) {
             if (error instanceof common_1.NotFoundException) {
                 throw error;
             }
-            throw new common_1.BadRequestException(`Erro ao buscar usuário: ${error.message}`);
+            throw new common_1.BadRequestException(`Erro ao buscar usuario: ${error.message}`);
         }
     }
     async checkByCpf(cpf) {
@@ -268,7 +271,7 @@ let UsersService = class UsersService {
             const normalizedCpf = createUserDto.cpf.replace(/\D/g, '');
             try {
                 await this.findByCpf(normalizedCpf);
-                throw new common_1.BadRequestException('CPF já cadastrado');
+                throw new common_1.BadRequestException('CPF ja cadastrado');
             }
             catch (error) {
                 if (!(error instanceof common_1.NotFoundException)) {
@@ -280,10 +283,10 @@ let UsersService = class UsersService {
                 email: createUserDto.email?.toLowerCase(),
                 full_name: createUserDto.full_name || createUserDto.name,
                 phone: createUserDto.phone?.replace(/\D/g, ''),
-                created_at: admin.firestore.FieldValue.serverTimestamp(),
-                updated_at: admin.firestore.FieldValue.serverTimestamp(),
+                created_at: (0, firestore_rest_utils_1.serverTimestamp)(),
+                updated_at: (0, firestore_rest_utils_1.serverTimestamp)(),
             };
-            const userRef = await this.db.collection('users').add(userData);
+            const userRef = await this.firestore.addDocument('users', userData);
             return {
                 id: userRef.id,
                 ...userData,
@@ -293,18 +296,17 @@ let UsersService = class UsersService {
             if (error instanceof common_1.BadRequestException) {
                 throw error;
             }
-            throw new common_1.BadRequestException(`Erro ao criar usuário: ${error.message}`);
+            throw new common_1.BadRequestException(`Erro ao criar usuario: ${error.message}`);
         }
     }
     async update(userId, updateUserDto) {
         try {
-            const userRef = this.db.collection('users').doc(userId);
-            const userDoc = await userRef.get();
-            if (!userDoc.exists) {
-                throw new common_1.NotFoundException('Usuário não encontrado');
+            const userDoc = await this.firestore.getDocument('users', userId);
+            if (!userDoc) {
+                throw new common_1.NotFoundException('Usuario nao encontrado');
             }
             const updateData = {
-                updated_at: admin.firestore.FieldValue.serverTimestamp(),
+                updated_at: (0, firestore_rest_utils_1.serverTimestamp)(),
             };
             if (updateUserDto.full_name)
                 updateData.full_name = updateUserDto.full_name;
@@ -312,106 +314,85 @@ let UsersService = class UsersService {
                 updateData.email = updateUserDto.email.toLowerCase();
             if (updateUserDto.phone)
                 updateData.phone = updateUserDto.phone.replace(/\D/g, '');
-            await userRef.update(updateData);
-            const updatedDoc = await userRef.get();
+            await this.firestore.updateDocument('users', userId, updateData);
+            const updatedDoc = await this.firestore.getDocument('users', userId);
             return {
                 id: updatedDoc.id,
-                ...updatedDoc.data(),
+                ...updatedDoc.data,
             };
         }
         catch (error) {
             if (error instanceof common_1.NotFoundException) {
                 throw error;
             }
-            throw new common_1.BadRequestException(`Erro ao atualizar usuário: ${error.message}`);
+            throw new common_1.BadRequestException(`Erro ao atualizar usuario: ${error.message}`);
         }
     }
     async remove(userId) {
         try {
-            const userRef = this.db.collection('users').doc(userId);
-            const userDoc = await userRef.get();
-            if (!userDoc.exists) {
-                throw new common_1.NotFoundException('Usuário não encontrado');
+            const userDoc = await this.firestore.getDocument('users', userId);
+            if (!userDoc) {
+                throw new common_1.NotFoundException('Usuario nao encontrado');
             }
-            await userRef.update({
-                deleted_at: admin.firestore.FieldValue.serverTimestamp(),
-                updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            await this.firestore.updateDocument('users', userId, {
+                deleted_at: (0, firestore_rest_utils_1.serverTimestamp)(),
+                updated_at: (0, firestore_rest_utils_1.serverTimestamp)(),
             });
-            return { success: true, message: 'Usuário removido com sucesso' };
+            return { success: true, message: 'Usuario removido com sucesso' };
         }
         catch (error) {
             if (error instanceof common_1.NotFoundException) {
                 throw error;
             }
-            throw new common_1.BadRequestException(`Erro ao remover usuário: ${error.message}`);
+            throw new common_1.BadRequestException(`Erro ao remover usuario: ${error.message}`);
         }
     }
     async deleteUserDataComplete(userId) {
         try {
-            console.log(`🗑️ [UsersService] Iniciando limpeza completa dos dados do usuário: ${userId}`);
-            const userRef = this.db.collection('users').doc(userId);
-            const userDoc = await userRef.get();
-            if (!userDoc.exists) {
-                throw new common_1.NotFoundException('Usuário não encontrado no Firestore');
+            console.log(`[UsersService] Iniciando limpeza completa dos dados do usuario: ${userId}`);
+            const userDoc = await this.firestore.getDocument('users', userId);
+            if (!userDoc) {
+                throw new common_1.NotFoundException('Usuario nao encontrado no Firestore');
             }
-            const userData = userDoc.data();
+            const userData = userDoc.data;
             const ownerUid = userData['ownerUid'];
-            console.log(`📄 [UsersService] Documento encontrado. ownerUid: ${ownerUid || 'não vinculado'}`);
+            console.log(`[UsersService] Documento encontrado. ownerUid: ${ownerUid || 'nao vinculado'}`);
             const results = {
                 storageDeleted: false,
                 authDeleted: false,
                 firestoreDeleted: false,
             };
             try {
-                console.log('📦 [UsersService] Deletando arquivos do Storage...');
-                const bucket = admin.storage().bucket();
+                console.log('[UsersService] Deletando arquivos do Storage...');
                 const folderPath = `users/${userId}/kyc`;
-                const [files] = await bucket.getFiles({ prefix: folderPath });
-                if (files.length > 0) {
-                    await Promise.all(files.map(file => file.delete()));
-                    console.log(`✅ [UsersService] ${files.length} arquivo(s) do Storage deletado(s)`);
-                }
-                else {
-                    console.log('ℹ️ [UsersService] Nenhum arquivo encontrado no Storage');
-                }
+                const deletedCount = await this.storage.deleteFolder(folderPath);
+                console.log(`[UsersService] ${deletedCount} arquivo(s) do Storage deletado(s)`);
                 results.storageDeleted = true;
             }
             catch (error) {
-                console.warn(`⚠️ [UsersService] Erro ao deletar arquivos do Storage (continuando): ${error.message}`);
+                console.warn(`[UsersService] Erro ao deletar arquivos do Storage (continuando): ${error.message}`);
             }
             if (ownerUid) {
-                try {
-                    console.log(`🔐 [UsersService] Deletando conta do Firebase Auth (UID: ${ownerUid})...`);
-                    await admin.auth().deleteUser(ownerUid);
-                    console.log('✅ [UsersService] Conta do Firebase Auth deletada');
-                    results.authDeleted = true;
-                }
-                catch (error) {
-                    if (error.code === 'auth/user-not-found') {
-                        console.log('ℹ️ [UsersService] Usuário não encontrado no Firebase Auth (pode já ter sido deletado)');
-                    }
-                    else {
-                        console.warn(`⚠️ [UsersService] Erro ao deletar conta do Firebase Auth (continuando): ${error.message}`);
-                    }
-                }
+                console.log(`[UsersService] ownerUid ${ownerUid} encontrado - auth deletion skipped (sem firebase-admin)`);
+                results.authDeleted = false;
             }
             else {
-                console.log('ℹ️ [UsersService] Usuário não possui conta no Firebase Auth (ownerUid não encontrado)');
+                console.log('[UsersService] Usuario nao possui conta no Firebase Auth (ownerUid nao encontrado)');
             }
             try {
-                console.log('🗄️ [UsersService] Deletando documento do Firestore...');
-                await userRef.delete();
-                console.log('✅ [UsersService] Documento do Firestore deletado');
+                console.log('[UsersService] Deletando documento do Firestore...');
+                await this.firestore.deleteDocument('users', userId);
+                console.log('[UsersService] Documento do Firestore deletado');
                 results.firestoreDeleted = true;
             }
             catch (error) {
-                console.error(`❌ [UsersService] Erro ao deletar documento do Firestore: ${error.message}`);
+                console.error(`[UsersService] Erro ao deletar documento do Firestore: ${error.message}`);
                 throw new common_1.BadRequestException(`Erro ao deletar documento do Firestore: ${error.message}`);
             }
-            console.log('✅ [UsersService] Limpeza completa dos dados do usuário concluída com sucesso');
+            console.log('[UsersService] Limpeza completa dos dados do usuario concluida com sucesso');
             return {
                 success: true,
-                message: 'Dados do usuário deletados com sucesso',
+                message: 'Dados do usuario deletados com sucesso',
                 details: results,
             };
         }
@@ -419,26 +400,27 @@ let UsersService = class UsersService {
             if (error instanceof common_1.NotFoundException) {
                 throw error;
             }
-            console.error(`❌ [UsersService] Erro durante limpeza dos dados do usuário: ${error.message}`);
-            throw new common_1.BadRequestException(`Erro ao deletar dados do usuário: ${error.message}`);
+            console.error(`[UsersService] Erro durante limpeza dos dados do usuario: ${error.message}`);
+            throw new common_1.BadRequestException(`Erro ao deletar dados do usuario: ${error.message}`);
         }
     }
     async verifyPassword(verifyPasswordDto) {
-        throw new common_1.BadRequestException('Verificação de senha deve ser feita via Firebase Auth no frontend');
+        throw new common_1.BadRequestException('Verificacao de senha deve ser feita via Firebase Auth no frontend');
     }
     async syncFirebaseEmail(cpf, oldEmail) {
         try {
             const user = await this.findByCpf(cpf);
-            let firebaseUser;
-            try {
-                firebaseUser = await admin.auth().getUserByEmail(oldEmail);
+            const emailResults = await this.firestore.query('users', {
+                where: [{ field: 'email', op: '==', value: oldEmail.toLowerCase() }],
+                limit: 1,
+            });
+            if (emailResults.length === 0) {
+                throw new common_1.NotFoundException('Usuario nao encontrado com o email informado');
             }
-            catch (error) {
-                throw new common_1.NotFoundException('Usuário não encontrado no Firebase Auth');
-            }
-            await this.db.collection('users').doc(user.id).update({
-                email: firebaseUser.email,
-                updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            const foundUser = emailResults[0];
+            await this.firestore.updateDocument('users', user.id, {
+                email: foundUser.data.email,
+                updated_at: (0, firestore_rest_utils_1.serverTimestamp)(),
             });
             return { success: true, message: 'Email sincronizado com sucesso' };
         }
@@ -451,13 +433,13 @@ let UsersService = class UsersService {
     }
     async getStoreData(userId) {
         try {
-            const storeDoc = await this.db.collection('user_stores').doc(userId).get();
-            if (!storeDoc.exists) {
-                throw new common_1.NotFoundException('Dados da loja não encontrados');
+            const storeDoc = await this.firestore.getDocument('user_stores', userId);
+            if (!storeDoc) {
+                throw new common_1.NotFoundException('Dados da loja nao encontrados');
             }
             return {
                 id: storeDoc.id,
-                ...storeDoc.data(),
+                ...storeDoc.data,
             };
         }
         catch (error) {
@@ -469,16 +451,15 @@ let UsersService = class UsersService {
     }
     async upsertStoreData(userId, storeDataDto) {
         try {
-            const storeRef = this.db.collection('user_stores').doc(userId);
-            await storeRef.set({
+            await this.firestore.setDocument('user_stores', userId, {
                 ...storeDataDto,
                 user_id: userId,
-                updated_at: admin.firestore.FieldValue.serverTimestamp(),
-            }, { merge: true });
-            const storeDoc = await storeRef.get();
+                updated_at: (0, firestore_rest_utils_1.serverTimestamp)(),
+            }, true);
+            const storeDoc = await this.firestore.getDocument('user_stores', userId);
             return {
                 id: storeDoc.id,
-                ...storeDoc.data(),
+                ...storeDoc.data,
             };
         }
         catch (error) {
@@ -487,11 +468,12 @@ let UsersService = class UsersService {
     }
     async getPixKeys(userId) {
         try {
-            const pixKeysRef = this.db.collection('user_pix_keys').where('user_id', '==', userId);
-            const snapshot = await pixKeysRef.get();
-            return snapshot.docs.map(doc => ({
+            const results = await this.firestore.query('user_pix_keys', {
+                where: [{ field: 'user_id', op: '==', value: userId }],
+            });
+            return results.map(doc => ({
                 id: doc.id,
-                ...doc.data(),
+                ...doc.data,
             }));
         }
         catch (error) {
@@ -500,16 +482,16 @@ let UsersService = class UsersService {
     }
     async addPixKey(userId, createPixKeyDto) {
         try {
-            const pixKeyRef = await this.db.collection('user_pix_keys').add({
+            const pixKeyRef = await this.firestore.addDocument('user_pix_keys', {
                 user_id: userId,
                 ...createPixKeyDto,
-                created_at: admin.firestore.FieldValue.serverTimestamp(),
-                updated_at: admin.firestore.FieldValue.serverTimestamp(),
+                created_at: (0, firestore_rest_utils_1.serverTimestamp)(),
+                updated_at: (0, firestore_rest_utils_1.serverTimestamp)(),
             });
-            const pixKeyDoc = await pixKeyRef.get();
+            const pixKeyDoc = await this.firestore.getDocument('user_pix_keys', pixKeyRef.id);
             return {
                 id: pixKeyDoc.id,
-                ...pixKeyDoc.data(),
+                ...pixKeyDoc.data,
             };
         }
         catch (error) {
@@ -518,16 +500,14 @@ let UsersService = class UsersService {
     }
     async removePixKey(userId, keyId) {
         try {
-            const pixKeyRef = this.db.collection('user_pix_keys').doc(keyId);
-            const pixKeyDoc = await pixKeyRef.get();
-            if (!pixKeyDoc.exists) {
-                throw new common_1.NotFoundException('Chave PIX não encontrada');
+            const pixKeyDoc = await this.firestore.getDocument('user_pix_keys', keyId);
+            if (!pixKeyDoc) {
+                throw new common_1.NotFoundException('Chave PIX nao encontrada');
             }
-            const pixKeyData = pixKeyDoc.data();
-            if (pixKeyData?.user_id !== userId) {
-                throw new common_1.BadRequestException('Chave PIX não pertence ao usuário');
+            if (pixKeyDoc.data?.user_id !== userId) {
+                throw new common_1.BadRequestException('Chave PIX nao pertence ao usuario');
             }
-            await pixKeyRef.delete();
+            await this.firestore.deleteDocument('user_pix_keys', keyId);
             return { success: true, message: 'Chave PIX removida com sucesso' };
         }
         catch (error) {
@@ -539,22 +519,22 @@ let UsersService = class UsersService {
     }
     async updateLastLogin(userId) {
         try {
-            const userRef = this.db.collection('users').doc(userId);
-            await userRef.update({
-                last_login: admin.firestore.FieldValue.serverTimestamp(),
-                updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            await this.firestore.updateDocument('users', userId, {
+                last_login: (0, firestore_rest_utils_1.serverTimestamp)(),
+                updated_at: (0, firestore_rest_utils_1.serverTimestamp)(),
             });
             return { success: true };
         }
         catch (error) {
-            console.error(`Erro ao atualizar último login: ${error.message}`);
+            console.error(`Erro ao atualizar ultimo login: ${error.message}`);
             return { success: false };
         }
     }
 };
 exports.UsersService = UsersService;
 exports.UsersService = UsersService = __decorate([
-    (0, common_1.Injectable)()
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [typeof (_a = typeof firestore_rest_service_1.FirestoreRestService !== "undefined" && firestore_rest_service_1.FirestoreRestService) === "function" ? _a : Object, typeof (_b = typeof auth_jwt_service_1.AuthJwtService !== "undefined" && auth_jwt_service_1.AuthJwtService) === "function" ? _b : Object, typeof (_c = typeof storage_rest_service_1.StorageRestService !== "undefined" && storage_rest_service_1.StorageRestService) === "function" ? _c : Object, typeof (_d = typeof config_1.ConfigService !== "undefined" && config_1.ConfigService) === "function" ? _d : Object])
 ], UsersService);
 
 
@@ -562,16 +542,553 @@ exports.UsersService = UsersService = __decorate([
 /* 10 */
 /***/ ((module) => {
 
-module.exports = require("firebase-admin");
-
-/***/ }),
-/* 11 */
-/***/ ((module) => {
-
 module.exports = require("crypto");
 
 /***/ }),
+/* 11 */
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var FirestoreRestService_1;
+var _a;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.FirestoreRestService = void 0;
+const common_1 = __webpack_require__(2);
+const config_1 = __webpack_require__(6);
+const axios_1 = __webpack_require__(12);
+const firestore_rest_utils_1 = __webpack_require__(13);
+let FirestoreRestService = FirestoreRestService_1 = class FirestoreRestService {
+    constructor(configService) {
+        this.configService = configService;
+        this.logger = new common_1.Logger(FirestoreRestService_1.name);
+        this.projectId = this.configService.get('FIREBASE_PROJECT_ID', 'pagpagapp');
+        const apiKey = this.configService.get('FIREBASE_WEB_API_KEY', '');
+        this.baseUrl = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents`;
+        this.http = axios_1.default.create({
+            baseURL: this.baseUrl,
+            params: apiKey ? { key: apiKey } : {},
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 15000,
+        });
+        this.logger.log(`FirestoreRestService initialized (project: ${this.projectId})`);
+    }
+    async getDocument(collection, docId) {
+        try {
+            const res = await this.http.get(`/${collection}/${docId}`);
+            if (!res.data.fields)
+                return null;
+            return {
+                id: (0, firestore_rest_utils_1.extractDocId)(res.data.name),
+                data: (0, firestore_rest_utils_1.decodeFields)(res.data.fields),
+                ref: { path: `${collection}/${docId}` },
+            };
+        }
+        catch (error) {
+            if (error.response?.status === 404)
+                return null;
+            this.logger.error(`getDocument(${collection}/${docId}) failed: ${error.message}`);
+            throw error;
+        }
+    }
+    async addDocument(collection, data) {
+        const { fields, transforms } = this.separateTransforms(collection, '', data);
+        if (transforms.length > 0) {
+            const docPath = `${this.baseUrl}/${collection}`;
+            const writes = [];
+            const tempDocName = `projects/${this.projectId}/databases/(default)/documents/${collection}/__temp__`;
+            const commitUrl = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents:commit`;
+            const apiKey = this.configService.get('FIREBASE_WEB_API_KEY', '');
+            const res = await axios_1.default.post(commitUrl, {
+                writes: [
+                    {
+                        update: {
+                            fields,
+                        },
+                        currentDocument: { exists: false },
+                        updateTransforms: transforms,
+                    },
+                ],
+            }, { params: apiKey ? { key: apiKey } : {} });
+            const docName = res.data.writeResults[0]?.updateTime
+                ? res.data.commitTime
+                : '';
+        }
+        const res = await this.http.post(`/${collection}`, { fields });
+        const docId = (0, firestore_rest_utils_1.extractDocId)(res.data.name);
+        return {
+            id: docId,
+            data: { ...data, id: docId },
+            ref: { path: `${collection}/${docId}` },
+        };
+    }
+    async setDocument(collection, docId, data, merge = false) {
+        const { fields, transforms } = this.separateTransforms(collection, docId, data);
+        if (transforms.length > 0) {
+            await this.commitWrites([
+                {
+                    update: {
+                        name: `projects/${this.projectId}/databases/(default)/documents/${collection}/${docId}`,
+                        fields,
+                    },
+                    updateTransforms: transforms,
+                },
+            ]);
+        }
+        else {
+            const params = {};
+            if (merge) {
+                Object.keys(data).forEach((key, i) => {
+                    params[`updateMask.fieldPaths`] = params[`updateMask.fieldPaths`]
+                        ? [...(Array.isArray(params[`updateMask.fieldPaths`]) ? params[`updateMask.fieldPaths`] : [params[`updateMask.fieldPaths`]]), key]
+                        : key;
+                });
+            }
+            await this.http.patch(`/${collection}/${docId}`, { fields }, { params });
+        }
+    }
+    async updateDocument(collection, docId, data) {
+        const { fields, transforms } = this.separateTransforms(collection, docId, data);
+        const fieldPaths = Object.keys(fields);
+        if (transforms.length > 0) {
+            const write = {
+                update: {
+                    name: `projects/${this.projectId}/databases/(default)/documents/${collection}/${docId}`,
+                    fields,
+                },
+                updateMask: { fieldPaths },
+                updateTransforms: transforms,
+            };
+            await this.commitWrites([write]);
+        }
+        else {
+            const updateMask = fieldPaths.map((f) => `updateMask.fieldPaths=${f}`).join('&');
+            await this.http.patch(`/${collection}/${docId}?${updateMask}`, { fields });
+        }
+    }
+    async deleteDocument(collection, docId) {
+        try {
+            await this.http.delete(`/${collection}/${docId}`);
+        }
+        catch (error) {
+            if (error.response?.status === 404)
+                return;
+            throw error;
+        }
+    }
+    async query(collection, options = {}) {
+        const structuredQuery = {
+            from: [{ collectionId: collection }],
+        };
+        if (options.where && options.where.length > 0) {
+            const filters = options.where.map((w) => ({
+                fieldFilter: {
+                    field: { fieldPath: w.field },
+                    op: this.mapOperator(w.op),
+                    value: (0, firestore_rest_utils_1.encodeValue)(w.value),
+                },
+            }));
+            if (filters.length === 1) {
+                structuredQuery.where = filters[0];
+            }
+            else {
+                structuredQuery.where = {
+                    compositeFilter: { op: 'AND', filters },
+                };
+            }
+        }
+        if (options.orderBy) {
+            structuredQuery.orderBy = [
+                {
+                    field: { fieldPath: options.orderBy },
+                    direction: options.orderDirection || 'ASCENDING',
+                },
+            ];
+        }
+        if (options.limit) {
+            structuredQuery.limit = options.limit;
+        }
+        try {
+            const res = await this.http.post(':runQuery', { structuredQuery });
+            if (!Array.isArray(res.data))
+                return [];
+            return res.data
+                .filter((r) => r.document)
+                .map((r) => ({
+                id: (0, firestore_rest_utils_1.extractDocId)(r.document.name),
+                data: (0, firestore_rest_utils_1.decodeFields)(r.document.fields || {}),
+                ref: { path: r.document.name.split('/documents/')[1] },
+            }));
+        }
+        catch (error) {
+            this.logger.error(`query(${collection}) failed: ${error.message}`);
+            throw error;
+        }
+    }
+    async batchDelete(paths) {
+        if (paths.length === 0)
+            return;
+        const writes = paths.map((p) => ({
+            delete: `projects/${this.projectId}/databases/(default)/documents/${p}`,
+        }));
+        for (let i = 0; i < writes.length; i += 500) {
+            const chunk = writes.slice(i, i + 500);
+            await this.commitWrites(chunk);
+        }
+    }
+    async commitWrites(writes) {
+        const apiKey = this.configService.get('FIREBASE_WEB_API_KEY', '');
+        const commitUrl = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents:commit`;
+        return axios_1.default.post(commitUrl, { writes }, { params: apiKey ? { key: apiKey } : {} });
+    }
+    separateTransforms(collection, docId, data) {
+        const fields = {};
+        const transforms = [];
+        for (const [key, value] of Object.entries(data)) {
+            if (value && typeof value === 'object' && value.__type === 'serverTimestamp') {
+                transforms.push({
+                    fieldPath: key,
+                    setToServerValue: 'REQUEST_TIME',
+                });
+            }
+            else if (value && typeof value === 'object' && value.__type === 'increment') {
+                transforms.push({
+                    fieldPath: key,
+                    increment: { integerValue: String(value.amount) },
+                });
+            }
+            else if (value !== undefined) {
+                fields[key] = (0, firestore_rest_utils_1.encodeValue)(value);
+            }
+        }
+        return { fields, transforms };
+    }
+    mapOperator(op) {
+        const map = {
+            '==': 'EQUAL',
+            '!=': 'NOT_EQUAL',
+            '<': 'LESS_THAN',
+            '<=': 'LESS_THAN_OR_EQUAL',
+            '>': 'GREATER_THAN',
+            '>=': 'GREATER_THAN_OR_EQUAL',
+            'array-contains': 'ARRAY_CONTAINS',
+            in: 'IN',
+            'array-contains-any': 'ARRAY_CONTAINS_ANY',
+            'not-in': 'NOT_IN',
+        };
+        return map[op] || op;
+    }
+};
+exports.FirestoreRestService = FirestoreRestService;
+exports.FirestoreRestService = FirestoreRestService = FirestoreRestService_1 = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [typeof (_a = typeof config_1.ConfigService !== "undefined" && config_1.ConfigService) === "function" ? _a : Object])
+], FirestoreRestService);
+
+
+/***/ }),
 /* 12 */
+/***/ ((module) => {
+
+module.exports = require("axios");
+
+/***/ }),
+/* 13 */
+/***/ ((__unused_webpack_module, exports) => {
+
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.encodeValue = encodeValue;
+exports.decodeValue = decodeValue;
+exports.decodeFields = decodeFields;
+exports.encodeFields = encodeFields;
+exports.extractDocId = extractDocId;
+exports.buildFieldFilter = buildFieldFilter;
+exports.serverTimestamp = serverTimestamp;
+exports.fieldIncrement = fieldIncrement;
+function encodeValue(value) {
+    if (value === null || value === undefined) {
+        return { nullValue: null };
+    }
+    if (typeof value === 'boolean') {
+        return { booleanValue: value };
+    }
+    if (typeof value === 'number') {
+        if (Number.isInteger(value)) {
+            return { integerValue: String(value) };
+        }
+        return { doubleValue: value };
+    }
+    if (typeof value === 'string') {
+        return { stringValue: value };
+    }
+    if (value instanceof Date) {
+        return { timestampValue: value.toISOString() };
+    }
+    if (Array.isArray(value)) {
+        return { arrayValue: { values: value.map(encodeValue) } };
+    }
+    if (typeof value === 'object') {
+        if (value.__type === 'serverTimestamp') {
+            return { stringValue: '__SERVER_TIMESTAMP__' };
+        }
+        const fields = {};
+        for (const [k, v] of Object.entries(value)) {
+            if (v !== undefined) {
+                fields[k] = encodeValue(v);
+            }
+        }
+        return { mapValue: { fields } };
+    }
+    return { stringValue: String(value) };
+}
+function decodeValue(val) {
+    if ('nullValue' in val)
+        return null;
+    if ('booleanValue' in val)
+        return val.booleanValue;
+    if ('integerValue' in val)
+        return parseInt(val.integerValue, 10);
+    if ('doubleValue' in val)
+        return val.doubleValue;
+    if ('stringValue' in val)
+        return val.stringValue;
+    if ('timestampValue' in val)
+        return new Date(val.timestampValue);
+    if ('referenceValue' in val)
+        return val.referenceValue;
+    if ('geoPointValue' in val)
+        return val.geoPointValue;
+    if ('arrayValue' in val) {
+        return (val.arrayValue.values || []).map(decodeValue);
+    }
+    if ('mapValue' in val) {
+        return decodeFields(val.mapValue.fields || {});
+    }
+    return null;
+}
+function decodeFields(fields) {
+    const result = {};
+    for (const [key, val] of Object.entries(fields)) {
+        result[key] = decodeValue(val);
+    }
+    return result;
+}
+function encodeFields(obj) {
+    const fields = {};
+    for (const [key, val] of Object.entries(obj)) {
+        if (val !== undefined) {
+            fields[key] = encodeValue(val);
+        }
+    }
+    return fields;
+}
+function extractDocId(name) {
+    const parts = name.split('/');
+    return parts[parts.length - 1];
+}
+function buildFieldFilter(field, op, value) {
+    return {
+        fieldFilter: {
+            field: { fieldPath: field },
+            op,
+            value: encodeValue(value),
+        },
+    };
+}
+function serverTimestamp() {
+    return { __type: 'serverTimestamp' };
+}
+function fieldIncrement(amount) {
+    return { __type: 'increment', amount };
+}
+
+
+/***/ }),
+/* 14 */
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var AuthJwtService_1;
+var _a;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.AuthJwtService = void 0;
+const common_1 = __webpack_require__(2);
+const config_1 = __webpack_require__(6);
+const jwt = __webpack_require__(15);
+const axios_1 = __webpack_require__(12);
+let AuthJwtService = AuthJwtService_1 = class AuthJwtService {
+    constructor(configService) {
+        this.configService = configService;
+        this.logger = new common_1.Logger(AuthJwtService_1.name);
+        this.jwtSecret = this.configService.get('JWT_SECRET', '');
+        this.jwtExpiresIn = this.configService.get('JWT_EXPIRES_IN', '7d');
+        this.apiKey = this.configService.get('FIREBASE_WEB_API_KEY', '');
+        this.projectId = this.configService.get('FIREBASE_PROJECT_ID', 'pagpagapp');
+        if (!this.jwtSecret) {
+            this.logger.warn('JWT_SECRET not set! Token signing will fail.');
+        }
+        this.logger.log('AuthJwtService initialized');
+    }
+    signToken(payload) {
+        return jwt.sign(payload, this.jwtSecret, {
+            expiresIn: this.jwtExpiresIn,
+            issuer: 'neves-capital-api',
+            audience: 'pagpag-app',
+        });
+    }
+    verifyToken(token) {
+        try {
+            return jwt.verify(token, this.jwtSecret, {
+                issuer: 'neves-capital-api',
+                audience: 'pagpag-app',
+            });
+        }
+        catch (error) {
+            this.logger.error(`JWT verification failed: ${error.message}`);
+            throw new Error(`Token inválido: ${error.message}`);
+        }
+    }
+    async sendPasswordResetEmail(email) {
+        try {
+            const res = await axios_1.default.post(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${this.apiKey}`, {
+                requestType: 'PASSWORD_RESET',
+                email,
+            });
+            this.logger.log(`Password reset email sent to ${email}`);
+            return res.data.email;
+        }
+        catch (error) {
+            const msg = error.response?.data?.error?.message || error.message;
+            this.logger.error(`Failed to send password reset: ${msg}`);
+            throw new Error(`Falha ao enviar reset de senha: ${msg}`);
+        }
+    }
+    async lookupUserByEmail(email) {
+        try {
+            const res = await axios_1.default.post(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${this.apiKey}`, { email: [email] });
+            const users = res.data.users;
+            return users && users.length > 0 ? users[0] : null;
+        }
+        catch (error) {
+            if (error.response?.data?.error?.message === 'USER_NOT_FOUND') {
+                return null;
+            }
+            throw error;
+        }
+    }
+};
+exports.AuthJwtService = AuthJwtService;
+exports.AuthJwtService = AuthJwtService = AuthJwtService_1 = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [typeof (_a = typeof config_1.ConfigService !== "undefined" && config_1.ConfigService) === "function" ? _a : Object])
+], AuthJwtService);
+
+
+/***/ }),
+/* 15 */
+/***/ ((module) => {
+
+module.exports = require("jsonwebtoken");
+
+/***/ }),
+/* 16 */
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var StorageRestService_1;
+var _a;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.StorageRestService = void 0;
+const common_1 = __webpack_require__(2);
+const config_1 = __webpack_require__(6);
+const axios_1 = __webpack_require__(12);
+let StorageRestService = StorageRestService_1 = class StorageRestService {
+    constructor(configService) {
+        this.configService = configService;
+        this.logger = new common_1.Logger(StorageRestService_1.name);
+        this.bucket = this.configService.get('FIREBASE_STORAGE_BUCKET', 'pagpagapp.appspot.com');
+        this.apiKey = this.configService.get('FIREBASE_WEB_API_KEY', '');
+        this.baseUrl = `https://storage.googleapis.com/storage/v1/b/${this.bucket}/o`;
+        this.logger.log(`StorageRestService initialized (bucket: ${this.bucket})`);
+    }
+    async listFiles(prefix) {
+        try {
+            const res = await axios_1.default.get(this.baseUrl, {
+                params: {
+                    prefix,
+                    key: this.apiKey,
+                },
+            });
+            return res.data.items || [];
+        }
+        catch (error) {
+            this.logger.error(`listFiles(${prefix}) failed: ${error.message}`);
+            return [];
+        }
+    }
+    async deleteFile(fileName) {
+        try {
+            const encodedName = encodeURIComponent(fileName);
+            await axios_1.default.delete(`${this.baseUrl}/${encodedName}`, {
+                params: { key: this.apiKey },
+            });
+            return true;
+        }
+        catch (error) {
+            if (error.response?.status === 404)
+                return true;
+            this.logger.error(`deleteFile(${fileName}) failed: ${error.message}`);
+            return false;
+        }
+    }
+    async deleteFolder(prefix) {
+        const files = await this.listFiles(prefix);
+        let deleted = 0;
+        for (const file of files) {
+            if (await this.deleteFile(file.name)) {
+                deleted++;
+            }
+        }
+        this.logger.log(`Deleted ${deleted}/${files.length} files from ${prefix}`);
+        return deleted;
+    }
+};
+exports.StorageRestService = StorageRestService;
+exports.StorageRestService = StorageRestService = StorageRestService_1 = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [typeof (_a = typeof config_1.ConfigService !== "undefined" && config_1.ConfigService) === "function" ? _a : Object])
+], StorageRestService);
+
+
+/***/ }),
+/* 17 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -594,12 +1111,12 @@ const common_1 = __webpack_require__(2);
 const swagger_1 = __webpack_require__(3);
 const throttler_1 = __webpack_require__(7);
 const users_service_1 = __webpack_require__(9);
-const create_user_dto_1 = __webpack_require__(13);
-const update_user_dto_1 = __webpack_require__(15);
-const verify_password_dto_1 = __webpack_require__(16);
-const store_data_dto_1 = __webpack_require__(17);
-const pix_key_dto_1 = __webpack_require__(18);
-const api_key_guard_1 = __webpack_require__(19);
+const create_user_dto_1 = __webpack_require__(18);
+const update_user_dto_1 = __webpack_require__(20);
+const verify_password_dto_1 = __webpack_require__(21);
+const store_data_dto_1 = __webpack_require__(22);
+const pix_key_dto_1 = __webpack_require__(23);
+const api_key_guard_1 = __webpack_require__(24);
 let UsersController = class UsersController {
     constructor(usersService) {
         this.usersService = usersService;
@@ -811,7 +1328,7 @@ exports.UsersController = UsersController = __decorate([
 
 
 /***/ }),
-/* 13 */
+/* 18 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -826,7 +1343,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.CreateUserDto = void 0;
-const class_validator_1 = __webpack_require__(14);
+const class_validator_1 = __webpack_require__(19);
 const swagger_1 = __webpack_require__(3);
 class CreateUserDto {
 }
@@ -908,13 +1425,13 @@ __decorate([
 
 
 /***/ }),
-/* 14 */
+/* 19 */
 /***/ ((module) => {
 
 module.exports = require("class-validator");
 
 /***/ }),
-/* 15 */
+/* 20 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -929,7 +1446,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.UpdateUserDto = void 0;
-const class_validator_1 = __webpack_require__(14);
+const class_validator_1 = __webpack_require__(19);
 const swagger_1 = __webpack_require__(3);
 class UpdateUserDto {
 }
@@ -997,7 +1514,7 @@ __decorate([
 
 
 /***/ }),
-/* 16 */
+/* 21 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -1012,7 +1529,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.VerifyPasswordDto = void 0;
-const class_validator_1 = __webpack_require__(14);
+const class_validator_1 = __webpack_require__(19);
 const swagger_1 = __webpack_require__(3);
 class VerifyPasswordDto {
 }
@@ -1030,7 +1547,7 @@ __decorate([
 
 
 /***/ }),
-/* 17 */
+/* 22 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -1045,7 +1562,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.StoreDataDto = void 0;
-const class_validator_1 = __webpack_require__(14);
+const class_validator_1 = __webpack_require__(19);
 const swagger_1 = __webpack_require__(3);
 class StoreDataDto {
 }
@@ -1069,7 +1586,7 @@ __decorate([
 
 
 /***/ }),
-/* 18 */
+/* 23 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -1084,7 +1601,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ReorderPixKeysDto = exports.UpdatePixKeyDto = exports.CreatePixKeyDto = void 0;
-const class_validator_1 = __webpack_require__(14);
+const class_validator_1 = __webpack_require__(19);
 const swagger_1 = __webpack_require__(3);
 class CreatePixKeyDto {
 }
@@ -1124,7 +1641,7 @@ __decorate([
 
 
 /***/ }),
-/* 19 */
+/* 24 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -1157,7 +1674,7 @@ exports.ApiKeyGuard = ApiKeyGuard = __decorate([
 
 
 /***/ }),
-/* 20 */
+/* 25 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -1171,12 +1688,12 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AuthModule = void 0;
 const common_1 = __webpack_require__(2);
 const config_1 = __webpack_require__(6);
-const email_template_service_1 = __webpack_require__(21);
-const email_sender_service_1 = __webpack_require__(24);
-const simple_otp_service_1 = __webpack_require__(28);
-const whatsapp_service_1 = __webpack_require__(29);
-const auth_controller_1 = __webpack_require__(31);
-const whatsapp_webhook_controller_1 = __webpack_require__(34);
+const email_template_service_1 = __webpack_require__(26);
+const email_sender_service_1 = __webpack_require__(29);
+const simple_otp_service_1 = __webpack_require__(33);
+const whatsapp_service_1 = __webpack_require__(34);
+const auth_controller_1 = __webpack_require__(36);
+const whatsapp_webhook_controller_1 = __webpack_require__(39);
 const users_module_1 = __webpack_require__(8);
 let AuthModule = class AuthModule {
 };
@@ -1197,7 +1714,7 @@ exports.AuthModule = AuthModule = __decorate([
 
 
 /***/ }),
-/* 21 */
+/* 26 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -1210,22 +1727,22 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var _a;
+var _a, _b;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.EmailTemplateService = void 0;
 const common_1 = __webpack_require__(2);
 const config_1 = __webpack_require__(6);
-const admin = __webpack_require__(10);
-const fs = __webpack_require__(22);
-const path = __webpack_require__(23);
+const auth_jwt_service_1 = __webpack_require__(14);
+const fs = __webpack_require__(27);
+const path = __webpack_require__(28);
 let EmailTemplateService = class EmailTemplateService {
-    constructor(configService) {
+    constructor(configService, authJwt) {
         this.configService = configService;
+        this.authJwt = authJwt;
     }
     async generatePasswordResetLink(email, actionCodeSettings) {
-        const auth = admin.auth();
-        const link = await auth.generatePasswordResetLink(email, actionCodeSettings);
-        return link;
+        await this.authJwt.sendPasswordResetEmail(email);
+        return `https://pagpagbrasil.com.br/reset?email=${encodeURIComponent(email)}`;
     }
     getLogoSource() {
         const hostedUrl = this.configService.get('LOGO_HOSTED_URL', 'https://apppagpag.firebaseapp.com/assets/icons/PagPag.png');
@@ -1344,24 +1861,24 @@ let EmailTemplateService = class EmailTemplateService {
 exports.EmailTemplateService = EmailTemplateService;
 exports.EmailTemplateService = EmailTemplateService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [typeof (_a = typeof config_1.ConfigService !== "undefined" && config_1.ConfigService) === "function" ? _a : Object])
+    __metadata("design:paramtypes", [typeof (_a = typeof config_1.ConfigService !== "undefined" && config_1.ConfigService) === "function" ? _a : Object, typeof (_b = typeof auth_jwt_service_1.AuthJwtService !== "undefined" && auth_jwt_service_1.AuthJwtService) === "function" ? _b : Object])
 ], EmailTemplateService);
 
 
 /***/ }),
-/* 22 */
+/* 27 */
 /***/ ((module) => {
 
 module.exports = require("fs");
 
 /***/ }),
-/* 23 */
+/* 28 */
 /***/ ((module) => {
 
 module.exports = require("path");
 
 /***/ }),
-/* 24 */
+/* 29 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -1379,7 +1896,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.EmailSenderService = void 0;
 const common_1 = __webpack_require__(2);
 const config_1 = __webpack_require__(6);
-const email_template_service_1 = __webpack_require__(21);
+const email_template_service_1 = __webpack_require__(26);
 let EmailSenderService = class EmailSenderService {
     constructor(emailTemplateService, configService) {
         this.emailTemplateService = emailTemplateService;
@@ -1413,7 +1930,7 @@ let EmailSenderService = class EmailSenderService {
     }
     async sendViaSendGrid(email, htmlContent) {
         try {
-            const sendgrid = __webpack_require__(25);
+            const sendgrid = __webpack_require__(30);
             const apiKey = this.configService.get('SENDGRID_API_KEY');
             if (!apiKey) {
                 throw new Error('SENDGRID_API_KEY não configurada');
@@ -1436,7 +1953,7 @@ let EmailSenderService = class EmailSenderService {
     }
     async sendViaAwsSes(email, htmlContent) {
         try {
-            const { SESClient, SendEmailCommand } = __webpack_require__(26);
+            const { SESClient, SendEmailCommand } = __webpack_require__(31);
             const sesClient = new SESClient({
                 region: this.configService.get('AWS_REGION', 'us-east-1'),
                 credentials: {
@@ -1463,7 +1980,7 @@ let EmailSenderService = class EmailSenderService {
     }
     async sendViaResend(email, htmlContent) {
         try {
-            const { Resend } = __webpack_require__(27);
+            const { Resend } = __webpack_require__(32);
             const apiKey = this.configService.get('RESEND_API_KEY');
             if (!apiKey) {
                 throw new Error('RESEND_API_KEY não configurada');
@@ -1492,25 +2009,25 @@ exports.EmailSenderService = EmailSenderService = __decorate([
 
 
 /***/ }),
-/* 25 */
+/* 30 */
 /***/ ((module) => {
 
 module.exports = require("@sendgrid/mail");
 
 /***/ }),
-/* 26 */
+/* 31 */
 /***/ ((module) => {
 
 module.exports = require("@aws-sdk/client-ses");
 
 /***/ }),
-/* 27 */
+/* 32 */
 /***/ ((module) => {
 
 module.exports = require("resend");
 
 /***/ }),
-/* 28 */
+/* 33 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -1520,13 +2037,18 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var _a;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.SimpleOtpService = void 0;
 const common_1 = __webpack_require__(2);
-const admin = __webpack_require__(10);
+const firestore_rest_service_1 = __webpack_require__(11);
+const firestore_rest_utils_1 = __webpack_require__(13);
 let SimpleOtpService = class SimpleOtpService {
-    constructor() {
-        this.db = admin.firestore();
+    constructor(firestore) {
+        this.firestore = firestore;
         this.otpCollection = 'otp_codes';
         this.otpExpirationMinutes = 10;
         this.maxAttempts = 5;
@@ -1540,7 +2062,7 @@ let SimpleOtpService = class SimpleOtpService {
             if (normalizedPhone.length < 10) {
                 return {
                     success: false,
-                    message: 'Número de telefone inválido',
+                    message: 'Numero de telefone invalido',
                 };
             }
             const code = this.generateOtpCode();
@@ -1549,29 +2071,27 @@ let SimpleOtpService = class SimpleOtpService {
             const otpDoc = {
                 phone: normalizedPhone,
                 code,
-                expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+                expiresAt,
                 attempts: 0,
                 verified: false,
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                createdAt: (0, firestore_rest_utils_1.serverTimestamp)(),
             };
             const tQuery = Date.now();
-            const oldOtps = await this.db
-                .collection(this.otpCollection)
-                .where('phone', '==', normalizedPhone)
-                .get();
-            console.log(`⏱️ [OTP-TIMING]   query OTPs antigos: ${Date.now() - tQuery}ms (found: ${oldOtps.size})`);
-            const batch = this.db.batch();
-            oldOtps.docs.forEach((doc) => {
-                batch.delete(doc.ref);
+            const oldOtps = await this.firestore.query(this.otpCollection, {
+                where: [{ field: 'phone', op: 'EQUAL', value: normalizedPhone }],
             });
+            console.log(`[OTP-TIMING]   query OTPs antigos: ${Date.now() - tQuery}ms (found: ${oldOtps.length})`);
             const tWrite = Date.now();
-            await batch.commit();
-            await this.db.collection(this.otpCollection).add(otpDoc);
-            console.log(`⏱️ [OTP-TIMING]   batch+add: ${Date.now() - tWrite}ms`);
+            if (oldOtps.length > 0) {
+                const paths = oldOtps.map((doc) => `${this.otpCollection}/${doc.id}`);
+                await this.firestore.batchDelete(paths);
+            }
+            await this.firestore.addDocument(this.otpCollection, otpDoc);
+            console.log(`[OTP-TIMING]   delete+add: ${Date.now() - tWrite}ms`);
             return {
                 success: true,
                 code,
-                message: `Código OTP gerado. Para testes, use: ${code}`,
+                message: `Codigo OTP gerado. Para testes, use: ${code}`,
             };
         }
         catch (error) {
@@ -1586,20 +2106,20 @@ let SimpleOtpService = class SimpleOtpService {
                 String(msg).includes('UNAVAILABLE');
             const oauthUserCredentialExpired = String(msg).includes('invalid_grant') ||
                 String(msg).includes('invalid_rapt');
-            let userMessage = 'Erro ao gerar código OTP';
+            let userMessage = 'Erro ao gerar codigo OTP';
             if (oauthUserCredentialExpired) {
                 userMessage =
-                    'Credenciais OAuth expiradas ou revogadas. No Railway remova GOOGLE_CREDENTIALS_JSON e configure FIREBASE_SERVICE_ACCOUNT com o JSON da service account (Firebase Console → Project settings → Service accounts → Generate new private key).';
+                    'Credenciais expiradas ou revogadas. Verifique FIREBASE_SERVICE_ACCOUNT ou GOOGLE_APPLICATION_CREDENTIALS no ambiente.';
             }
             else if (permissionDenied) {
                 userMessage =
-                    'Firestore recusou gravação. Confira FIREBASE_SERVICE_ACCOUNT e GOOGLE_CLOUD_PROJECT no Railway.';
+                    'Firestore recusou gravacao. Confira FIREBASE_SERVICE_ACCOUNT e GOOGLE_CLOUD_PROJECT no Railway.';
             }
             else if (unavailable) {
-                userMessage = 'Firestore temporariamente indisponível. Tente novamente em instantes.';
+                userMessage = 'Firestore temporariamente indisponivel. Tente novamente em instantes.';
             }
             else if (process.env.NODE_ENV === 'development') {
-                userMessage = `Erro ao gerar código OTP: ${msg}`;
+                userMessage = `Erro ao gerar codigo OTP: ${msg}`;
             }
             return {
                 success: false,
@@ -1610,77 +2130,77 @@ let SimpleOtpService = class SimpleOtpService {
     async verifyOtp(phone, code) {
         try {
             const normalizedPhone = phone.replace(/\D/g, '');
-            const otpQuery = await this.db
-                .collection(this.otpCollection)
-                .where('phone', '==', normalizedPhone)
-                .where('verified', '==', false)
-                .orderBy('createdAt', 'desc')
-                .limit(1)
-                .get();
-            if (otpQuery.empty) {
+            const otpResults = await this.firestore.query(this.otpCollection, {
+                where: [
+                    { field: 'phone', op: 'EQUAL', value: normalizedPhone },
+                    { field: 'verified', op: 'EQUAL', value: false },
+                ],
+                orderBy: 'createdAt',
+                orderDirection: 'DESCENDING',
+                limit: 1,
+            });
+            if (otpResults.length === 0) {
                 return {
                     success: false,
-                    message: 'Código OTP não encontrado ou já utilizado',
+                    message: 'Codigo OTP nao encontrado ou ja utilizado',
                 };
             }
-            const otpDoc = otpQuery.docs[0];
-            const otpData = otpDoc.data();
-            const expiresAt = otpData.expiresAt instanceof admin.firestore.Timestamp
-                ? otpData.expiresAt.toDate()
+            const otpDoc = otpResults[0];
+            const otpData = otpDoc.data;
+            const expiresAt = otpData.expiresAt instanceof Date
+                ? otpData.expiresAt
                 : new Date(otpData.expiresAt);
             if (new Date() > expiresAt) {
-                await otpDoc.ref.delete();
+                await this.firestore.deleteDocument(this.otpCollection, otpDoc.id);
                 return {
                     success: false,
-                    message: 'Código OTP expirado. Solicite um novo código.',
+                    message: 'Codigo OTP expirado. Solicite um novo codigo.',
                 };
             }
             if (otpData.attempts >= this.maxAttempts) {
-                await otpDoc.ref.delete();
+                await this.firestore.deleteDocument(this.otpCollection, otpDoc.id);
                 return {
                     success: false,
-                    message: 'Número máximo de tentativas excedido. Solicite um novo código.',
+                    message: 'Numero maximo de tentativas excedido. Solicite um novo codigo.',
                 };
             }
             if (otpData.code !== code) {
-                await otpDoc.ref.update({
-                    attempts: admin.firestore.FieldValue.increment(1),
+                await this.firestore.updateDocument(this.otpCollection, otpDoc.id, {
+                    attempts: (0, firestore_rest_utils_1.fieldIncrement)(1),
                 });
                 const remainingAttempts = this.maxAttempts - otpData.attempts - 1;
                 return {
                     success: false,
-                    message: `Código incorreto. Tentativas restantes: ${remainingAttempts}`,
+                    message: `Codigo incorreto. Tentativas restantes: ${remainingAttempts}`,
                 };
             }
-            await otpDoc.ref.update({
+            await this.firestore.updateDocument(this.otpCollection, otpDoc.id, {
                 verified: true,
             });
             return {
                 success: true,
-                message: 'Código OTP verificado com sucesso',
+                message: 'Codigo OTP verificado com sucesso',
             };
         }
         catch (error) {
             console.error('Erro ao verificar OTP:', error);
             return {
                 success: false,
-                message: 'Erro ao verificar código OTP',
+                message: 'Erro ao verificar codigo OTP',
             };
         }
     }
     async cleanupExpiredOtps() {
         try {
-            const now = admin.firestore.Timestamp.now();
-            const expiredOtps = await this.db
-                .collection(this.otpCollection)
-                .where('expiresAt', '<', now)
-                .get();
-            const batch = this.db.batch();
-            expiredOtps.docs.forEach((doc) => {
-                batch.delete(doc.ref);
+            const now = new Date();
+            const expiredOtps = await this.firestore.query(this.otpCollection, {
+                where: [{ field: 'expiresAt', op: 'LESS_THAN', value: now }],
             });
-            await batch.commit();
-            console.log(`Limpeza: ${expiredOtps.size} OTPs expirados removidos`);
+            if (expiredOtps.length > 0) {
+                const paths = expiredOtps.map((doc) => `${this.otpCollection}/${doc.id}`);
+                await this.firestore.batchDelete(paths);
+            }
+            console.log(`Limpeza: ${expiredOtps.length} OTPs expirados removidos`);
         }
         catch (error) {
             console.error('Erro ao limpar OTPs expirados:', error);
@@ -1689,12 +2209,13 @@ let SimpleOtpService = class SimpleOtpService {
 };
 exports.SimpleOtpService = SimpleOtpService;
 exports.SimpleOtpService = SimpleOtpService = __decorate([
-    (0, common_1.Injectable)()
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [typeof (_a = typeof firestore_rest_service_1.FirestoreRestService !== "undefined" && firestore_rest_service_1.FirestoreRestService) === "function" ? _a : Object])
 ], SimpleOtpService);
 
 
 /***/ }),
-/* 29 */
+/* 34 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -1713,7 +2234,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.WhatsAppService = void 0;
 const common_1 = __webpack_require__(2);
 const config_1 = __webpack_require__(6);
-const Twilio = __webpack_require__(30);
+const Twilio = __webpack_require__(35);
 let WhatsAppService = WhatsAppService_1 = class WhatsAppService {
     constructor(configService) {
         this.configService = configService;
@@ -1793,13 +2314,13 @@ exports.WhatsAppService = WhatsAppService = WhatsAppService_1 = __decorate([
 
 
 /***/ }),
-/* 30 */
+/* 35 */
 /***/ ((module) => {
 
 module.exports = require("twilio");
 
 /***/ }),
-/* 31 */
+/* 36 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -1815,33 +2336,34 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AuthController = void 0;
 const common_1 = __webpack_require__(2);
 const swagger_1 = __webpack_require__(3);
 const throttler_1 = __webpack_require__(7);
-const api_key_guard_1 = __webpack_require__(19);
-const admin = __webpack_require__(10);
-const email_sender_service_1 = __webpack_require__(24);
-const simple_otp_service_1 = __webpack_require__(28);
-const whatsapp_service_1 = __webpack_require__(29);
+const api_key_guard_1 = __webpack_require__(24);
+const auth_jwt_service_1 = __webpack_require__(14);
+const email_sender_service_1 = __webpack_require__(29);
+const simple_otp_service_1 = __webpack_require__(33);
+const whatsapp_service_1 = __webpack_require__(34);
 const users_service_1 = __webpack_require__(9);
-const reset_password_dto_1 = __webpack_require__(32);
-const send_phone_otp_dto_1 = __webpack_require__(33);
+const reset_password_dto_1 = __webpack_require__(37);
+const send_phone_otp_dto_1 = __webpack_require__(38);
 let AuthController = class AuthController {
-    constructor(emailSenderService, simpleOtpService, whatsAppService, usersService) {
+    constructor(emailSenderService, simpleOtpService, whatsAppService, usersService, authJwt) {
         this.emailSenderService = emailSenderService;
         this.simpleOtpService = simpleOtpService;
         this.whatsAppService = whatsAppService;
         this.usersService = usersService;
+        this.authJwt = authJwt;
     }
     async resetPassword(resetPasswordDto) {
         try {
             await this.emailSenderService.sendPasswordResetEmail(resetPasswordDto.email);
             return {
                 success: true,
-                message: 'Email de redefinição de senha enviado com sucesso',
+                message: 'Email de redefinicao de senha enviado com sucesso',
             };
         }
         catch (error) {
@@ -1874,7 +2396,7 @@ let AuthController = class AuthController {
         const t1 = Date.now();
         const result = await this.simpleOtpService.sendOtp(body.phone);
         const t2 = Date.now();
-        console.log(`⏱️ [OTP-TIMING] Firestore (gerar+salvar OTP): ${t2 - t1}ms`);
+        console.log(`[OTP-TIMING] Firestore (gerar+salvar OTP): ${t2 - t1}ms`);
         if (!result.success) {
             throw new common_1.BadRequestException(result.message);
         }
@@ -1882,19 +2404,19 @@ let AuthController = class AuthController {
             const t3 = Date.now();
             this.whatsAppService.sendOtpMessage(body.phone, result.code)
                 .then((sent) => {
-                console.log(`⏱️ [OTP-TIMING] Twilio WhatsApp: ${Date.now() - t3}ms`);
+                console.log(`[OTP-TIMING] Twilio WhatsApp: ${Date.now() - t3}ms`);
                 if (!sent) {
-                    console.warn(`⚠️ [AuthController] Falha ao enviar OTP via WhatsApp para ${body.phone.substring(0, 4)}***`);
+                    console.warn(`[AuthController] Falha ao enviar OTP via WhatsApp para ${body.phone.substring(0, 4)}***`);
                 }
             })
                 .catch((err) => {
-                console.error(`❌ [AuthController] Erro ao enviar OTP via WhatsApp: ${err.message}`);
+                console.error(`[AuthController] Erro ao enviar OTP via WhatsApp: ${err.message}`);
             });
         }
-        console.log(`⏱️ [OTP-TIMING] TOTAL (até response): ${Date.now() - t0}ms`);
+        console.log(`[OTP-TIMING] TOTAL (ate response): ${Date.now() - t0}ms`);
         return {
             success: true,
-            message: 'Código de verificação enviado via WhatsApp',
+            message: 'Codigo de verificacao enviado via WhatsApp',
         };
     }
     async verifyOtpLogin(body) {
@@ -1903,12 +2425,12 @@ let AuthController = class AuthController {
             throw new common_1.BadRequestException(otpResult.message);
         }
         const normalizedPhone = body.phone.replace(/\D/g, '');
-        console.log(`✅ [AuthController] OTP verificado para ${normalizedPhone.substring(0, 4)}***`);
+        console.log(`[AuthController] OTP verificado para ${normalizedPhone.substring(0, 4)}***`);
         const user = await this.usersService.findByPhone(normalizedPhone);
         if (user) {
             const isComplete = this.isRegistrationComplete(user);
             if (!isComplete) {
-                console.log(`⚠️ [AuthController] Usuário encontrado mas cadastro incompleto. ID: ${user.id}`);
+                console.log(`[AuthController] Usuario encontrado mas cadastro incompleto. ID: ${user.id}`);
                 return {
                     success: true,
                     status: 'REGISTER',
@@ -1916,38 +2438,24 @@ let AuthController = class AuthController {
                     phone: normalizedPhone,
                 };
             }
-            console.log(`✅ [AuthController] Usuário completo encontrado. ID: ${user.id}`);
+            console.log(`[AuthController] Usuario completo encontrado. ID: ${user.id}`);
             try {
-                let firebaseUid;
-                try {
-                    const firebaseUser = await admin.auth().getUserByPhoneNumber('+' + normalizedPhone);
-                    firebaseUid = firebaseUser.uid;
-                }
-                catch (e) {
-                    if (e.code === 'auth/user-not-found') {
-                        const newUser = await admin.auth().createUser({
-                            phoneNumber: '+' + normalizedPhone,
-                        });
-                        firebaseUid = newUser.uid;
-                        console.log(`📝 [AuthController] Firebase Auth user criado: ${firebaseUid}`);
-                    }
-                    else {
-                        throw e;
-                    }
-                }
-                const customToken = await admin.auth().createCustomToken(firebaseUid);
-                console.log(`🔑 [AuthController] Custom token gerado para UID: ${firebaseUid}`);
+                const token = this.authJwt.signToken({
+                    sub: user.id,
+                    phone: normalizedPhone,
+                });
+                console.log(`[AuthController] JWT token gerado para userId: ${user.id}`);
                 try {
                     await this.usersService.updateLastLogin(user.id);
                 }
                 catch (error) {
-                    console.warn(`⚠️ [AuthController] Erro ao registrar login (não crítico): ${error.message}`);
+                    console.warn(`[AuthController] Erro ao registrar login (nao critico): ${error.message}`);
                 }
                 return {
                     success: true,
                     status: 'LOGGED_IN',
                     message: 'Login realizado com sucesso.',
-                    customToken,
+                    token,
                     userId: user.id,
                     phone: normalizedPhone,
                     user: {
@@ -1959,37 +2467,43 @@ let AuthController = class AuthController {
                 };
             }
             catch (error) {
-                console.error(`❌ [AuthController] Erro ao gerar custom token: ${error.message}`);
+                console.error(`[AuthController] Erro ao gerar JWT token: ${error.message}`);
                 throw new common_1.BadRequestException('Erro ao processar login. Tente novamente.');
             }
         }
         else {
-            console.log(`📝 [AuthController] Usuário não encontrado para ${normalizedPhone.substring(0, 4)}***`);
+            console.log(`[AuthController] Usuario nao encontrado para ${normalizedPhone.substring(0, 4)}***`);
             return {
                 success: true,
                 status: 'REGISTER',
-                message: 'Usuário não encontrado. Redirecionando para cadastro.',
+                message: 'Usuario nao encontrado. Redirecionando para cadastro.',
                 phone: normalizedPhone,
             };
         }
     }
     async checkUserStatus(body) {
         try {
-            console.log('🔐 [AuthController] Verificando status do usuário...');
-            const decodedToken = await admin.auth().verifyIdToken(body.token);
-            const firebaseUid = decodedToken.uid;
-            const phoneNumber = decodedToken.phone_number;
-            console.log(`📱 [AuthController] Token verificado. UID: ${firebaseUid}, Phone: ${phoneNumber?.substring(0, 4)}****`);
+            console.log('[AuthController] Verificando status do usuario...');
+            let decoded;
+            try {
+                decoded = this.authJwt.verifyToken(body.token);
+            }
+            catch (error) {
+                throw new common_1.UnauthorizedException('Token invalido ou expirado');
+            }
+            const userId = decoded.sub;
+            const phoneNumber = decoded.phone;
+            console.log(`[AuthController] Token verificado. userId: ${userId}, Phone: ${phoneNumber?.substring(0, 4)}****`);
             if (!phoneNumber) {
-                throw new common_1.BadRequestException('Token não contém número de telefone');
+                throw new common_1.BadRequestException('Token nao contem numero de telefone');
             }
             const normalizedPhone = phoneNumber.replace(/\D/g, '');
-            console.log(`🔍 [AuthController] Buscando usuário no Firestore...`);
+            console.log(`[AuthController] Buscando usuario no Firestore...`);
             const user = await this.usersService.findByPhone(normalizedPhone);
             if (user) {
                 const isRegistrationComplete = this.isRegistrationComplete(user);
                 if (!isRegistrationComplete) {
-                    console.log(`⚠️ [AuthController] Usuário encontrado mas cadastro incompleto. ID: ${user.id}`);
+                    console.log(`[AuthController] Usuario encontrado mas cadastro incompleto. ID: ${user.id}`);
                     return {
                         success: true,
                         status: 'REGISTER',
@@ -1997,18 +2511,18 @@ let AuthController = class AuthController {
                         phone: normalizedPhone,
                     };
                 }
-                console.log(`✅ [AuthController] Usuário encontrado com cadastro completo. ID: ${user.id}`);
+                console.log(`[AuthController] Usuario encontrado com cadastro completo. ID: ${user.id}`);
                 try {
                     await this.usersService.updateLastLogin(user.id);
-                    console.log(`📝 [AuthController] Login registrado para usuário ${user.id}`);
+                    console.log(`[AuthController] Login registrado para usuario ${user.id}`);
                 }
                 catch (error) {
-                    console.warn(`⚠️ [AuthController] Erro ao registrar login (não crítico): ${error.message}`);
+                    console.warn(`[AuthController] Erro ao registrar login (nao critico): ${error.message}`);
                 }
                 return {
                     success: true,
                     status: 'LOGGED_IN',
-                    message: 'Usuário autenticado com sucesso. Redirecionando para o dashboard.',
+                    message: 'Usuario autenticado com sucesso. Redirecionando para o dashboard.',
                     phone: normalizedPhone,
                     userId: user.id,
                     user: {
@@ -2020,26 +2534,23 @@ let AuthController = class AuthController {
                 };
             }
             else {
-                console.log(`📝 [AuthController] Usuário não encontrado. Redirecionando para cadastro.`);
+                console.log(`[AuthController] Usuario nao encontrado. Redirecionando para cadastro.`);
                 return {
                     success: true,
                     status: 'REGISTER',
-                    message: 'Usuário não encontrado. Redirecionando para cadastro.',
+                    message: 'Usuario nao encontrado. Redirecionando para cadastro.',
                     phone: normalizedPhone,
                 };
             }
         }
         catch (error) {
-            console.error(`❌ [AuthController] Erro ao verificar status:`, {
+            console.error(`[AuthController] Erro ao verificar status:`, {
                 message: error.message,
                 code: error.code,
                 stack: error.stack,
             });
-            if (error instanceof common_1.BadRequestException) {
+            if (error instanceof common_1.BadRequestException || error instanceof common_1.UnauthorizedException) {
                 throw error;
-            }
-            if (error.code === 'auth/argument-error' || error.code === 'auth/id-token-expired') {
-                throw new common_1.UnauthorizedException('Token inválido ou expirado');
             }
             throw new common_1.BadRequestException(`Erro ao verificar status: ${error.message}`);
         }
@@ -2047,46 +2558,46 @@ let AuthController = class AuthController {
     isRegistrationComplete(user) {
         const hasCpf = !!(user.cpfEncrypted || user.cpfHash || user.cpf);
         if (!hasCpf) {
-            console.log(`⚠️ [AuthController] Campo obrigatório ausente: CPF (cpfEncrypted/cpfHash/cpf)`);
+            console.log(`[AuthController] Campo obrigatorio ausente: CPF (cpfEncrypted/cpfHash/cpf)`);
             return false;
         }
         const hasEmail = !!(user.emailEncrypted || user.emailHash || user.email);
         if (!hasEmail) {
-            console.log(`⚠️ [AuthController] Campo obrigatório ausente: Email (emailEncrypted/emailHash/email)`);
+            console.log(`[AuthController] Campo obrigatorio ausente: Email (emailEncrypted/emailHash/email)`);
             return false;
         }
         const hasFullName = !!(user.displayName || user.full_name);
         if (!hasFullName) {
-            console.log(`⚠️ [AuthController] Campo obrigatório ausente: Nome Completo (displayName/full_name)`);
+            console.log(`[AuthController] Campo obrigatorio ausente: Nome Completo (displayName/full_name)`);
             return false;
         }
         const hasPhone = !!(user.phone || user.phoneHash);
         if (!hasPhone) {
-            console.log(`⚠️ [AuthController] Campo obrigatório ausente: Telefone (phone/phoneHash)`);
+            console.log(`[AuthController] Campo obrigatorio ausente: Telefone (phone/phoneHash)`);
             return false;
         }
         if (!user.birthDate) {
-            console.log(`⚠️ [AuthController] Campo obrigatório ausente: birthDate`);
+            console.log(`[AuthController] Campo obrigatorio ausente: birthDate`);
             return false;
         }
         if (!user.motherName || user.motherName === '') {
-            console.log(`⚠️ [AuthController] Campo obrigatório ausente: motherName`);
+            console.log(`[AuthController] Campo obrigatorio ausente: motherName`);
             return false;
         }
         if (!user.occupation || user.occupation === '') {
-            console.log(`⚠️ [AuthController] Campo obrigatório ausente: occupation`);
+            console.log(`[AuthController] Campo obrigatorio ausente: occupation`);
             return false;
         }
         if (!user.incomeRange || user.incomeRange === '') {
-            console.log(`⚠️ [AuthController] Campo obrigatório ausente: incomeRange`);
+            console.log(`[AuthController] Campo obrigatorio ausente: incomeRange`);
             return false;
         }
         const hasDocumentType = !!(user.kycDocuments?.documentType || user.documentType);
         if (!hasDocumentType) {
-            console.log(`⚠️ [AuthController] Campo obrigatório ausente: documentType (kycDocuments.documentType/documentType)`);
+            console.log(`[AuthController] Campo obrigatorio ausente: documentType (kycDocuments.documentType/documentType)`);
             return false;
         }
-        console.log(`✅ [AuthController] Todos os campos obrigatórios estão presentes`);
+        console.log(`[AuthController] Todos os campos obrigatorios estao presentes`);
         return true;
     }
 };
@@ -2095,57 +2606,57 @@ __decorate([
     (0, common_1.Post)('reset-password'),
     (0, throttler_1.Throttle)({ default: { limit: 5, ttl: 60000 } }),
     (0, swagger_1.ApiOperation)({
-        summary: 'Enviar email de redefinição de senha (customizado)',
-        description: 'Envia email customizado com template personalizado usando Firebase Admin SDK para gerar o link'
+        summary: 'Enviar email de redefinicao de senha (customizado)',
+        description: 'Envia email customizado com template personalizado'
     }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Email enviado com sucesso' }),
-    (0, swagger_1.ApiResponse)({ status: 400, description: 'Email inválido' }),
-    (0, swagger_1.ApiResponse)({ status: 404, description: 'Usuário não encontrado no Firebase' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Email invalido' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'Usuario nao encontrado' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [typeof (_e = typeof reset_password_dto_1.ResetPasswordDto !== "undefined" && reset_password_dto_1.ResetPasswordDto) === "function" ? _e : Object]),
+    __metadata("design:paramtypes", [typeof (_f = typeof reset_password_dto_1.ResetPasswordDto !== "undefined" && reset_password_dto_1.ResetPasswordDto) === "function" ? _f : Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "resetPassword", null);
 __decorate([
     (0, common_1.Post)('send-otp'),
     (0, throttler_1.Throttle)({ default: { limit: 3, ttl: 60000 } }),
     (0, swagger_1.ApiOperation)({
-        summary: 'Enviar código OTP para telefone (alternativa ao Firebase Phone Auth)',
-        description: 'Gera e retorna código OTP de 6 dígitos. Para testes, o código é retornado no response.'
+        summary: 'Enviar codigo OTP para telefone (alternativa ao Firebase Phone Auth)',
+        description: 'Gera e retorna codigo OTP de 6 digitos. Para testes, o codigo e retornado no response.'
     }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'OTP gerado com sucesso' }),
-    (0, swagger_1.ApiResponse)({ status: 400, description: 'Telefone inválido' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Telefone invalido' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [typeof (_f = typeof send_phone_otp_dto_1.SendPhoneOtpDto !== "undefined" && send_phone_otp_dto_1.SendPhoneOtpDto) === "function" ? _f : Object]),
+    __metadata("design:paramtypes", [typeof (_g = typeof send_phone_otp_dto_1.SendPhoneOtpDto !== "undefined" && send_phone_otp_dto_1.SendPhoneOtpDto) === "function" ? _g : Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "sendOtp", null);
 __decorate([
     (0, common_1.Post)('verify-otp'),
     (0, throttler_1.Throttle)({ default: { limit: 10, ttl: 60000 } }),
     (0, swagger_1.ApiOperation)({
-        summary: 'Verificar código OTP',
-        description: 'Valida o código OTP enviado pelo usuário'
+        summary: 'Verificar codigo OTP',
+        description: 'Valida o codigo OTP enviado pelo usuario'
     }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'OTP verificado com sucesso' }),
-    (0, swagger_1.ApiResponse)({ status: 400, description: 'Código inválido ou expirado' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Codigo invalido ou expirado' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [typeof (_g = typeof send_phone_otp_dto_1.VerifyPhoneOtpDto !== "undefined" && send_phone_otp_dto_1.VerifyPhoneOtpDto) === "function" ? _g : Object]),
+    __metadata("design:paramtypes", [typeof (_h = typeof send_phone_otp_dto_1.VerifyPhoneOtpDto !== "undefined" && send_phone_otp_dto_1.VerifyPhoneOtpDto) === "function" ? _h : Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "verifyOtp", null);
 __decorate([
     (0, common_1.Post)('send-otp-whatsapp'),
     (0, throttler_1.Throttle)({ default: { limit: 3, ttl: 60000 } }),
     (0, swagger_1.ApiOperation)({
-        summary: 'Enviar código OTP via WhatsApp',
-        description: 'Gera código OTP de 4 dígitos e envia via WhatsApp para o telefone informado'
+        summary: 'Enviar codigo OTP via WhatsApp',
+        description: 'Gera codigo OTP de 4 digitos e envia via WhatsApp para o telefone informado'
     }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'OTP enviado via WhatsApp com sucesso' }),
-    (0, swagger_1.ApiResponse)({ status: 400, description: 'Telefone inválido ou falha no envio' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Telefone invalido ou falha no envio' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [typeof (_h = typeof send_phone_otp_dto_1.SendPhoneOtpDto !== "undefined" && send_phone_otp_dto_1.SendPhoneOtpDto) === "function" ? _h : Object]),
+    __metadata("design:paramtypes", [typeof (_j = typeof send_phone_otp_dto_1.SendPhoneOtpDto !== "undefined" && send_phone_otp_dto_1.SendPhoneOtpDto) === "function" ? _j : Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "sendOtpWhatsApp", null);
 __decorate([
@@ -2153,28 +2664,28 @@ __decorate([
     (0, throttler_1.Throttle)({ default: { limit: 10, ttl: 60000 } }),
     (0, swagger_1.ApiOperation)({
         summary: 'Verificar OTP e fazer login',
-        description: 'Valida o código OTP, busca usuário pelo telefone e retorna status + custom token para login'
+        description: 'Valida o codigo OTP, busca usuario pelo telefone no Firestore e retorna status + JWT token para login'
     }),
-    (0, swagger_1.ApiResponse)({ status: 200, description: 'OTP verificado e status do usuário retornado' }),
-    (0, swagger_1.ApiResponse)({ status: 400, description: 'Código inválido, expirado ou telefone inválido' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'OTP verificado e status do usuario retornado' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Codigo invalido, expirado ou telefone invalido' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [typeof (_j = typeof send_phone_otp_dto_1.VerifyPhoneOtpDto !== "undefined" && send_phone_otp_dto_1.VerifyPhoneOtpDto) === "function" ? _j : Object]),
+    __metadata("design:paramtypes", [typeof (_k = typeof send_phone_otp_dto_1.VerifyPhoneOtpDto !== "undefined" && send_phone_otp_dto_1.VerifyPhoneOtpDto) === "function" ? _k : Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "verifyOtpLogin", null);
 __decorate([
     (0, common_1.Post)('check-user-status'),
     (0, throttler_1.Throttle)({ default: { limit: 10, ttl: 60000 } }),
     (0, swagger_1.ApiOperation)({
-        summary: 'Verificar status do usuário após autenticação Firebase',
-        description: 'Verifica se o usuário existe no sistema e retorna o status (LOGGED_IN, REQUIRE_CPF_CHECK ou REGISTER)'
+        summary: 'Verificar status do usuario apos autenticacao',
+        description: 'Verifica o JWT token, busca o usuario no Firestore e retorna o status (LOGGED_IN ou REGISTER)'
     }),
-    (0, swagger_1.ApiResponse)({ status: 200, description: 'Status do usuário retornado com sucesso' }),
-    (0, swagger_1.ApiResponse)({ status: 400, description: 'Token inválido' }),
-    (0, swagger_1.ApiResponse)({ status: 401, description: 'Token não autorizado' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Status do usuario retornado com sucesso' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Token invalido' }),
+    (0, swagger_1.ApiResponse)({ status: 401, description: 'Token nao autorizado' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [typeof (_k = typeof send_phone_otp_dto_1.CheckUserStatusDto !== "undefined" && send_phone_otp_dto_1.CheckUserStatusDto) === "function" ? _k : Object]),
+    __metadata("design:paramtypes", [typeof (_l = typeof send_phone_otp_dto_1.CheckUserStatusDto !== "undefined" && send_phone_otp_dto_1.CheckUserStatusDto) === "function" ? _l : Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "checkUserStatus", null);
 exports.AuthController = AuthController = __decorate([
@@ -2182,12 +2693,12 @@ exports.AuthController = AuthController = __decorate([
     (0, common_1.Controller)('api/auth'),
     (0, common_1.UseGuards)(api_key_guard_1.ApiKeyGuard),
     (0, swagger_1.ApiSecurity)('api-key'),
-    __metadata("design:paramtypes", [typeof (_a = typeof email_sender_service_1.EmailSenderService !== "undefined" && email_sender_service_1.EmailSenderService) === "function" ? _a : Object, typeof (_b = typeof simple_otp_service_1.SimpleOtpService !== "undefined" && simple_otp_service_1.SimpleOtpService) === "function" ? _b : Object, typeof (_c = typeof whatsapp_service_1.WhatsAppService !== "undefined" && whatsapp_service_1.WhatsAppService) === "function" ? _c : Object, typeof (_d = typeof users_service_1.UsersService !== "undefined" && users_service_1.UsersService) === "function" ? _d : Object])
+    __metadata("design:paramtypes", [typeof (_a = typeof email_sender_service_1.EmailSenderService !== "undefined" && email_sender_service_1.EmailSenderService) === "function" ? _a : Object, typeof (_b = typeof simple_otp_service_1.SimpleOtpService !== "undefined" && simple_otp_service_1.SimpleOtpService) === "function" ? _b : Object, typeof (_c = typeof whatsapp_service_1.WhatsAppService !== "undefined" && whatsapp_service_1.WhatsAppService) === "function" ? _c : Object, typeof (_d = typeof users_service_1.UsersService !== "undefined" && users_service_1.UsersService) === "function" ? _d : Object, typeof (_e = typeof auth_jwt_service_1.AuthJwtService !== "undefined" && auth_jwt_service_1.AuthJwtService) === "function" ? _e : Object])
 ], AuthController);
 
 
 /***/ }),
-/* 32 */
+/* 37 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -2203,7 +2714,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ResetPasswordByCpfDto = exports.ResetPasswordDto = void 0;
 const swagger_1 = __webpack_require__(3);
-const class_validator_1 = __webpack_require__(14);
+const class_validator_1 = __webpack_require__(19);
 class ResetPasswordDto {
 }
 exports.ResetPasswordDto = ResetPasswordDto;
@@ -2230,7 +2741,7 @@ __decorate([
 
 
 /***/ }),
-/* 33 */
+/* 38 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -2246,7 +2757,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.CheckUserStatusDto = exports.VerifyPhoneOtpDto = exports.SendPhoneOtpDto = void 0;
 const swagger_1 = __webpack_require__(3);
-const class_validator_1 = __webpack_require__(14);
+const class_validator_1 = __webpack_require__(19);
 class SendPhoneOtpDto {
 }
 exports.SendPhoneOtpDto = SendPhoneOtpDto;
@@ -2289,7 +2800,7 @@ __decorate([
 
 
 /***/ }),
-/* 34 */
+/* 39 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -2310,7 +2821,7 @@ var _a, _b;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.WhatsAppWebhookController = void 0;
 const common_1 = __webpack_require__(2);
-const whatsapp_service_1 = __webpack_require__(29);
+const whatsapp_service_1 = __webpack_require__(34);
 let WhatsAppWebhookController = WhatsAppWebhookController_1 = class WhatsAppWebhookController {
     constructor(whatsAppService) {
         this.whatsAppService = whatsAppService;
@@ -2365,7 +2876,7 @@ exports.WhatsAppWebhookController = WhatsAppWebhookController = WhatsAppWebhookC
 
 
 /***/ }),
-/* 35 */
+/* 40 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -2379,13 +2890,16 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 var HealthController_1;
+var _a;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.HealthController = void 0;
 const common_1 = __webpack_require__(2);
 const swagger_1 = __webpack_require__(3);
-const admin = __webpack_require__(10);
+const firestore_rest_service_1 = __webpack_require__(11);
+const firestore_rest_utils_1 = __webpack_require__(13);
 let HealthController = HealthController_1 = class HealthController {
-    constructor() {
+    constructor(firestore) {
+        this.firestore = firestore;
         this.logger = new common_1.Logger(HealthController_1.name);
         this.KEEP_ALIVE_INTERVAL = 30 * 60 * 1000;
     }
@@ -2396,7 +2910,9 @@ let HealthController = HealthController_1 = class HealthController {
     async warmUpFirestore() {
         try {
             const start = Date.now();
-            await admin.firestore().collection('_health').doc('ping').set({ timestamp: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            await this.firestore.setDocument('_health', 'ping', {
+                timestamp: (0, firestore_rest_utils_1.serverTimestamp)(),
+            }, true);
             this.logger.log(`🔥 Firestore keep-alive OK (${Date.now() - start}ms)`);
         }
         catch (error) {
@@ -2422,15 +2938,41 @@ __decorate([
 ], HealthController.prototype, "check", null);
 exports.HealthController = HealthController = HealthController_1 = __decorate([
     (0, swagger_1.ApiTags)('Health'),
-    (0, common_1.Controller)('health')
+    (0, common_1.Controller)('health'),
+    __metadata("design:paramtypes", [typeof (_a = typeof firestore_rest_service_1.FirestoreRestService !== "undefined" && firestore_rest_service_1.FirestoreRestService) === "function" ? _a : Object])
 ], HealthController);
 
 
 /***/ }),
-/* 36 */
-/***/ ((module) => {
+/* 41 */
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
-module.exports = require("os");
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.FirebaseRestModule = void 0;
+const common_1 = __webpack_require__(2);
+const config_1 = __webpack_require__(6);
+const firestore_rest_service_1 = __webpack_require__(11);
+const auth_jwt_service_1 = __webpack_require__(14);
+const storage_rest_service_1 = __webpack_require__(16);
+let FirebaseRestModule = class FirebaseRestModule {
+};
+exports.FirebaseRestModule = FirebaseRestModule;
+exports.FirebaseRestModule = FirebaseRestModule = __decorate([
+    (0, common_1.Global)(),
+    (0, common_1.Module)({
+        imports: [config_1.ConfigModule],
+        providers: [firestore_rest_service_1.FirestoreRestService, auth_jwt_service_1.AuthJwtService, storage_rest_service_1.StorageRestService],
+        exports: [firestore_rest_service_1.FirestoreRestService, auth_jwt_service_1.AuthJwtService, storage_rest_service_1.StorageRestService],
+    })
+], FirebaseRestModule);
+
 
 /***/ })
 /******/ 	]);
@@ -2471,82 +3013,12 @@ const common_1 = __webpack_require__(2);
 const swagger_1 = __webpack_require__(3);
 const helmet_1 = __webpack_require__(4);
 const app_module_1 = __webpack_require__(5);
-const admin = __webpack_require__(10);
-const fs = __webpack_require__(22);
-const os = __webpack_require__(36);
-const path = __webpack_require__(23);
-if (!admin.apps.length) {
-    try {
-        const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || 'pagpagapp';
-        const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
-        const firebaseCiToken = process.env.FIREBASE_CI_TOKEN;
-        const googleCredentialsJson = process.env.GOOGLE_CREDENTIALS_JSON;
-        const isCloudRun = !!process.env.K_SERVICE;
-        console.log('🔧 Inicializando Firebase Admin...');
-        console.log(`📋 Project ID: ${projectId}`);
-        if (serviceAccountJson) {
-            console.log('📋 Modo: SERVICE_ACCOUNT');
-            admin.initializeApp({
-                credential: admin.credential.cert(JSON.parse(serviceAccountJson)),
-                projectId,
-            });
-        }
-        else if (firebaseCiToken) {
-            console.log('📋 Modo: FIREBASE_CI_TOKEN (convertido para ADC)');
-            const adcJson = JSON.stringify({
-                type: 'authorized_user',
-                client_id: '563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com',
-                client_secret: 'j9iVZfS8kkCEFUPaAeJV0sAi',
-                refresh_token: firebaseCiToken,
-            });
-            const credPath = path.join(os.tmpdir(), 'firebase-ci-credentials.json');
-            fs.writeFileSync(credPath, adcJson, { mode: 0o600 });
-            process.env.GOOGLE_APPLICATION_CREDENTIALS = credPath;
-            admin.initializeApp({ projectId });
-            admin.firestore().settings({ preferRest: true });
-        }
-        else if (googleCredentialsJson) {
-            console.log('📋 Modo: GOOGLE_CREDENTIALS_JSON (Railway/externo)');
-            console.warn('⚠️ Credencial de usuário OAuth — pode expirar por RAPT. Prefira FIREBASE_CI_TOKEN.');
-            const credPath = path.join(os.tmpdir(), 'gcloud-credentials.json');
-            fs.writeFileSync(credPath, googleCredentialsJson, { mode: 0o600 });
-            process.env.GOOGLE_APPLICATION_CREDENTIALS = credPath;
-            admin.initializeApp({ projectId });
-            admin.firestore().settings({ preferRest: true });
-        }
-        else if (isCloudRun) {
-            console.log('📋 Modo: ADC (Cloud Run)');
-            admin.initializeApp({ projectId });
-        }
-        else {
-            console.log('📋 Modo: ADC (desenvolvimento local)');
-            admin.initializeApp({ projectId });
-        }
-        admin.firestore();
-        console.log('✅ Firebase Admin inicializado com sucesso');
-    }
-    catch (error) {
-        console.error('❌ Erro ao inicializar Firebase Admin:', error.message);
-        try {
-            admin.initializeApp();
-            console.log('✅ Firebase Admin inicializado com credenciais padrão (fallback)');
-        }
-        catch (fallbackError) {
-            console.error('❌ Falha total ao inicializar Firebase Admin:', fallbackError.message);
-            console.error('💡 Opções de autenticação:');
-            console.error('   1. FIREBASE_SERVICE_ACCOUNT=<json> (Service Account Key)');
-            console.error('   2. FIREBASE_CI_TOKEN=<token> (via npx firebase login:ci)');
-            console.error('   3. GOOGLE_CREDENTIALS_JSON=<json> (ADC JSON - pode expirar)');
-            console.error('   4. gcloud auth application-default login (dev local)');
-            throw fallbackError;
-        }
-    }
-}
 async function bootstrap() {
     try {
         console.log('🚀 Iniciando aplicação NestJS...');
         console.log(`📋 Ambiente: ${process.env.NODE_ENV || 'development'}`);
         console.log(`🔌 Porta: ${process.env.PORT || 8080}`);
+        console.log(`🔥 Firebase: REST API (sem Admin SDK)`);
         const app = await core_1.NestFactory.create(app_module_1.AppModule);
         app.use((0, helmet_1.default)());
         app.enableCors({
@@ -2580,8 +3052,8 @@ async function bootstrap() {
         }));
         const config = new swagger_1.DocumentBuilder()
             .setTitle('Neves Capital API')
-            .setDescription('API Backend for Neves Capital - Firebase')
-            .setVersion('1.0')
+            .setDescription('API Backend for Neves Capital - Firebase REST')
+            .setVersion('2.0')
             .addApiKey({ type: 'apiKey', name: 'x-api-key', in: 'header' }, 'api-key')
             .build();
         const document = swagger_1.SwaggerModule.createDocument(app, config);
