@@ -351,7 +351,7 @@ class _Step7PersonalData2ScreenState extends State<Step7PersonalData2Screen> {
         // Marcar como logado
         try {
           if (widget.authController != null) {
-            await widget.authController!.loginWithOtpMock(widget.cpf);
+            await widget.authController!.loginWithOtp(widget.cpf);
             AppLogger.info('✅ Login automático realizado com sucesso');
           }
         } catch (loginError) {
@@ -818,15 +818,25 @@ class _OccupationSearchScreenState extends State<_OccupationSearchScreen> {
     super.dispose();
   }
 
+  /// Remove acentos de uma string para busca flexível
+  static String _removeAccents(String text) {
+    const accented =  'àáâãäåèéêëìíîïòóôõöùúûüýñçÀÁÂÃÄÅÈÉÊËÌÍÎÏÒÓÔÕÖÙÚÛÜÝÑÇ';
+    const unaccented = 'aaaaaaeeeeiiiioooooouuuuyncAAAAAAEEEEIIIIOOOOOUUUUYNC';
+    return text.split('').map((char) {
+      final index = accented.indexOf(char);
+      return index >= 0 ? unaccented[index] : char;
+    }).join();
+  }
+
   void _filterOccupations() {
-    final query = _searchController.text.toLowerCase();
+    final query = _removeAccents(_searchController.text.toLowerCase());
     setState(() {
       if (query.isEmpty) {
         _filteredOccupations = widget.occupations;
       } else {
         _filteredOccupations = widget.occupations
             .where((occupation) =>
-                occupation.toLowerCase().contains(query))
+                _removeAccents(occupation.toLowerCase()).contains(query))
             .toList();
       }
     });
@@ -837,11 +847,16 @@ class _OccupationSearchScreenState extends State<_OccupationSearchScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
-      extendBodyBehindAppBar: true,
-      appBar: GlassAppBar(
-        onBackPressed: () {
-          Navigator.pop(context, widget.selectedOccupation);
-        },
+      appBar: AppBar(
+        backgroundColor: AppTheme.backgroundColor,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            Navigator.pop(context, widget.selectedOccupation);
+          },
+        ),
         title: TextField(
           controller: _searchController,
           focusNode: _searchFocusNode,

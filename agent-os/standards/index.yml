@@ -1,0 +1,33 @@
+# Agent OS Standards Index
+
+api:
+  backend-endpoints:
+    description: NestJS backend structure, controller pattern with ApiKeyGuard, DTOs, Swagger docs, key endpoints
+  firebase-rest:
+    description: Firebase REST API services (FirestoreRestService, AuthJwtService, StorageRestService) replacing admin SDK
+
+architecture:
+  clean-architecture:
+    description: Flutter feature structure with data/domain/presentation layers, manual DI factories, shared code organization
+  result-pattern:
+    description: Sealed Result<T> class with Success/Error — all use cases must return Result, never throw
+  state-management:
+    description: ChangeNotifier + ListenableBuilder pattern, controller conventions, dispose safety, manual DI
+
+auth:
+  authentication-flow:
+    description: OTP via WhatsApp login flow, 8-step registration, biometric auth, login state management
+  security:
+    description: API key guard, JWT tokens, AES-256 encryption, SecureStorage, rate limiting, encrypted Firestore fields
+
+integrations:
+  payment-gateway:
+    description: Pagar.me Core V5 credit card integration, known limitations (hardcoded data), payment flow steps
+  twilio-whatsapp:
+    description: WhatsApp Business OTP delivery via Twilio, content templates, fire-and-forget pattern
+
+mobile:
+  flutter-conventions:
+    description: Dart SDK constraints, AppTheme dark mode system, DesignSystem tokens, imperative navigation, shared components
+  services:
+    description: Static-method service pattern, EnvService, FirestoreService, BiometricService, EncryptionService, AuthApiService

@@ -343,63 +343,73 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
-      appBar: GlassAppBar(
-        title: const Text(
-          'Endereço',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        bottom: RegistrationProgressIndicator.preferredSize(2),
-        onBackPressed: () {
-          // Tentar fazer pop primeiro (se houver tela anterior na pilha)
-          // Se não houver, navegar explicitamente para a tela anterior
-          if (Navigator.canPop(context)) {
-            Navigator.pop(context);
-          } else {
-            // Não há tela anterior na pilha (vem do fluxo de "Recomeçar")
-            // Navegar explicitamente para a tela de dados pessoais 1
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => Step5PersonalData1Screen(
-                  authController: widget.authController,
-                  themeController: widget.themeController,
-                  cpf: widget.cpf,
-                  phone: widget.phone,
-                  email: widget.email,
-                  initialFullName: widget.fullName,
-                  initialBirthDate: widget.birthDate,
-                  initialMotherName: widget.motherName,
-                ),
-              ),
-            );
-          }
-        },
-      ),
       body: Container(
         color: AppTheme.backgroundColor,
-        child: SafeArea(
-          child: KeyboardDismissWrapper(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 0),
-              child: Form(
-                key: _formKey,
-                autovalidateMode: AutovalidateMode.disabled,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: KeyboardDismissWrapper(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(24.0, topPadding + 8, 24.0, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header: botão voltar + título
+                Row(
                   children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
+                    LiquidBackButton(
+                      onPressed: () {
+                        if (Navigator.canPop(context)) {
+                          Navigator.pop(context);
+                        } else {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => Step5PersonalData1Screen(
+                                authController: widget.authController,
+                                themeController: widget.themeController,
+                                cpf: widget.cpf,
+                                phone: widget.phone,
+                                email: widget.email,
+                                initialFullName: widget.fullName,
+                                initialBirthDate: widget.birthDate,
+                                initialMotherName: widget.motherName,
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    const Expanded(
+                      child: Text(
+                        'Endereço',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 40), // Balance the back button
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Barra de progresso
+                RegistrationProgressIndicator(currentStep: 2),
+                const SizedBox(height: 24),
+                // Formulário
+                Expanded(
+                  child: Form(
+                    key: _formKey,
+                    autovalidateMode: AutovalidateMode.disabled,
+                    child: SingleChildScrollView(
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                     // CEP
                     TextFormField(
                       controller: _cepController,
@@ -412,7 +422,7 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                             },
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
-                              LengthLimitingTextInputFormatter(9), // xxxxx-xxx
+                              LengthLimitingTextInputFormatter(8), // 8 dígitos (formatação adiciona o hífen)
                             ],
                             style: const TextStyle(color: Colors.white),
                             onChanged: (value) {
@@ -737,50 +747,49 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                         ),
                       ),
                     ],
-                          ],
-                        ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _handleNext,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
-                          foregroundColor: AppTheme.backgroundColor,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _handleNext,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: AppTheme.backgroundColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                AppTheme.backgroundColor),
                           ),
-                          elevation: 0,
+                        )
+                      : const Text(
+                          'Avançar',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                      AppTheme.backgroundColor),
-                                ),
-                              )
-                            : const Text(
-                                'Avançar',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
                 ),
               ),
-            ),
+              const SizedBox(height: 24),
+            ],
           ),
         ),
+      ),
       ),
     );
   }

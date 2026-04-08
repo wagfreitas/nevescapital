@@ -345,7 +345,7 @@ class AuthController extends ChangeNotifier {
   ///
   /// **REFATORADO**: Agora usa GetUserByCpfUseCase (Clean Architecture)
   /// **Nota**: Prefira loginWithOtpDirect() quando já tiver os dados do usuário
-  Future<bool> loginWithOtpMock(String cpf) async {
+  Future<bool> loginWithOtp(String cpf) async {
     _isLoading = true;
     _errorMessage = null;
     _loginProgress = LoginProgress.searchingUser;
@@ -399,7 +399,7 @@ class AuthController extends ChangeNotifier {
   /// Login direto com OTP - OTIMIZADO (sem re-busca ao Firestore)
   ///
   /// Chamado quando já temos CPF e userId do getUserByDocumentId().
-  /// Evita uma segunda query ao Firestore que o loginWithOtpMock() faria.
+  /// Evita uma segunda query ao Firestore que o loginWithOtp() faria.
   /// Economiza ~500ms-1s por login.
   Future<bool> loginWithOtpDirect({
     required String cpf,

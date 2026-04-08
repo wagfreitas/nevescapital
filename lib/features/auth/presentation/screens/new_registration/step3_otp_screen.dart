@@ -89,6 +89,32 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
     super.dispose();
   }
 
+  /// Trata mudanças no campo OTP (detecta paste com múltiplos dígitos)
+  void _handleOtpChanged(String value) {
+    // Detectar PASTE: se o valor colado tem caracteres não-numéricos, limpar
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    if (digits != value) {
+      // Havia caracteres não-numéricos, limpar e aplicar só dígitos
+      final trimmed = digits.length > _otpLength ? digits.substring(0, _otpLength) : digits;
+      _otpController.value = TextEditingValue(
+        text: trimmed,
+        selection: TextSelection.collapsed(offset: trimmed.length),
+      );
+    }
+    setState(() {
+      _errorMessage = null;
+    });
+  }
+
+  /// Limpa o campo OTP inteiro
+  void _clearAllFields() {
+    _otpController.clear();
+    _otpFocusNode.requestFocus();
+    setState(() {
+      _errorMessage = null;
+    });
+  }
+
   Future<void> _handleVerifyOtp() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -330,9 +356,10 @@ class _Step3OtpScreenState extends State<Step3OtpScreen> {
                           autofocus: true,
                           keyboardType: TextInputType.number,
                           textAlign: TextAlign.center,
-                          maxLength: _otpLength,
+                          onChanged: _handleOtpChanged,
                           inputFormatters: [
                             FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(_otpLength),
                           ],
                           style: const TextStyle(
                             fontSize: 32,
