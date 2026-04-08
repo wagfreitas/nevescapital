@@ -115,6 +115,32 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
     super.dispose();
   }
 
+  /// Trata mudanças no campo OTP (detecta paste com múltiplos dígitos)
+  void _handleOtpChanged(String value) {
+    // Detectar PASTE: se o valor colado tem caracteres não-numéricos, limpar
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    if (digits != value) {
+      // Havia caracteres não-numéricos, limpar e aplicar só dígitos
+      final trimmed = digits.length > _otpLength ? digits.substring(0, _otpLength) : digits;
+      _otpController.value = TextEditingValue(
+        text: trimmed,
+        selection: TextSelection.collapsed(offset: trimmed.length),
+      );
+    }
+    setState(() {
+      _errorMessage = null;
+    });
+  }
+
+  /// Limpa o campo OTP inteiro
+  void _clearAllFields() {
+    _otpController.clear();
+    _otpFocusNode.requestFocus();
+    setState(() {
+      _errorMessage = null;
+    });
+  }
+
   Future<void> _handleVerifyOtp() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -303,8 +329,8 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
               AppLogger.info(
                   'CPF obtido: ${cpf.substring(0, 3)}***');
 
-              // ⚡ OTIMIZADO: Usa loginWithOtpDirect() em vez de loginWithOtpMock()
-              // loginWithOtpMock faria OUTRA query ao Firestore (getUserByCpf) = ~500ms desperdiçados
+              // ⚡ OTIMIZADO: Usa loginWithOtpDirect() em vez de loginWithOtp()
+              // loginWithOtp faria OUTRA query ao Firestore (getUserByCpf) = ~500ms desperdiçados
               // loginWithOtpDirect usa o CPF que já temos = 0ms de query extra
               final loginSuccess = await widget.authController!.loginWithOtpDirect(
                 cpf: cpf,
@@ -664,10 +690,11 @@ class _LoginStep3OtpScreenState extends State<LoginStep3OtpScreen> {
                           _handleVerifyOtp();
                         }
                       },
+                      onChanged: _handleOtpChanged,
                       textAlign: TextAlign.center,
-                      maxLength: _otpLength,
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(_otpLength),
                       ],
                       style: const TextStyle(
                         fontSize: 32,

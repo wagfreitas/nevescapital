@@ -327,7 +327,7 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 16),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.1),
+                                color: AppTheme.inputEditableBackgroundColor,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: formState.hasError
@@ -420,15 +420,24 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
     super.dispose();
   }
 
+  String _removeAccents(String text) {
+    const accented =  'àáâãäåèéêëìíîïòóôõöùúûüýñçÀÁÂÃÄÅÈÉÊËÌÍÎÏÒÓÔÕÖÙÚÛÜÝÑÇ';
+    const unaccented = 'aaaaaaeeeeiiiioooooouuuuyncAAAAAAEEEEIIIIOOOOOUUUUYNC';
+    return text.split('').map((char) {
+      final index = accented.indexOf(char);
+      return index >= 0 ? unaccented[index] : char;
+    }).join();
+  }
+
   void _filterTypes() {
-    final query = _searchController.text.toLowerCase().trim();
+    final query = _removeAccents(_searchController.text.toLowerCase().trim());
     setState(() {
       if (query.isEmpty) {
         _filteredTypes = List.from(widget.businessTypes);
       } else {
         _filteredTypes = widget.businessTypes
             .where((type) =>
-                (type['label'] ?? '').toLowerCase().contains(query))
+                _removeAccents((type['label'] ?? '').toLowerCase()).contains(query))
             .toList();
       }
     });
@@ -510,11 +519,7 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
                         ),
                         trailing: isSelected
                             ? Icon(Icons.check, color: AppTheme.primaryColor)
-                            : const Icon(
-                                Icons.arrow_forward_ios,
-                                size: 16,
-                                color: AppTheme.textSecondary,
-                              ),
+                            : null,
                         onTap: () => Navigator.of(context).pop(value),
                       );
                     },

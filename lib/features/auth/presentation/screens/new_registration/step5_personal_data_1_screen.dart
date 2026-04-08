@@ -322,6 +322,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                   TextFormField(
                           controller: _fullNameController,
                           focusNode: _fullNameFocusNode,
+                          textCapitalization: TextCapitalization.words,
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
                             labelText: 'Nome Completo',
@@ -437,6 +438,7 @@ class _Step5PersonalData1ScreenState extends State<Step5PersonalData1Screen> {
                         // Nome da Mãe
                         TextFormField(
                           controller: _motherNameController,
+                          textCapitalization: TextCapitalization.words,
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
                             labelText: 'Nome da Mãe',

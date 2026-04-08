@@ -6,15 +6,12 @@ import 'package:neves_capital/shared/helpers/card_brand_detector.dart';
 import 'package:neves_capital/shared/helpers/card_brand_image_loader.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/glass_app_bar.dart';
-// TODO: Reativar quando implementar retorno do gateway:
-// import 'package:neves_capital/features/payment/data/services/pagarme_service.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
 import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/shared/data/brazilian_banks.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import '../helpers/payment_step_helper.dart';
 import 'sale_completion_screen.dart';
-// import 'payment_result_screen.dart'; // TODO: Reativar quando implementar retorno do gateway
 
 /// Tela 5: Resumo da operação
 class PaymentStep5Screen extends StatefulWidget {
@@ -169,10 +166,6 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
 
       AppLogger.info('✅ Venda cadastrada com sucesso: $saleId');
 
-      // TODO: Processar pagamento com gateway quando implementar retorno
-      // final pagarmeService = PagarmeService();
-      // final resultado = await pagarmeService.processarPagamentoCartao(...);
-
       if (!mounted) return;
 
       // 4. Navegar para tela de conclusão da venda
@@ -183,19 +176,6 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
         ),
       );
       
-      // TODO: Quando implementar retorno do gateway, usar PaymentResultScreen
-      // Navigator.pushReplacement(
-      //   context,
-      //   MaterialPageRoute(
-      //     builder: (context) => PaymentResultScreen(
-      //       sucesso: resultado['success'] ?? false,
-      //       mensagem: resultado['message'] ?? 'Erro desconhecido',
-      //       transactionId: resultado['transactionId'],
-      //       valorCentavos: widget.valorCentavos,
-      //       nomeEstabelecimento: widget.nomeEstabelecimento,
-      //     ),
-      //   ),
-      // );
     } catch (e) {
       setState(() {
         _isProcessing = false;

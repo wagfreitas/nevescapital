@@ -70,7 +70,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
         
         // Completar login (ambos os fatores validados: OTP + Biometria)
         AppLogger.debug('Completando login após validação dos dois fatores');
-        final loginSuccess = await widget.authController.loginWithOtpMock(widget.cpf);
+        final loginSuccess = await widget.authController.loginWithOtp(widget.cpf);
         
         if (!mounted) return;
         
@@ -126,7 +126,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     
     // Completar login mesmo sem biometria (OTP já foi validado)
     AppLogger.debug('Completando login após validação do primeiro fator (OTP)');
-    final loginSuccess = await widget.authController.loginWithOtpMock(widget.cpf);
+    final loginSuccess = await widget.authController.loginWithOtp(widget.cpf);
     
     if (!mounted) return;
     

@@ -526,7 +526,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                           context: context,
                           initialDate: tempStartDate ?? DateTime.now(),
                           firstDate: DateTime(2020),
-                          lastDate: DateTime.now(),
+                          lastDate: tempEndDate ?? DateTime.now(),
                           locale: const Locale('pt', 'BR'),
                           builder: (context, child) {
                             return Theme(
@@ -548,8 +548,13 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                           },
                         );
                         if (picked != null && context.mounted) {
-                          startDateController.text = FormatHelpers.date(picked);
                           tempStartDate = picked;
+                          startDateController.text = FormatHelpers.date(picked);
+                          // Se "De" ficou maior que "Até", ajustar "Até"
+                          if (tempEndDate != null && picked.isAfter(tempEndDate!)) {
+                            tempEndDate = picked;
+                            endDateController.text = FormatHelpers.date(picked);
+                          }
                           setDialogState(() {});
                         }
                       },

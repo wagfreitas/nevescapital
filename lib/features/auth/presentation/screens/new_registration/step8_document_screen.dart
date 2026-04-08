@@ -10,7 +10,6 @@ import 'dart:io';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
-// import 'package:neves_capital/shared/services/firebase_storage_service.dart'; // TODO: Reativar quando upload for implementado
 import 'package:neves_capital/features/auth/data/services/local_registration_storage.dart';
 import 'package:neves_capital/features/auth/data/services/registration_service.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
@@ -411,7 +410,7 @@ class _Step8DocumentScreenState extends State<Step8DocumentScreen> {
       // Marcar como logado (não crítico se falhar)
       try {
         if (widget.authController != null) {
-          await widget.authController!.loginWithOtpMock(widget.cpf);
+          await widget.authController!.loginWithOtp(widget.cpf);
           AppLogger.info('✅ Login automático realizado com sucesso');
         }
       } catch (loginError) {

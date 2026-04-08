@@ -136,7 +136,7 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
         }
 
         // Fazer login com OTP (já validado na tela anterior)
-        final loginSuccess = await widget.authController!.loginWithOtpMock(cpf);
+        final loginSuccess = await widget.authController!.loginWithOtp(cpf);
 
         if (!mounted) return;
 
