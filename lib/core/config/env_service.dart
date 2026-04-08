@@ -27,26 +27,13 @@ class EnvService {
   static String get apiKey =>
       dotenv.env['API_KEY'] ?? '';
 
-  // Pagar.me
-  static String get pagarmeApiKey =>
-      dotenv.env['PAGARME_API_KEY'] ?? '';
-
-  static String get pagarmeBaseUrl =>
-      dotenv.env['PAGARME_BASE_URL'] ?? 'https://api.pagar.me/core/v5';
-
   /// Verifica se todas as chaves obrigatórias estão configuradas
   static bool validateRequiredKeys() {
     try {
       final apiKeyValue = apiKey;
-      final pagarmeKeyValue = pagarmeApiKey;
-      
+
       if (apiKeyValue.isEmpty) {
         AppLogger.warning('⚠️ API_KEY não configurada');
-        return false;
-      }
-      
-      if (pagarmeKeyValue.isEmpty) {
-        AppLogger.warning('⚠️ PAGARME_API_KEY não configurada');
         return false;
       }
       
