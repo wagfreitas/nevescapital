@@ -3,54 +3,23 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class PixValidationService {
-  private readonly pagarmeApiKey: string | null;
-
-  constructor(private readonly configService: ConfigService) {
-    this.pagarmeApiKey = this.configService.get<string>('PAGARME_API_KEY') || null;
-  }
+  constructor(private readonly configService: ConfigService) {}
 
   /**
-   * Valida chave PIX via Pagar.me (validação real no DICT)
-   * NOTA: Pagar.me não tem endpoint direto para validar chaves PIX
-   * Esta função valida o formato e retorna sucesso se o formato estiver correto
-   * Para validação real completa, seria necessário consultar o DICT diretamente
+   * Valida chave PIX (validação de formato)
+   * Validação real no DICT requer integração com instituição financeira
    */
   async validatePixKeyReal(key: string): Promise<{ valid: boolean; error?: string; accountData?: any }> {
-    // Primeiro, validar formato
     const formatValidation = this.validatePixKey(key);
     if (!formatValidation.valid) {
       return { valid: false, error: formatValidation.error };
     }
 
-    // Se não tem API key configurada, retorna apenas validação de formato
-    if (!this.pagarmeApiKey) {
-      console.warn('⚠️ PAGARME_API_KEY não configurada. Apenas validação de formato será realizada.');
-      return { 
-        valid: true, 
-        accountData: { 
-          message: 'Chave PIX com formato válido (validação real não disponível)',
-          validated: 'format_only',
-        },
-      };
-    }
-
-    // Pagar.me não oferece endpoint direto para validar chaves PIX
-    // A validação real requer consulta ao DICT (Diretório de Identificadores de Contas Transacionais)
-    // do Banco Central, que não está disponível publicamente
-    // 
-    // Por enquanto, validamos apenas o formato e retornamos sucesso
-    // Em produção, seria necessário:
-    // 1. Integração com instituição financeira que tenha acesso ao DICT
-    // 2. Ou usar serviço terceirizado de validação PIX
-    // 3. Ou validar quando o usuário receber primeiro pagamento PIX
-    
-    console.log('✅ Chave PIX com formato válido (validação real requer acesso ao DICT)');
     return {
       valid: true,
       accountData: {
         message: 'Chave PIX com formato válido',
         validated: 'format',
-        note: 'Validação real no DICT requer integração adicional',
       },
     };
   }
