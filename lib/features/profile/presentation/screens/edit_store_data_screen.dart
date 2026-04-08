@@ -25,6 +25,7 @@ class EditStoreDataScreen extends StatefulWidget {
 class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
   final _formKey = GlobalKey<FormState>();
   final _storeNameController = TextEditingController();
+  final _ramoController = TextEditingController();
 
   bool _isLoading = false;
   bool _isLoadingData = true;
@@ -71,6 +72,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
   void dispose() {
     _storeNameController.removeListener(_checkForChanges);
     _storeNameController.dispose();
+    _ramoController.dispose();
     super.dispose();
   }
 
@@ -128,9 +130,9 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
       setState(() {
         _storeNameController.text = userData['storeName'] ?? '';
         _selectedBusinessType = validBusinessType;
-        
+        _ramoController.text = _getSelectedRamoLabel() ?? '';
+
         // Armazenar valores originais
-        _originalStoreName = _storeNameController.text.trim();
         _originalStoreName = _storeNameController.text.trim();
         _originalBusinessType = _selectedBusinessType;
         _hasChanges = false;
@@ -180,6 +182,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
     if (selected != null && mounted) {
       setState(() {
         _selectedBusinessType = selected;
+        _ramoController.text = _getSelectedRamoLabel() ?? '';
         _checkForChanges();
       });
     }
@@ -321,41 +324,61 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                         ),
                         const SizedBox(height: 24.0),
 
-                        // Ramo de atividade (campo com busca)
-                        GestureDetector(
-                          onTap: () => _showRamoSearch(context),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 16),
-                            decoration: BoxDecoration(
-                              color: AppTheme.inputEditableBackgroundColor,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                width: 1,
+                        // Ramo de Atuação
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            GestureDetector(
+                              onTap: () => _showRamoSearch(context),
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.inputEditableBackgroundColor,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.store, color: Colors.white70),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        _ramoController.text.isNotEmpty
+                                            ? _ramoController.text
+                                            : 'Selecione o ramo',
+                                        style: TextStyle(
+                                          color: _ramoController.text.isNotEmpty
+                                              ? Colors.white
+                                              : Colors.white.withValues(alpha: 0.45),
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                    const Icon(Icons.keyboard_arrow_down, color: Colors.white70),
+                                  ],
+                                ),
                               ),
                             ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.store, color: Colors.white70),
-                                const SizedBox(width: 12),
-                                Expanded(
+                            if (_ramoController.text.isNotEmpty)
+                              Positioned(
+                                left: 12,
+                                top: -8,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  color: AppTheme.inputEditableBackgroundColor,
                                   child: Text(
-                                    _getSelectedRamoLabel() ??
-                                        'Ramo de Atuação',
+                                    'Ramo de Atuação',
                                     style: TextStyle(
-                                      color: _selectedBusinessType != null
-                                          ? Colors.white
-                                          : Colors.white.withValues(alpha: 0.5),
-                                      fontSize: 16,
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                      fontSize: 12,
                                     ),
                                   ),
                                 ),
-                                const Icon(Icons.keyboard_arrow_down,
-                                    color: Colors.white70),
-                              ],
-                            ),
-                          ),
+                              ),
+                          ],
                         ),
                         const Spacer(),
                         // Botão Atualizar (altura padrão: 24px abaixo)
