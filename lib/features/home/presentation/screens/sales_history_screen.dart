@@ -8,6 +8,7 @@ import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/shared/helpers/card_brand_detector.dart';
 import 'package:neves_capital/shared/helpers/card_brand_image_loader.dart';
 import 'package:neves_capital/shared/helpers/format_helpers.dart';
+import 'package:neves_capital/shared/helpers/brazil_date_input_formatter.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
@@ -490,6 +491,81 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           child: SingleChildScrollView(
             child: StatefulBuilder(
               builder: (context, setDialogState) {
+                Widget datePickerTheme(Widget? child) {
+                  return Theme(
+                    data: Theme.of(context).copyWith(
+                      colorScheme: ColorScheme.dark(
+                        primary: AppTheme.primaryColor,
+                        onPrimary: Colors.white,
+                        surface: AppTheme.cardColor,
+                        onSurface: Colors.white,
+                      ),
+                      textButtonTheme: TextButtonThemeData(
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                    child: child!,
+                  );
+                }
+
+                Future<void> pickStartDate() async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: tempStartDate ??
+                        parseBrazilDate(startDateController.text) ??
+                        DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: tempEndDate ?? DateTime.now(),
+                    locale: const Locale('pt', 'BR'),
+                    initialEntryMode: DatePickerEntryMode.calendarOnly,
+                    builder: (context, child) => datePickerTheme(child),
+                  );
+                  if (picked != null && context.mounted) {
+                    tempStartDate = picked;
+                    startDateController.text = FormatHelpers.date(picked);
+                    if (tempEndDate != null && picked.isAfter(tempEndDate!)) {
+                      tempEndDate = picked;
+                      endDateController.text = FormatHelpers.date(picked);
+                    }
+                    setDialogState(() {});
+                  }
+                }
+
+                Future<void> pickEndDate() async {
+                  final initial = tempEndDate ??
+                      parseBrazilDate(endDateController.text) ??
+                      tempStartDate ??
+                      DateTime.now();
+                  final first = tempStartDate ?? DateTime(2020);
+                  final now = DateTime.now();
+                  final plus12 = tempStartDate != null
+                      ? DateTime(
+                          tempStartDate!.year + 1,
+                          tempStartDate!.month,
+                          tempStartDate!.day,
+                        )
+                      : now;
+                  final last = (tempStartDate != null && plus12.isBefore(now))
+                      ? plus12
+                      : now;
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: initial,
+                    firstDate: first,
+                    lastDate: last,
+                    locale: const Locale('pt', 'BR'),
+                    initialEntryMode: DatePickerEntryMode.calendarOnly,
+                    builder: (context, child) => datePickerTheme(child),
+                  );
+                  if (picked != null && context.mounted) {
+                    endDateController.text = FormatHelpers.date(picked);
+                    tempEndDate = picked;
+                    setDialogState(() {});
+                  }
+                }
+
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -519,158 +595,98 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Data inicial (De)
-                    InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: tempStartDate ?? DateTime.now(),
-                          firstDate: DateTime(2020),
-                          lastDate: tempEndDate ?? DateTime.now(),
-                          locale: const Locale('pt', 'BR'),
-                          builder: (context, child) {
-                            return Theme(
-                              data: Theme.of(context).copyWith(
-                                colorScheme: ColorScheme.dark(
-                                  primary: AppTheme.primaryColor,
-                                  onPrimary: Colors.white,
-                                  surface: AppTheme.cardColor,
-                                  onSurface: Colors.white,
-                                ),
-                                textButtonTheme: TextButtonThemeData(
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: Colors.white,
-                                  ),
-                                ),
-                              ),
-                              child: child!,
-                            );
-                          },
-                        );
-                        if (picked != null && context.mounted) {
-                          tempStartDate = picked;
-                          startDateController.text = FormatHelpers.date(picked);
-                          // Se "De" ficou maior que "Até", ajustar "Até"
-                          if (tempEndDate != null && picked.isAfter(tempEndDate!)) {
-                            tempEndDate = picked;
-                            endDateController.text = FormatHelpers.date(picked);
-                          }
-                          setDialogState(() {});
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: IgnorePointer(
-                        child: TextFormField(
-                          controller: startDateController,
-                          readOnly: true,
-                          decoration: InputDecoration(
-                            labelText: 'De',
-                            hintText: 'dd/mm/aaaa',
-                            hintStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.5),
-                            ),
-                            filled: true,
-                            fillColor: AppTheme.inputEditableBackgroundColor,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            prefixIcon: const Icon(
-                              Icons.calendar_today,
-                              color: Colors.white70,
-                              size: 20,
-                            ),
+                    // Data inicial (De) — só calendário (sem teclado / sem modo "Inserir data" do Material)
+                    TextFormField(
+                      controller: startDateController,
+                      readOnly: true,
+                      onTap: pickStartDate,
+                      decoration: InputDecoration(
+                        labelText: 'De',
+                        hintText: 'Toque para escolher',
+                        hintStyle: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.5),
+                        ),
+                        filled: true,
+                        fillColor: AppTheme.inputEditableBackgroundColor,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.2),
                           ),
-                          style: const TextStyle(color: Colors.white),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: AppTheme.primaryColor,
+                            width: 2,
+                          ),
+                        ),
+                        prefixIcon: const Icon(
+                          Icons.calendar_today,
+                          color: Colors.white70,
+                          size: 20,
+                        ),
+                        suffixIcon: IconButton(
+                          icon: const Icon(
+                            Icons.edit_calendar,
+                            color: Colors.white70,
+                            size: 22,
+                          ),
+                          onPressed: pickStartDate,
                         ),
                       ),
+                      style: const TextStyle(color: Colors.white),
                     ),
                     const SizedBox(height: 12),
                     // Data final (Até)
-                    InkWell(
-                      onTap: () async {
-                        final initial = tempEndDate ?? tempStartDate ?? DateTime.now();
-                        final first = tempStartDate ?? DateTime(2020);
-                        final now = DateTime.now();
-                        final plus12 = tempStartDate != null
-                            ? DateTime(
-                                tempStartDate!.year + 1,
-                                tempStartDate!.month,
-                                tempStartDate!.day,
-                              )
-                            : now;
-                        final last = (tempStartDate != null && plus12.isBefore(now))
-                            ? plus12
-                            : now;
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: initial,
-                          firstDate: first,
-                          lastDate: last,
-                          locale: const Locale('pt', 'BR'),
-                          builder: (context, child) {
-                            return Theme(
-                              data: Theme.of(context).copyWith(
-                                colorScheme: ColorScheme.dark(
-                                  primary: AppTheme.primaryColor,
-                                  onPrimary: Colors.white,
-                                  surface: AppTheme.cardColor,
-                                  onSurface: Colors.white,
-                                ),
-                                textButtonTheme: TextButtonThemeData(
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: Colors.white,
-                                  ),
-                                ),
-                              ),
-                              child: child!,
-                            );
-                          },
-                        );
-                        if (picked != null && context.mounted) {
-                          endDateController.text = FormatHelpers.date(picked);
-                          tempEndDate = picked;
-                          setDialogState(() {});
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: IgnorePointer(
-                        child: TextFormField(
-                          controller: endDateController,
-                          readOnly: true,
-                          decoration: InputDecoration(
-                            labelText: 'Até',
-                            hintText: 'dd/mm/aaaa',
-                            hintStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.5),
-                            ),
-                            filled: true,
-                            fillColor: AppTheme.inputEditableBackgroundColor,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            prefixIcon: const Icon(
-                              Icons.calendar_today,
-                              color: Colors.white70,
-                              size: 20,
-                            ),
+                    TextFormField(
+                      controller: endDateController,
+                      readOnly: true,
+                      onTap: pickEndDate,
+                      decoration: InputDecoration(
+                        labelText: 'Até',
+                        hintText: 'Toque para escolher',
+                        hintStyle: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.5),
+                        ),
+                        filled: true,
+                        fillColor: AppTheme.inputEditableBackgroundColor,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.2),
                           ),
-                          style: const TextStyle(color: Colors.white),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: AppTheme.primaryColor,
+                            width: 2,
+                          ),
+                        ),
+                        prefixIcon: const Icon(
+                          Icons.calendar_today,
+                          color: Colors.white70,
+                          size: 20,
+                        ),
+                        suffixIcon: IconButton(
+                          icon: const Icon(
+                            Icons.edit_calendar,
+                            color: Colors.white70,
+                            size: 22,
+                          ),
+                          onPressed: pickEndDate,
                         ),
                       ),
+                      style: const TextStyle(color: Colors.white),
                     ),
                   ],
                 ),
@@ -848,21 +864,19 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       onPressed: () {
                         // Capturar valores finais dos controllers antes de fechar
                         // Data início
-                        if (startDateController.text.isNotEmpty && startDateController.text.length == 10) {
-                          final parsed = _parseDate(startDateController.text);
-                          if (parsed != null) {
-                            tempStartDate = parsed;
-                          }
+                        if (startDateController.text.isNotEmpty &&
+                            startDateController.text.length == 10) {
+                          final parsed =
+                              parseBrazilDate(startDateController.text);
+                          tempStartDate = parsed;
                         } else {
                           tempStartDate = null;
                         }
-                        
-                        // Data fim
-                        if (endDateController.text.isNotEmpty && endDateController.text.length == 10) {
-                          final parsed = _parseDate(endDateController.text);
-                          if (parsed != null) {
-                            tempEndDate = parsed;
-                          }
+
+                        if (endDateController.text.isNotEmpty &&
+                            endDateController.text.length == 10) {
+                          final parsed = parseBrazilDate(endDateController.text);
+                          tempEndDate = parsed;
                         } else {
                           tempEndDate = null;
                         }
@@ -1042,49 +1056,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     });
   }
 
-  /// Parse de data no formato DD/MM/YYYY
-  DateTime? _parseDate(String dateStr) {
-    try {
-      final parts = dateStr.split('/');
-      if (parts.length != 3) return null;
-      
-      final day = int.parse(parts[0]);
-      final month = int.parse(parts[1]);
-      final year = int.parse(parts[2]);
-      
-      if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900 || year > 2100) {
-        return null;
-      }
-      
-      return DateTime(year, month, day);
-    } catch (e) {
-      return null;
-    }
-  }
-}
-
-/// Formatter para data no formato DD/MM/YYYY
-class _DateInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final digitsOnly = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
-
-    var formatted = '';
-    for (var i = 0; i < digitsOnly.length && i < 8; i++) {
-      if (i == 2 || i == 4) {
-        formatted += '/';
-      }
-      formatted += digitsOnly[i];
-    }
-
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
-    );
-  }
 }
 
 /// Formatter para valores monetários
