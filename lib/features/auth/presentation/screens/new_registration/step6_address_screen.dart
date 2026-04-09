@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
-import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
@@ -346,8 +345,35 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
-      extendBodyBehindAppBar: true,
-      appBar: GlassAppBar(
+      appBar: AppBar(
+        backgroundColor: AppTheme.backgroundColor,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => Step5PersonalData1Screen(
+                    authController: widget.authController,
+                    themeController: widget.themeController,
+                    cpf: widget.cpf,
+                    phone: widget.phone,
+                    email: widget.email,
+                    initialFullName: widget.fullName,
+                    initialBirthDate: widget.birthDate,
+                    initialMotherName: widget.motherName,
+                  ),
+                ),
+              );
+            }
+          },
+        ),
+        centerTitle: true,
         title: const Text(
           'Endereço',
           style: TextStyle(
@@ -357,50 +383,22 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
           ),
         ),
         bottom: RegistrationProgressIndicator.preferredSize(2),
-        onBackPressed: () {
-          if (Navigator.canPop(context)) {
-            Navigator.pop(context);
-          } else {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => Step5PersonalData1Screen(
-                  authController: widget.authController,
-                  themeController: widget.themeController,
-                  cpf: widget.cpf,
-                  phone: widget.phone,
-                  email: widget.email,
-                  initialFullName: widget.fullName,
-                  initialBirthDate: widget.birthDate,
-                  initialMotherName: widget.motherName,
-                ),
-              ),
-            );
-          }
-        },
       ),
-      body: SafeArea(
-        top: false,
-        child: KeyboardDismissWrapper(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              24.0,
-              MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40,
-              24.0,
-              0,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: Form(
-                    key: _formKey,
-                    autovalidateMode: AutovalidateMode.disabled,
-                    child: SingleChildScrollView(
-                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
+      body: KeyboardDismissWrapper(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Form(
+                  key: _formKey,
+                  autovalidateMode: AutovalidateMode.disabled,
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                     // CEP
                     TextFormField(
                       controller: _cepController,
@@ -470,32 +468,22 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                                 borderSide: const BorderSide(color: Colors.red, width: 2),
                               ),
                               prefixIcon: const Icon(Icons.location_on, color: Colors.white70),
+                              suffixIcon: _isSearchingCep
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(12),
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                                        ),
+                                      ),
+                                    )
+                                  : null,
                             ),
                       validator: CepHelper.validateCep,
                     ),
-                    if (_isSearchingCep) ...[
-                      const SizedBox(height: 8),
-                      const Row(
-                        children: [
-                          SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-                            ),
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'Buscando endereço...',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
                     const SizedBox(height: 20),
                     // Logradouro
                     TextFormField(
@@ -737,52 +725,52 @@ class _Step6AddressScreenState extends State<Step6AddressScreen> {
                           ],
                         ),
                       ),
-                    ],
-                        ],
-                      ),
+                      ],
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _handleNext,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                      foregroundColor: AppTheme.backgroundColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                  AppTheme.backgroundColor),
-                            ),
-                          )
-                        : const Text(
-                            'Avançar',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                  ),
+              ),
+              const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _handleNext,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: AppTheme.backgroundColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 24),
-              ],
+                elevation: 0,
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            AppTheme.backgroundColor),
+                      ),
+                    )
+                  : const Text(
+                      'Avançar',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
             ),
           ),
-        ),
+          const SizedBox(height: 24),
+        ],
       ),
-    );
+    ),
+  ),
+);
   }
 }
+
 

@@ -8,8 +8,6 @@ import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/features/auth/presentation/screens/new_registration/step2_phone_screen.dart';
 import 'package:neves_capital/features/auth/presentation/screens/new_registration/step4_email_screen.dart';
-import 'package:neves_capital/features/auth/data/services/registration_service.dart';
-import 'package:neves_capital/features/auth/presentation/helpers/registration_navigator.dart';
 import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'package:neves_capital/features/home/presentation/screens/main_tab_screen.dart';
@@ -166,34 +164,6 @@ class _UnifiedCpfScreenState extends State<UnifiedCpfScreen> {
         // CPF NÃO EXISTE: Fluxo de Cadastro
         // ============================================
         AppLogger.info('👤 CPF não encontrado - Redirecionando para cadastro');
-
-        // Verificar se há cadastro abandonado
-        final registrationProgress = await RegistrationService.getProgress(cpf);
-
-        if (registrationProgress != null &&
-            !registrationProgress.isComplete &&
-            !registrationProgress.isStale) {
-          if (!mounted) return;
-
-          final shouldResume = await RegistrationNavigator.showResumeDialog(
-            context,
-            registrationProgress.currentStep,
-          );
-
-          if (!mounted) return;
-
-          if (shouldResume) {
-            RegistrationNavigator.navigateToStep(
-              context: context,
-              progress: registrationProgress,
-              authController: widget.authController,
-              themeController: widget.themeController,
-            );
-            return;
-          } else {
-            await RegistrationService.deleteProgress(cpf);
-          }
-        }
 
         // Novo cadastro
         if (mounted) {
