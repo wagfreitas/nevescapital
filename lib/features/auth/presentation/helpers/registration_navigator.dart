@@ -14,12 +14,15 @@ import 'package:neves_capital/core/utils/app_logger.dart';
 
 /// Helper para navegar para a tela correta baseado no progresso do cadastro
 class RegistrationNavigator {
-  /// Navega para a tela correspondente ao passo atual do cadastro
+  /// Navega para a tela correspondente ao passo atual do cadastro.
+  /// [replaceRoute] = true quando retomando cadastro abandonado (Splash/Onboarding)
+  /// [replaceRoute] = false quando avançando entre steps (permite swipe back)
   static void navigateToStep({
     required BuildContext context,
     required RegistrationProgress progress,
     AuthController? authController,
     ThemeController? themeController,
+    bool replaceRoute = true,
   }) {
     AppLogger.debug('Navegando para step: ${progress.currentStep}');
 
@@ -266,26 +269,29 @@ class RegistrationNavigator {
     }
 
     if (targetScreen != null) {
-      // Usar pushReplacement para substituir o OnboardingScreen na pilha
-      // Assim, quando o usuário clicar em voltar, não volta para o onboarding
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => targetScreen!),
-      );
+      final route = MaterialPageRoute(builder: (context) => targetScreen!);
+      if (replaceRoute) {
+        // Retomando cadastro: substituir rota atual (Splash/Onboarding)
+        Navigator.pushReplacement(context, route);
+      } else {
+        // Avançando entre steps: manter pilha para swipe back
+        Navigator.push(context, route);
+      }
     } else {
       AppLogger.error(
           'Não foi possível navegar: dados incompletos para o step ${progress.currentStep}');
-      // Fallback para início do cadastro
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => Step2PhoneScreen(
-            authController: authController,
-            themeController: themeController,
-            cpf: progress.cpf,
-          ),
+      final fallbackRoute = MaterialPageRoute(
+        builder: (context) => Step2PhoneScreen(
+          authController: authController,
+          themeController: themeController,
+          cpf: progress.cpf,
         ),
       );
+      if (replaceRoute) {
+        Navigator.pushReplacement(context, fallbackRoute);
+      } else {
+        Navigator.push(context, fallbackRoute);
+      }
     }
   }
 

@@ -110,8 +110,9 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
     }
 
     // Backspace detectado via onChanged (campo ficou vazio)
-    if (value.isEmpty) {
-      _clearAllFields();
+    if (value.isEmpty && index > 0) {
+      _focusNodes[index - 1].requestFocus();
+      setState(() => _errorMessage = null);
       return;
     }
 

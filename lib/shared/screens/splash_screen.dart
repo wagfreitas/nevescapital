@@ -6,6 +6,9 @@ import 'package:neves_capital/features/home/presentation/screens/main_tab_screen
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/shared/services/biometric_service.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/features/auth/data/services/registration_service.dart';
+import 'package:neves_capital/features/auth/data/services/local_registration_storage.dart';
+import 'package:neves_capital/features/auth/presentation/helpers/registration_navigator.dart';
 
 /// Splash screen - ponto de entrada da aplicação
 /// Verifica estado de login e navega conforme necessário
@@ -228,12 +231,43 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
-  /// Navega para tela de onboarding
-  void _navigateToOnboarding() {
+  /// Navega para tela de onboarding, mas antes verifica cadastro abandonado
+  Future<void> _navigateToOnboarding() async {
     if (!mounted) return;
 
     final authController = widget.authController ?? AuthController();
     final themeController = widget.themeController ?? ThemeController();
+
+    // Verificar se há cadastro abandonado no SharedPreferences
+    try {
+      final progress = await LocalRegistrationStorage.getLocal();
+      if (mounted && progress != null && !progress.isComplete && !progress.isStale) {
+        AppLogger.info('📋 Cadastro abandonado encontrado - step: ${progress.currentStep}');
+
+        final shouldResume = await RegistrationNavigator.showResumeDialog(
+          context,
+          progress.currentStep,
+        );
+
+        if (!mounted) return;
+
+        if (shouldResume) {
+          RegistrationNavigator.navigateToStep(
+            context: context,
+            progress: progress,
+            authController: authController,
+            themeController: themeController,
+          );
+          return;
+        } else {
+          await RegistrationService.deleteProgress(progress.cpf);
+        }
+      }
+    } catch (e) {
+      AppLogger.error('Erro ao verificar cadastro abandonado: $e');
+    }
+
+    if (!mounted) return;
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
