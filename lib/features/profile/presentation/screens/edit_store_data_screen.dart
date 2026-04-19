@@ -269,121 +269,133 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
             )
           : SafeArea(
               child: KeyboardDismissWrapper(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24.0, kToolbarHeight, 24.0, 0),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Nome da loja
-                        TextFormField(
-                          controller: _storeNameController,
-                          autofocus: false, // Não focar automaticamente
-                          textInputAction: TextInputAction.next,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16.0,
-                            fontWeight: FontWeight.normal,
-                            height: 1.0,
-                            letterSpacing: 0.0,
-                          ),
-                          onChanged: (value) => _checkForChanges(),
-                          decoration: InputDecoration(
-                            labelText: 'Nome da Loja',
-                            labelStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.7),
-                              fontSize: 16,
-                            ),
-                            filled: true,
-                            fillColor: AppTheme.inputEditableBackgroundColor,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                  color: Colors.white.withValues(alpha: 0.2)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                  color: AppTheme.primaryColor, width: 2),
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Nome da loja é obrigatório';
-                            }
-                            if (value.trim().length < 3) {
-                              return 'Nome deve ter pelo menos 3 caracteres';
-                            }
-                            return null;
-                          },
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24.0, kToolbarHeight, 24.0, 0),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight - kToolbarHeight,
                         ),
-                        const SizedBox(height: 24.0),
-
-                        // Ramo de Atuação
-                        GestureDetector(
-                          onTap: () => _showRamoSearch(context),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
-                            decoration: BoxDecoration(
-                              color: AppTheme.inputEditableBackgroundColor,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.store, color: Colors.white70),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        'Ramo de Atuação',
-                                        style: TextStyle(
-                                          color: Colors.white.withValues(alpha: 0.7),
-                                          fontSize: 12,
-                                        ),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  TextFormField(
+                                    controller: _storeNameController,
+                                    autofocus: false,
+                                    textInputAction: TextInputAction.next,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16.0,
+                                      fontWeight: FontWeight.normal,
+                                      height: 1.0,
+                                      letterSpacing: 0.0,
+                                    ),
+                                    onChanged: (value) => _checkForChanges(),
+                                    decoration: InputDecoration(
+                                      labelText: 'Nome da Loja',
+                                      labelStyle: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.7),
+                                        fontSize: 16,
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        _getSelectedRamoLabel() ?? 'Selecione o ramo',
-                                        style: TextStyle(
-                                          color: _selectedBusinessType != null
-                                              ? Colors.white
-                                              : Colors.white.withValues(alpha: 0.45),
-                                          fontSize: 16,
-                                        ),
+                                      filled: true,
+                                      fillColor: AppTheme.inputEditableBackgroundColor,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide.none,
                                       ),
-                                    ],
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                            color: Colors.white.withValues(alpha: 0.2)),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                            color: AppTheme.primaryColor, width: 2),
+                                      ),
+                                    ),
+                                    validator: (value) {
+                                      if (value == null || value.trim().isEmpty) {
+                                        return 'Nome da loja é obrigatório';
+                                      }
+                                      if (value.trim().length < 3) {
+                                        return 'Nome deve ter pelo menos 3 caracteres';
+                                      }
+                                      return null;
+                                    },
                                   ),
+                                  const SizedBox(height: 24.0),
+                                  GestureDetector(
+                                    onTap: () => _showRamoSearch(context),
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.inputEditableBackgroundColor,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: Colors.white.withValues(alpha: 0.2),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.store, color: Colors.white70),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  'Ramo de Atuação',
+                                                  style: TextStyle(
+                                                    color: Colors.white.withValues(alpha: 0.7),
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  _getSelectedRamoLabel() ?? 'Selecione o ramo',
+                                                  style: TextStyle(
+                                                    color: _selectedBusinessType != null
+                                                        ? Colors.white
+                                                        : Colors.white.withValues(alpha: 0.45),
+                                                    fontSize: 16,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const Icon(Icons.keyboard_arrow_down, color: Colors.white70),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 24, bottom: 24),
+                                child: CustomButton(
+                                  text: 'Atualizar',
+                                  onPressed: (_isLoading || !_hasChanges)
+                                      ? null
+                                      : _saveStoreData,
+                                  isLoading: _isLoading,
                                 ),
-                                const Icon(Icons.keyboard_arrow_down, color: Colors.white70),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
-                        const Spacer(),
-                        // Botão Atualizar (altura padrão: 24px abaixo)
-                        CustomButton(
-                          text: 'Atualizar',
-                          onPressed: (_isLoading || !_hasChanges)
-                              ? null
-                              : _saveStoreData,
-                          isLoading: _isLoading,
-                        ),
-                        const SizedBox(height: 24),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -464,7 +476,7 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
         color: AppTheme.backgroundColor,
         child: Builder(
           builder: (context) {
-            final topPadding = MediaQuery.of(context).padding.top;
+            final topPadding = MediaQuery.of(context).padding.top + 36;
             return Column(
               children: [
                 Padding(

@@ -274,20 +274,20 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
     final totalSteps = PaymentStepHelper.getTotalSteps(widget.hasAccount);
     
     return Scaffold(
-      extendBodyBehindAppBar: true,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: GlassAppBar(
         title: const Text(
           'Dados Bancários',
           style: TextStyle(
-            fontSize: 28,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
         ),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(28),
+          preferredSize: const Size.fromHeight(16),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
             child: PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
           ),
         ),
@@ -298,20 +298,13 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
                 valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
               ),
             )
-          : Container(
-              color: AppTheme.backgroundColor,
-              child: SafeArea(
-                top: false,
-                child: Column(
+          : SafeArea(
+              child: Column(
                   children: [
                     Expanded(
                       child: SingleChildScrollView(
-                        padding: EdgeInsets.fromLTRB(
-                          24.0,
-                          MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40,
-                          24.0,
-                          24.0,
-                        ),
+                        clipBehavior: Clip.none,
+                        padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 24.0),
                         child: Form(
                           key: _formKey,
                           child: Column(
@@ -387,7 +380,6 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
                   ],
                 ),
               ),
-            ),
     );
   }
 
@@ -464,6 +456,7 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
         labelText: 'Banco',
         labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
         floatingLabelBehavior: FloatingLabelBehavior.auto,
+        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
         prefixIcon: const Icon(
           Icons.account_balance,
           color: AppTheme.textSecondary,
@@ -514,6 +507,7 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
         labelText: label,
         labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
         floatingLabelBehavior: FloatingLabelBehavior.auto,
+        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
         prefixIcon: Icon(prefixIcon, color: AppTheme.textSecondary),
         filled: true,
         fillColor: AppTheme.inputEditableBackgroundColor,

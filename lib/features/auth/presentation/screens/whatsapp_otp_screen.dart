@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
@@ -36,8 +35,9 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
   int _otpLength = 4;
 
   List<TextEditingController> _controllers =
-      List.generate(4, (_) => TextEditingController());
+      List.generate(4, (_) => TextEditingController(text: '\u200B'));
   List<FocusNode> _focusNodes = List.generate(4, (_) => FocusNode());
+  List<String> _previousValues = List.generate(4, (_) => '\u200B');
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -50,10 +50,13 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
   bool _isSmsMode = false;
   String? _smsVerificationId;
 
-  bool get _isOtpComplete =>
-      _controllers.every((c) => c.text.length == 1);
+  static const String _zwsp = '\u200B';
 
-  String get _otpCode => _controllers.map((c) => c.text).join();
+  bool get _isOtpComplete =>
+      _controllers.every((c) => c.text != _zwsp && c.text.isNotEmpty);
+
+  String get _otpCode =>
+      _controllers.map((c) => c.text == _zwsp ? '' : c.text).join();
 
   @override
   void initState() {
@@ -103,54 +106,67 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
   }
 
   void _onDigitChanged(int index, String value) {
-    // Detectar PASTE: se o valor colado tem múltiplos dígitos
-    if (value.length > 1) {
-      _pasteCode(value);
+    final digits = value.replaceAll(_zwsp, '').replaceAll(RegExp(r'\D'), '');
+
+    // Paste: múltiplos dígitos colados
+    if (digits.length > 1) {
+      _pasteCode(digits);
       return;
     }
 
-    // Backspace detectado via onChanged (campo ficou vazio)
-    if (value.isEmpty && index > 0) {
-      _focusNodes[index - 1].requestFocus();
+    final hadDigit = _previousValues[index] != _zwsp &&
+        _previousValues[index].isNotEmpty;
+
+    if (value.isEmpty) {
+      // Backspace apagou o conteúdo (ZWSP ou dígito)
+      _controllers[index].value = TextEditingValue(
+        text: _zwsp,
+        selection: const TextSelection.collapsed(offset: 1),
+      );
+      _previousValues[index] = _zwsp;
+
+      if (hadDigit) {
+        // Tinha dígito → apagou o dígito, fica no mesmo campo
+      } else {
+        // Estava "vazio" (ZWSP) → mover para campo anterior
+        if (index > 0) {
+          _focusNodes[index - 1].requestFocus();
+        }
+      }
       setState(() => _errorMessage = null);
       return;
     }
 
-    if (value.length == 1 && index < _otpLength - 1) {
-      // Avançar para o próximo campo
-      _focusNodes[index + 1].requestFocus();
+    // Digitou um número
+    if (digits.length == 1) {
+      _controllers[index].value = TextEditingValue(
+        text: digits,
+        selection: TextSelection.collapsed(offset: digits.length),
+      );
+      _previousValues[index] = digits;
+      if (index < _otpLength - 1) {
+        _focusNodes[index + 1].requestFocus();
+      }
     }
 
-    setState(() {
-      _errorMessage = null;
-    });
+    setState(() => _errorMessage = null);
   }
 
-  /// Cola o código completo nos campos (suporte a paste do WhatsApp)
   void _pasteCode(String code) {
     final digits = code.replaceAll(RegExp(r'\D'), '');
     for (int i = 0; i < _otpLength; i++) {
-      _controllers[i].text = i < digits.length ? digits[i] : '';
+      final text = i < digits.length ? digits[i] : _zwsp;
+      _controllers[i].value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+      _previousValues[i] = text;
     }
-    // Focar no último campo preenchido ou no último
     final focusIndex = (digits.length >= _otpLength) ? _otpLength - 1 : digits.length;
     if (focusIndex < _otpLength) {
       _focusNodes[focusIndex].requestFocus();
     }
-    setState(() {
-      _errorMessage = null;
-    });
-  }
-
-  /// Limpa todos os campos e foca no primeiro
-  void _clearAllFields() {
-    for (final c in _controllers) {
-      c.clear();
-    }
-    _focusNodes[0].requestFocus();
-    setState(() {
-      _errorMessage = null;
-    });
+    setState(() => _errorMessage = null);
   }
 
   Future<void> _handleVerify() async {
@@ -246,9 +262,10 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
           );
         }
       } else if (status == 'REGISTER') {
-        // Navegar para cadastro
+        // Navegar para cadastro (push para manter pilha e permitir voltar)
         if (mounted) {
-          Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+          Navigator.push(
+            context,
             MaterialPageRoute(
               builder: (context) => UnifiedCpfScreen(
                 authController: widget.authController,
@@ -256,7 +273,6 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
                 initialPhone: widget.phone,
               ),
             ),
-            (route) => false,
           );
         }
       } else {
@@ -301,9 +317,12 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
         _startResendCountdown();
 
         if (result['success'] == true) {
-          // Limpar campos
-          for (final c in _controllers) {
-            c.clear();
+          for (int i = 0; i < _controllers.length; i++) {
+            _controllers[i].value = TextEditingValue(
+              text: _zwsp,
+              selection: const TextSelection.collapsed(offset: 1),
+            );
+            _previousValues[i] = _zwsp;
           }
           _focusNodes[0].requestFocus();
         } else {
@@ -385,8 +404,9 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
       _otpLength = 6;
       _isLoading = false;
       _errorMessage = null;
-      _controllers = List.generate(6, (_) => TextEditingController());
+      _controllers = List.generate(6, (_) => TextEditingController(text: _zwsp));
       _focusNodes = List.generate(6, (_) => FocusNode());
+      _previousValues = List.generate(6, (_) => _zwsp);
     });
 
     // Focar no primeiro campo
@@ -566,10 +586,8 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
                         focusNode: _focusNodes[index],
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
-                        maxLength: index == 0 ? _otpLength : 1,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
+                        maxLength: 2,
+                        inputFormatters: const [],
                         onChanged: (value) => _onDigitChanged(index, value),
                         style: TextStyle(
                           fontSize: _isSmsMode ? 20 : 24,

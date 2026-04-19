@@ -8,106 +8,61 @@ import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/registration_lifecycle_observer.dart';
 import 'package:neves_capital/features/auth/domain/entities/registration_progress.dart';
+import 'package:neves_capital/features/auth/data/services/local_registration_storage.dart';
 import 'package:neves_capital/features/auth/presentation/screens/unified_cpf_screen.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
-import 'step3_otp_screen.dart';
+import 'registration_otp_screen.dart';
 
-/// Tela 2 do Cadastro: Insira seu telefone
-class Step2PhoneScreen extends StatefulWidget {
+/// Cadastro - Telefone
+/// Coleta o numero de celular do usuario para envio do OTP via WhatsApp.
+class RegistrationPhoneScreen extends StatefulWidget {
   final AuthController? authController;
   final ThemeController? themeController;
   final String cpf;
   final String? initialPhone;
-  final bool autoSubmitPhone;
 
-  const Step2PhoneScreen({
+  const RegistrationPhoneScreen({
     super.key,
     this.authController,
     this.themeController,
     required this.cpf,
     this.initialPhone,
-    this.autoSubmitPhone = false,
   });
 
   @override
-  State<Step2PhoneScreen> createState() => _Step2PhoneScreenState();
+  State<RegistrationPhoneScreen> createState() =>
+      _RegistrationPhoneScreenState();
 }
 
-class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
-  final TextEditingController _phoneController = TextEditingController();
-  final FocusNode _phoneFocusNode = FocusNode();
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
+  final _phoneController = TextEditingController();
+  final _phoneFocusNode = FocusNode();
+  final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   String? _errorMessage;
   late RegistrationLifecycleObserver _lifecycleObserver;
-  String? _prefilledPhone;
-  bool _hasAutoSubmitted = false;
 
   @override
   void initState() {
     super.initState();
 
-    // Configurar observer para salvar progresso apenas se o app for encerrado
     _lifecycleObserver = RegistrationLifecycleObserver(
       getCurrentProgress: _buildCurrentProgress,
       shouldSaveProgress: () => ModalRoute.of(context)?.isCurrent ?? false,
     );
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
 
-    _prefilledPhone = _normalizeInitialPhone(widget.initialPhone);
-
-    if (_prefilledPhone != null) {
-      _phoneController.text = PhoneHelper.formatPhone(_prefilledPhone!);
-    }
-
-    // Abrir teclado automaticamente ou avançar se phone já veio validado
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (_prefilledPhone != null && widget.autoSubmitPhone) {
-        _triggerAutoAdvance();
-      } else {
-        _phoneFocusNode.requestFocus();
+    // Pre-preencher telefone se disponivel
+    if (widget.initialPhone != null && widget.initialPhone!.isNotEmpty) {
+      final cleaned = PhoneHelper.cleanPhone(widget.initialPhone!);
+      if (cleaned.isNotEmpty) {
+        _phoneController.text = PhoneHelper.formatPhone(cleaned);
       }
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _phoneFocusNode.requestFocus();
     });
-  }
-
-  void _triggerAutoAdvance() {
-    if (_hasAutoSubmitted) return;
-    _hasAutoSubmitted = true;
-    _handleNext(autoTriggered: true);
-  }
-
-  String? _normalizeInitialPhone(String? phone) {
-    if (phone == null || phone.isEmpty) return null;
-
-    final cleaned = PhoneHelper.cleanPhone(phone);
-    if (cleaned.isEmpty) {
-      return null;
-    }
-
-    return cleaned;
-  }
-
-  RegistrationProgress _buildCurrentProgress() {
-    return RegistrationProgress(
-      cpf: widget.cpf,
-      currentStep: 'phone',
-      status: RegistrationStatus.inProgress,
-      lastUpdated: DateTime.now(),
-      phone: _safePhoneValue(),
-    );
-  }
-
-  String? _safePhoneValue() {
-    final raw = _phoneController.text.trim();
-    if (raw.isEmpty) return null;
-
-    try {
-      return PhoneHelper.getPhoneNumbers(raw);
-    } catch (e) {
-      AppLogger.debug('Telefone parcial inválido - não será salvo: $e');
-      return null;
-    }
   }
 
   @override
@@ -119,7 +74,25 @@ class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
     super.dispose();
   }
 
-  Future<void> _handleNext({bool autoTriggered = false}) async {
+  RegistrationProgress _buildCurrentProgress() {
+    final raw = _phoneController.text.trim();
+    String? phone;
+    if (raw.isNotEmpty) {
+      try {
+        phone = PhoneHelper.getPhoneNumbers(raw);
+      } catch (_) {}
+    }
+
+    return RegistrationProgress(
+      cpf: widget.cpf,
+      currentStep: 'phone',
+      status: RegistrationStatus.inProgress,
+      lastUpdated: DateTime.now(),
+      phone: phone,
+    );
+  }
+
+  Future<void> _handleNext() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -130,28 +103,31 @@ class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
     try {
       final phone = PhoneHelper.getPhoneNumbers(_phoneController.text);
 
-      // MOCK: Simular envio de OTP para cadastro
-      // Em produção, chamaria: FirestoreService.requestRegistrationOtp(widget.cpf, phone)
-      AppLogger.debug(
-          'MOCK: Enviando OTP de cadastro para CPF: ${widget.cpf.substring(0, 3)}***, Telefone: ${phone.substring(0, 2)}***');
-      AppLogger.debug('MOCK: Código enviado: 1234');
-
-      // Simular delay da API
+      // TODO: Em producao, chamar API para enviar OTP
       await Future.delayed(const Duration(seconds: 1));
 
       if (!mounted) return;
 
-      // Salvar progresso LOCALMENTE antes de navegar
-      AppLogger.debug('Salvando progresso antes de navegar para OTP');
-      await _lifecycleObserver.saveNow(localOnly: false);
+      // Salvar progresso localmente antes de navegar (merge com dados existentes)
+      final existing = await LocalRegistrationStorage.getLocal();
+      final progress = (existing ?? RegistrationProgress(
+        cpf: widget.cpf,
+        currentStep: 'otp',
+        status: RegistrationStatus.inProgress,
+        lastUpdated: DateTime.now(),
+      )).copyWith(
+        currentStep: 'otp',
+        lastUpdated: DateTime.now(),
+        phone: phone,
+      );
+      await LocalRegistrationStorage.saveLocal(progress);
 
       if (!mounted) return;
 
-      // Navegar para tela de OTP
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => Step3OtpScreen(
+          builder: (context) => RegistrationOtpScreen(
             authController: widget.authController,
             themeController: widget.themeController,
             cpf: widget.cpf,
@@ -167,16 +143,65 @@ class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _handleBack() async {
+    // Carregar progresso existente e fazer merge para nao perder dados de outras telas
+    final existing = await LocalRegistrationStorage.getLocal();
+    final raw = _phoneController.text.trim();
+    // Extrair apenas digitos (nunca falha, diferente de getPhoneNumbers)
+    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    final phone = digits.isNotEmpty ? digits : null;
+
+    // DEBUG: remover depois
+    AppLogger.info('DEBUG phone _handleBack:');
+    AppLogger.info('  raw: "$raw"');
+    AppLogger.info('  digits: "$digits"');
+    AppLogger.info('  phone: $phone');
+    AppLogger.info('  existing: ${existing != null}');
+    AppLogger.info('  existing.phone: ${existing?.phone}');
+    final progress = (existing ?? RegistrationProgress(
+      cpf: widget.cpf,
+      currentStep: 'phone',
+      status: RegistrationStatus.inProgress,
+      lastUpdated: DateTime.now(),
+    )).copyWith(
+      currentStep: 'phone',
+      lastUpdated: DateTime.now(),
+      phone: phone,
+    );
+    await LocalRegistrationStorage.saveLocal(progress);
+
+    if (!mounted) return;
+
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => UnifiedCpfScreen(
+            authController: widget.authController,
+            themeController: widget.themeController,
+            initialPhone: widget.initialPhone,
+            initialCpf: widget.cpf,
+          ),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: false,
       extendBodyBehindAppBar: true,
@@ -189,25 +214,7 @@ class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
             color: Colors.white,
           ),
         ),
-        onBackPressed: () {
-          // Se não houver tela anterior na pilha, navegar para tela de CPF
-          if (Navigator.canPop(context)) {
-            Navigator.pop(context);
-          } else {
-            // Se não pode voltar, navegar para tela de CPF com CPF restaurado
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => UnifiedCpfScreen(
-                  authController: widget.authController,
-                  themeController: widget.themeController,
-                  initialPhone: widget.initialPhone,
-                  initialCpf: widget.cpf,
-                ),
-              ),
-            );
-          }
-        },
+        onBackPressed: _handleBack,
       ),
       body: SafeArea(
         top: false,
@@ -305,6 +312,7 @@ class _Step2PhoneScreenState extends State<Step2PhoneScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 }

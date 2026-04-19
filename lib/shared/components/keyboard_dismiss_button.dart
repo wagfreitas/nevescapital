@@ -16,19 +16,18 @@ class KeyboardDismissWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Envolver com GestureDetector para fechar teclado ao tocar fora
     return GestureDetector(
-      onTap: () {
-        // Fechar teclado ao tocar em qualquer lugar
-        FocusScope.of(context).unfocus();
-      },
-      behavior: HitTestBehavior.translucent, // Permite que toques passem, mas captura áreas vazias
+      onTap: () => FocusScope.of(context).unfocus(),
+      // opaque: false para nao bloquear swipe-back do iOS
+      behavior: HitTestBehavior.translucent,
+      // Nao usar onHorizontalDragDown/onPanDown para nao interferir no swipe-back
+      excludeFromSemantics: true,
       child: child,
     );
   }
 }
 
-/// Widget simplificado que envolve um único campo de texto
+/// Widget simplificado que envolve um unico campo de texto
 class KeyboardDismissField extends StatelessWidget {
   final Widget child;
   final FocusNode focusNode;
@@ -43,13 +42,10 @@ class KeyboardDismissField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Envolver com GestureDetector para fechar teclado ao tocar fora
     return GestureDetector(
-      onTap: () {
-        // Fechar teclado ao tocar em qualquer lugar
-        FocusScope.of(context).unfocus();
-      },
-      behavior: HitTestBehavior.translucent, // Permite que toques passem, mas captura áreas vazias
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.translucent,
+      excludeFromSemantics: true,
       child: child,
     );
   }

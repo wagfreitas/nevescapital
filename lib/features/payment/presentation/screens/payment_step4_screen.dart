@@ -146,43 +146,42 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
     final totalSteps = PaymentStepHelper.getTotalSteps(widget.hasAccount);
     
     return Scaffold(
-      extendBodyBehindAppBar: true,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: GlassAppBar(
         title: const Text(
           'Dados do Cartão',
           style: TextStyle(
-            fontSize: 28,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
         ),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(28),
+          preferredSize: const Size.fromHeight(16),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
             child: PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
           ),
         ),
       ),
-      body: Container(
-              color: AppTheme.backgroundColor,
-              child: SafeArea(
-                top: false,
+      body: SafeArea(
                 child: KeyboardDismissWrapper(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      24.0,
-                      MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40,
-                      24.0,
-                      0,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 0),
                     child: Form(
                       key: _formKey,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // Nome Impresso no Cartão (mesma altura das telas anteriores: 40px do fim da app bar)
+                          Expanded(
+                            child: SingleChildScrollView(
+                              clipBehavior: Clip.none,
+                              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                          // Nome Impresso no Cartão
                           TextFormField(
                   controller: _nomeTitularController,
                   textInputAction: TextInputAction.next,
@@ -193,6 +192,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                     labelText: 'Nome Impresso no Cartão',
                     labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
                     floatingLabelBehavior: FloatingLabelBehavior.auto,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                     filled: true,
                     fillColor: AppTheme.inputEditableBackgroundColor,
                     border: OutlineInputBorder(
@@ -245,6 +245,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                     labelText: 'Número do Cartão',
                     labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
                     floatingLabelBehavior: FloatingLabelBehavior.auto,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                     prefixIcon: Icon(Icons.credit_card, color: AppTheme.textSecondary),
                     suffixIcon: _detectedBrand != CardBrand.unknown
                         ? _buildCardBrandIcon(_detectedBrand)
@@ -312,6 +313,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                           labelText: 'CVV',
                           labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
                           floatingLabelBehavior: FloatingLabelBehavior.auto,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                           prefixIcon: Icon(Icons.lock, color: AppTheme.textSecondary),
                           filled: true,
                           fillColor: AppTheme.inputEditableBackgroundColor,
@@ -373,6 +375,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                           hintText: 'MM/AA',
                           hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
                           floatingLabelBehavior: FloatingLabelBehavior.auto,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                           prefixIcon: Icon(Icons.calendar_today, color: AppTheme.textSecondary),
                           filled: true,
                           fillColor: AppTheme.inputEditableBackgroundColor,
@@ -424,8 +427,11 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                   ],
                 ),
                 const SizedBox(height: 32),
-                const Spacer(),
-                // Botão Avançar (mesmo espaçamento das outras telas: 24px abaixo)
+                ],
+              ),
+            ),
+          ),
+                // Botão Avançar
                 CustomButton(
                   text: 'Avançar',
                   onPressed: _continuar,
@@ -455,7 +461,6 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                   ),
                 ),
               ),
-            ),
     );
   }
 
