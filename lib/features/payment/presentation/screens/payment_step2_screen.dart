@@ -147,20 +147,20 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
     final totalSteps = PaymentStepHelper.getTotalSteps(effectiveHasAccount);
 
     return Scaffold(
-      extendBodyBehindAppBar: true,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: GlassAppBar(
         title: const Text(
           'Valor da Venda',
           style: TextStyle(
-            fontSize: 28,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
         ),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(28),
+          preferredSize: const Size.fromHeight(16),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
             child: _isLoadingAccount
                 ? const SizedBox.shrink()
                 : PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
@@ -181,8 +181,7 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const SizedBox(height: 40),
-                  // Campo de valor (padronizado)
+                      const SizedBox(height: 16),
                   TextFormField(
                     controller: _valorController,
                     focusNode: _valorFocusNode,
@@ -191,7 +190,7 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
                     autovalidateMode: AutovalidateMode.onUserInteraction,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 24,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                     inputFormatters: [
@@ -202,6 +201,7 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
                     decoration: InputDecoration(
                       labelText: 'Valor da Venda',
                       labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                       filled: true,
                       fillColor: AppTheme.inputEditableBackgroundColor,
                       border: OutlineInputBorder(
@@ -262,14 +262,16 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.check_circle, color: Colors.white, size: 20),
+                      const Icon(Icons.check_circle, color: Colors.white, size: 20),
                       const SizedBox(width: 8),
-                      Text(
-                        'Você receberá líquido $valorLiquidoFormatado',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                      Flexible(
+                        child: Text(
+                          'Valor líquido: $valorLiquidoFormatado',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ],

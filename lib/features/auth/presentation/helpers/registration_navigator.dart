@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:neves_capital/features/auth/domain/entities/registration_progress.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
-import 'package:neves_capital/features/auth/presentation/screens/new_registration/step2_phone_screen.dart';
-import 'package:neves_capital/features/auth/presentation/screens/new_registration/step3_otp_screen.dart';
-import 'package:neves_capital/features/auth/presentation/screens/new_registration/step4_email_screen.dart';
-import 'package:neves_capital/features/auth/presentation/screens/new_registration/step5_personal_data_1_screen.dart';
-import 'package:neves_capital/features/auth/presentation/screens/new_registration/step6_address_screen.dart';
-import 'package:neves_capital/features/auth/presentation/screens/new_registration/step7_personal_data_2_screen.dart';
+import 'package:neves_capital/features/auth/presentation/screens/new_registration/registration_phone_screen.dart';
+import 'package:neves_capital/features/auth/presentation/screens/new_registration/registration_otp_screen.dart';
+import 'package:neves_capital/features/auth/presentation/screens/new_registration/registration_email_screen.dart';
+import 'package:neves_capital/features/auth/presentation/screens/new_registration/registration_personal_data_screen.dart';
+import 'package:neves_capital/features/auth/presentation/screens/new_registration/registration_address_screen.dart';
+import 'package:neves_capital/features/auth/presentation/screens/new_registration/registration_additional_info_screen.dart';
 import 'package:neves_capital/features/auth/presentation/screens/new_registration/step7_selfie_screen.dart';
 import 'package:neves_capital/features/auth/presentation/screens/new_registration/step8_document_screen.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
@@ -30,7 +30,7 @@ class RegistrationNavigator {
 
     switch (progress.currentStep) {
       case 'phone':
-        targetScreen = Step2PhoneScreen(
+        targetScreen = RegistrationPhoneScreen(
           authController: authController,
           themeController: themeController,
           cpf: progress.cpf,
@@ -40,7 +40,7 @@ class RegistrationNavigator {
 
       case 'otp':
         if (progress.phone != null) {
-          targetScreen = Step3OtpScreen(
+          targetScreen = RegistrationOtpScreen(
             authController: authController,
             themeController: themeController,
             cpf: progress.cpf,
@@ -51,7 +51,7 @@ class RegistrationNavigator {
 
       case 'email':
         if (progress.phone != null) {
-          targetScreen = Step4EmailScreen(
+          targetScreen = RegistrationEmailScreen(
             authController: authController,
             themeController: themeController,
             cpf: progress.cpf,
@@ -63,7 +63,7 @@ class RegistrationNavigator {
 
       case 'personal1':
         if (progress.phone != null && progress.email != null) {
-          targetScreen = Step5PersonalData1Screen(
+          targetScreen = RegistrationPersonalDataScreen(
             authController: authController,
             themeController: themeController,
             cpf: progress.cpf,
@@ -82,7 +82,7 @@ class RegistrationNavigator {
             progress.fullName != null &&
             progress.birthDate != null &&
             progress.motherName != null) {
-          targetScreen = Step6AddressScreen(
+          targetScreen = RegistrationAddressScreen(
             authController: authController,
             themeController: themeController,
             cpf: progress.cpf,
@@ -114,7 +114,7 @@ class RegistrationNavigator {
             progress.neighborhood != null &&
             progress.city != null &&
             progress.state != null) {
-          targetScreen = Step7PersonalData2Screen(
+          targetScreen = RegistrationAdditionalInfoScreen(
             authController: authController,
             themeController: themeController,
             cpf: progress.cpf,
@@ -260,7 +260,7 @@ class RegistrationNavigator {
       default:
         AppLogger.warning('Step desconhecido: ${progress.currentStep}');
         // Fallback para tela de telefone
-        targetScreen = Step2PhoneScreen(
+        targetScreen = RegistrationPhoneScreen(
           authController: authController,
           themeController: themeController,
           cpf: progress.cpf,
@@ -281,7 +281,7 @@ class RegistrationNavigator {
       AppLogger.error(
           'Não foi possível navegar: dados incompletos para o step ${progress.currentStep}');
       final fallbackRoute = MaterialPageRoute(
-        builder: (context) => Step2PhoneScreen(
+        builder: (context) => RegistrationPhoneScreen(
           authController: authController,
           themeController: themeController,
           cpf: progress.cpf,

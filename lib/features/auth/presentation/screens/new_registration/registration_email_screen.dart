@@ -7,20 +7,21 @@ import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/registration_lifecycle_observer.dart';
 import 'package:neves_capital/features/auth/domain/entities/registration_progress.dart';
+import 'package:neves_capital/features/auth/data/services/local_registration_storage.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'package:neves_capital/features/auth/presentation/screens/unified_cpf_screen.dart';
-import 'package:neves_capital/features/auth/presentation/helpers/registration_navigation_helper.dart';
-import 'step5_personal_data_1_screen.dart';
+import 'registration_personal_data_screen.dart';
 
-/// Tela 4 do Cadastro: Insira seu email
-class Step4EmailScreen extends StatefulWidget {
+/// Cadastro - Email
+/// Coleta o email do usuario.
+class RegistrationEmailScreen extends StatefulWidget {
   final AuthController? authController;
   final ThemeController? themeController;
   final String cpf;
   final String phone;
   final String? initialEmail;
 
-  const Step4EmailScreen({
+  const RegistrationEmailScreen({
     super.key,
     this.authController,
     this.themeController,
@@ -30,13 +31,14 @@ class Step4EmailScreen extends StatefulWidget {
   });
 
   @override
-  State<Step4EmailScreen> createState() => _Step4EmailScreenState();
+  State<RegistrationEmailScreen> createState() =>
+      _RegistrationEmailScreenState();
 }
 
-class _Step4EmailScreenState extends State<Step4EmailScreen> {
-  final TextEditingController _emailController = TextEditingController();
-  final FocusNode _emailFocusNode = FocusNode();
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
+  final _emailController = TextEditingController();
+  final _emailFocusNode = FocusNode();
+  final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   String? _errorMessage;
   late RegistrationLifecycleObserver _lifecycleObserver;
@@ -45,7 +47,6 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
   void initState() {
     super.initState();
 
-    // Restaurar email se fornecido
     if (widget.initialEmail != null && widget.initialEmail!.isNotEmpty) {
       _emailController.text = widget.initialEmail!;
     }
@@ -65,10 +66,9 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
     );
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
 
-    // Abrir teclado automaticamente apenas se não houver email pré-preenchido
     if (widget.initialEmail == null || widget.initialEmail!.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _emailFocusNode.requestFocus();
+        if (mounted) _emailFocusNode.requestFocus();
       });
     }
   }
@@ -93,112 +93,108 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
     try {
       final email = EmailHelper.cleanEmail(_emailController.text);
 
-      // NÃO cria usuário aqui - apenas continua o fluxo de cadastro
-      // O usuário será criado em 'users' APENAS na tela final (step8)
-      // Durante o cadastro, tudo fica em 'registration_progress' (local + Firestore)
-      AppLogger.debug('Email validado - continuando fluxo de cadastro');
-      AppLogger.sensitive('Email', email);
-
-      if (!mounted) {
-        AppLogger.warning(
-            'Step4EmailScreen: Widget não está montado, abortando navegação');
-        return;
-      }
-
-      AppLogger.debug(
-          'Step4EmailScreen: Navegando para Step5PersonalData1Screen...');
-
-      // Criar progresso atual com dados preenchidos
-      final currentProgress = RegistrationProgress(
+      // Salvar progresso localmente (merge com dados existentes)
+      final existing = await LocalRegistrationStorage.getLocal();
+      final savedProgress = (existing ?? RegistrationProgress(
         cpf: widget.cpf,
         currentStep: 'personal1',
         status: RegistrationStatus.inProgress,
         lastUpdated: DateTime.now(),
+      )).copyWith(
+        currentStep: 'personal1',
+        lastUpdated: DateTime.now(),
         phone: widget.phone,
         email: email,
       );
-
-      // Salvar e buscar progresso completo (garante que dados de outras telas sejam preservados)
-      final completeProgress = await RegistrationNavigationHelper.saveAndGetCompleteProgress(
-        currentProgress: currentProgress,
-      );
+      await LocalRegistrationStorage.saveLocal(savedProgress);
 
       if (!mounted) return;
 
-      // Navegar para próxima tela (Informações Pessoais 1/2)
-      // Usar dados do progresso completo para restaurar tudo que já foi preenchido
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => Step5PersonalData1Screen(
+          builder: (context) => RegistrationPersonalDataScreen(
             authController: widget.authController,
             themeController: widget.themeController,
             cpf: widget.cpf,
             phone: widget.phone,
-            email: completeProgress?.email ?? email,
-            initialFullName: completeProgress?.fullName,
-            initialBirthDate: completeProgress?.birthDate,
-            initialMotherName: completeProgress?.motherName,
+            email: savedProgress.email ?? email,
+            initialFullName: savedProgress.fullName,
+            initialBirthDate: savedProgress.birthDate,
+            initialMotherName: savedProgress.motherName,
           ),
         ),
       );
-
-      AppLogger.debug('Step4EmailScreen: Navegação iniciada');
-    } catch (e, stackTrace) {
-      AppLogger.error('Step4EmailScreen: Erro ao continuar cadastro: $e');
-      AppLogger.debug('Step4EmailScreen: StackTrace: $stackTrace');
-
+    } catch (e) {
+      AppLogger.error('Erro ao continuar cadastro: $e');
       if (mounted) {
-        setState(() {
-          _errorMessage = 'Erro ao continuar cadastro. Tente novamente.';
-        });
+        setState(() =>
+            _errorMessage = 'Erro ao continuar cadastro. Tente novamente.');
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleBack() async {
+    // Carregar progresso existente e fazer merge para nao perder dados de outras telas
+    final existing = await LocalRegistrationStorage.getLocal();
+    final email = _emailController.text.isNotEmpty
+        ? EmailHelper.cleanEmail(_emailController.text)
+        : null;
+    final progress = (existing ?? RegistrationProgress(
+      cpf: widget.cpf,
+      currentStep: 'email',
+      status: RegistrationStatus.inProgress,
+      lastUpdated: DateTime.now(),
+    )).copyWith(
+      currentStep: 'email',
+      lastUpdated: DateTime.now(),
+      phone: widget.phone,
+      email: email,
+    );
+    await LocalRegistrationStorage.saveLocal(progress);
+
+    if (!mounted) return;
+
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => UnifiedCpfScreen(
+            authController: widget.authController,
+            themeController: widget.themeController,
+            initialPhone: widget.phone,
+            initialCpf: widget.cpf,
+          ),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: false,
       extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
         title: const Text(
-          'Insira seu email',
+          'Email',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
         ),
-        onBackPressed: () {
-          // Tentar fazer pop primeiro (se houver tela anterior na pilha)
-          // Se não houver, navegar explicitamente para a tela de CPF
-          // Isso garante que funciona tanto no fluxo normal quanto no "Recomeçar"
-          if (Navigator.canPop(context)) {
-            Navigator.pop(context);
-          } else {
-            // Não há tela anterior na pilha (vem do fluxo de "Recomeçar")
-            // Navegar explicitamente para a tela de CPF com o CPF restaurado
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => UnifiedCpfScreen(
-                  authController: widget.authController,
-                  themeController: widget.themeController,
-                  initialPhone: widget.phone,
-                  initialCpf: widget.cpf,
-                ),
-              ),
-            );
-          }
-        },
+        onBackPressed: _handleBack,
       ),
       body: SafeArea(
         top: false,
@@ -218,52 +214,52 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   TextFormField(
-                          controller: _emailController,
-                          focusNode: _emailFocusNode,
-                          autofocus: true,
-                          keyboardType: TextInputType.emailAddress,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            labelText: 'Email',
-                            labelStyle: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.7)),
-                            hintText: 'seu@email.com.br',
-                            hintStyle: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.3)),
-                            filled: true,
-                            fillColor: AppTheme.inputEditableBackgroundColor,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                  color: Colors.white.withValues(alpha: 0.2)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                  color: AppTheme.primaryColor, width: 2),
-                            ),
-                            errorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide:
-                                  const BorderSide(color: Colors.red, width: 2),
-                            ),
-                            prefixIcon:
-                                const Icon(Icons.email, color: Colors.white70),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Digite seu email';
-                            }
-                            if (!EmailHelper.isValidEmail(value)) {
-                              return 'Email inválido';
-                            }
-                            return null;
-                          },
-                        ),
+                    controller: _emailController,
+                    focusNode: _emailFocusNode,
+                    autofocus: true,
+                    keyboardType: TextInputType.emailAddress,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      labelStyle:
+                          TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                      hintText: 'seu@email.com.br',
+                      hintStyle:
+                          TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                      filled: true,
+                      fillColor: AppTheme.inputEditableBackgroundColor,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.2)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                            color: AppTheme.primaryColor, width: 2),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: Colors.red, width: 2),
+                      ),
+                      prefixIcon:
+                          const Icon(Icons.email, color: Colors.white70),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Digite seu email';
+                      }
+                      if (!EmailHelper.isValidEmail(value)) {
+                        return 'Email inválido';
+                      }
+                      return null;
+                    },
+                  ),
                   if (_errorMessage != null) ...[
                     const SizedBox(height: 16),
                     Container(
@@ -309,9 +305,8 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
                               width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(
-                                        AppTheme.backgroundColor),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppTheme.backgroundColor),
                               ),
                             )
                           : const Text(
@@ -330,6 +325,7 @@ class _Step4EmailScreenState extends State<Step4EmailScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 }

@@ -222,46 +222,48 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      extendBodyBehindAppBar: true,
-      appBar: const GlassAppBar(),
+      appBar: GlassAppBar(
+        title: const Text(
+          'Dados da Loja',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(16),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: PaymentStepHelper.buildProgressIndicator(1, 5),
+          ),
+        ),
+      ),
       body: SafeArea(
         child: KeyboardDismissWrapper(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 0),
             child: Form(
               key: _formKey,
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Título
-                  const Center(
-                    child: Text(
-                      'Dados da Loja',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Indicador de progresso (abaixo do título)
-                  // Esta tela só aparece se o usuário não tem conta, então sempre é passo 1 de 5
-                  PaymentStepHelper.buildProgressIndicator(1, 5),
-                  const SizedBox(height: 32),
-
-                  // Campo de nome do estabelecimento
+                  Expanded(
+                    child: SingleChildScrollView(
+                      clipBehavior: Clip.none,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                   TextFormField(
                     controller: _nomeEstabelecimentoController,
                     textInputAction: TextInputAction.next,
                     textCapitalization: TextCapitalization.words,
-                    style: const TextStyle(color: Colors.white),
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
                     decoration: InputDecoration(
-                      labelText: 'Nome do Estabelecimento',
+                      labelText: 'Nome da Loja',
                       labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                      prefixIcon: const Icon(Icons.storefront, color: Colors.white70),
                       filled: true,
                       fillColor: AppTheme.inputEditableBackgroundColor,
                       border: OutlineInputBorder(
@@ -293,91 +295,76 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Campo de ramo de atuação (abre tela de seleção no formato da escolha do banco)
-                  FormField<String>(
-                    initialValue: _ramoAtuacao,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
+                  TextFormField(
+                    readOnly: true,
+                    controller: TextEditingController(
+                      text: _getRamoLabel(_ramoAtuacao) ?? '',
+                    ),
+                    onTap: () async {
+                      final value = await Navigator.of(context).push<String>(
+                        MaterialPageRoute(
+                          builder: (context) => _RamoSearchScreen(
+                            businessTypes: _businessTypes,
+                            selectedValue: _ramoAtuacao,
+                          ),
+                        ),
+                      );
+                      if (value != null && mounted) {
+                        setState(() {
+                          _ramoAtuacao = value;
+                        });
+                      }
+                    },
+                    style: TextStyle(
+                      color: _ramoAtuacao != null
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.45),
+                      fontSize: 16,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Ramo de Atuação',
+                      labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                      hintText: 'Selecione o ramo',
+                      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.45)),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                      prefixIcon: const Icon(Icons.store, color: Colors.white70),
+                      suffixIcon: const Icon(Icons.keyboard_arrow_down, color: Colors.white70),
+                      filled: true,
+                      fillColor: AppTheme.inputEditableBackgroundColor,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.red, width: 2),
+                      ),
+                    ),
+                    validator: (_) {
+                      if (_ramoAtuacao == null || _ramoAtuacao!.isEmpty) {
                         return 'Por favor, selecione o ramo de atuação';
                       }
                       return null;
                     },
-                    builder: (formState) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          GestureDetector(
-                            onTap: () async {
-                              final value = await Navigator.of(context).push<String>(
-                                MaterialPageRoute(
-                                  builder: (context) => _RamoSearchScreen(
-                                    businessTypes: _businessTypes,
-                                    selectedValue: _ramoAtuacao,
-                                  ),
-                                ),
-                              );
-                              if (value != null && mounted) {
-                                setState(() {
-                                  _ramoAtuacao = value;
-                                  formState.didChange(value);
-                                });
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 16),
-                              decoration: BoxDecoration(
-                                color: AppTheme.inputEditableBackgroundColor,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: formState.hasError
-                                      ? Colors.red
-                                      : Colors.white.withValues(alpha: 0.2),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.store, color: Colors.white70),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      _getRamoLabel(_ramoAtuacao) ?? 'Ramo de Atuação',
-                                      style: TextStyle(
-                                        color: _ramoAtuacao != null
-                                            ? Colors.white
-                                            : Colors.white.withValues(alpha: 0.5),
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                  const Icon(Icons.keyboard_arrow_down,
-                                      color: Colors.white70),
-                                ],
-                              ),
-                            ),
-                          ),
-                          if (formState.hasError) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              formState.errorText!,
-                              style: const TextStyle(
-                                color: Colors.red,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ],
-                      );
-                    },
                   ),
-                  const SizedBox(height: 40),
-
-                  // Botão Avançar
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   CustomButton(
                     text: 'Avançar',
                     onPressed: _continuar,
                   ),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -459,8 +446,8 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
         color: AppTheme.backgroundColor,
         child: Builder(
           builder: (context) {
-            // Pouco espaço entre o título e a caixa de busca (mais próximo)
-            final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight + 1;
+            // Caixa de busca colada ao titulo (usando toolbarHeight reduzido)
+            final topPadding = MediaQuery.of(context).padding.top + 36;
             return Column(
               children: [
                 Padding(

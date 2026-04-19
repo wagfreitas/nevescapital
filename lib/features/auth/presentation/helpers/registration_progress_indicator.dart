@@ -18,11 +18,12 @@ class RegistrationProgressIndicator extends StatelessWidget {
   });
 
   /// Widget para usar no [PreferredSizeWidget] da AppBar (bottom).
+  /// Altura reduzida (16px) com barras proximas ao titulo.
   static PreferredSizeWidget preferredSize(int currentStep, {int totalSteps = 3}) {
     return PreferredSize(
-      preferredSize: const Size.fromHeight(28),
+      preferredSize: const Size.fromHeight(16),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
         child: RegistrationProgressIndicator(
           currentStep: currentStep,
           totalSteps: totalSteps,

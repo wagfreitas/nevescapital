@@ -208,20 +208,20 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
     final detectedBrand = showBrand ? CardBrandDetector.detectBrand(widget.numeroCartao) : CardBrand.unknown;
 
     return Scaffold(
-      extendBodyBehindAppBar: true,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: GlassAppBar(
         title: const Text(
           'Resumo da Venda',
           style: TextStyle(
-            fontSize: 28,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
         ),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(28),
+          preferredSize: const Size.fromHeight(16),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
             child: PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
           ),
         ),
@@ -257,17 +257,9 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
                     valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
                   ),
                 )
-              : Container(
-                  color: AppTheme.backgroundColor,
-                  child: SafeArea(
-                    top: false,
+              : SafeArea(
                     child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        24.0,
-                        MediaQuery.of(context).padding.top + kToolbarHeight + 28 + 40,
-                        24.0,
-                        24.0,
-                      ),
+                      padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 24.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -409,7 +401,6 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
                       ),
                     ),
                   ),
-                ),
     );
   }
 
@@ -457,6 +448,7 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
             labelText: 'Banco',
             labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
             floatingLabelBehavior: FloatingLabelBehavior.auto,
+            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             prefixIcon: const Icon(
               Icons.account_balance,
               color: AppTheme.textSecondary,
@@ -491,6 +483,7 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
             labelText: 'Conta com Dígito',
             labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
             floatingLabelBehavior: FloatingLabelBehavior.auto,
+            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             prefixIcon: const Icon(
               Icons.account_balance_wallet,
               color: AppTheme.textSecondary,
@@ -525,6 +518,7 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
             labelText: 'Agência',
             labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
             floatingLabelBehavior: FloatingLabelBehavior.auto,
+            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             prefixIcon: const Icon(
               Icons.location_on,
               color: AppTheme.textSecondary,
