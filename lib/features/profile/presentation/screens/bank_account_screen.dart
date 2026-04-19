@@ -263,7 +263,6 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
       extendBodyBehindAppBar: true,
       appBar: GlassAppBar(
         title: const Text(
@@ -281,9 +280,10 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
                 valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
               ),
             )
-          : SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24.0, kToolbarHeight, 24.0, 0),
+          : Container(
+              color: AppTheme.backgroundColor,
+              child: SafeArea(
+                top: false,
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -291,6 +291,12 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
                     children: [
                       Expanded(
                         child: SingleChildScrollView(
+                          padding: EdgeInsets.fromLTRB(
+                            24.0,
+                            MediaQuery.of(context).padding.top + kToolbarHeight + 24,
+                            24.0,
+                            0,
+                          ),
                           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -344,14 +350,14 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      // Botão Atualizar
-                      CustomButton(
-                        text: 'Atualizar',
-                        onPressed: (_isLoading || !_hasChanges) ? null : _handleConfirm,
-                        isLoading: _isLoading,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 24.0),
+                        child: CustomButton(
+                          text: 'Atualizar',
+                          onPressed: (_isLoading || !_hasChanges) ? null : _handleConfirm,
+                          isLoading: _isLoading,
+                        ),
                       ),
-                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
@@ -418,7 +424,6 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
     );
   }
 
-  /// Construir campo de banco customizado
   Widget _buildBankField() {
     return GestureDetector(
       onTap: _openBankSearch,
