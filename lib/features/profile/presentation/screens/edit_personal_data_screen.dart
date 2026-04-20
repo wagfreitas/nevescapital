@@ -373,24 +373,26 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
           : SafeArea(
               top: false,
               child: KeyboardDismissWrapper(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    24.0,
-                    MediaQuery.of(context).padding.top + kToolbarHeight + 40,
-                    24.0,
-                    0,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: SingleChildScrollView(
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // Campo Email
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        clipBehavior: Clip.none,
+                        padding: EdgeInsets.fromLTRB(
+                          24.0,
+                          MediaQuery.of(context).padding.top + kToolbarHeight + 24,
+                          24.0,
+                          0,
+                        ),
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Campo Email
                             TextFormField(
                               controller: _emailController,
                               focusNode: _emailFocusNode,
@@ -485,16 +487,15 @@ class _EditPersonalDataScreenState extends State<EditPersonalDataScreen> {
                           ),
                         ),
                       ),
-                      const Spacer(),
-                      // Botão Atualizar (altura padrão: 24px abaixo)
-                      CustomButton(
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 24.0),
+                      child: CustomButton(
                         text: 'Atualizar',
                         onPressed: (_isLoading || !_hasChanges) ? null : _handleConfirm,
                         isLoading: _isLoading,
                       ),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),

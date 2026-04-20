@@ -174,6 +174,47 @@ class CardBrandDetector {
     }
   }
   
+  /// Número de dígitos esperado (padrão) para a bandeira.
+  /// Usado para validação de comprimento. Para bandeiras de comprimento
+  /// variável, retorna o tamanho mais comum.
+  static int getExpectedDigits(CardBrand brand) {
+    switch (brand) {
+      case CardBrand.amex:
+        return 15;
+      case CardBrand.diners:
+        return 14;
+      default:
+        return 16;
+    }
+  }
+
+  /// Limite máximo de dígitos aceitos para a bandeira.
+  /// Usado para truncar o input sem rejeitar números válidos mais longos.
+  static int getMaxDigits(CardBrand brand) {
+    switch (brand) {
+      case CardBrand.amex:
+        return 15;
+      case CardBrand.diners:
+        return 14;
+      case CardBrand.unknown:
+        return 19;
+      default:
+        return 16;
+    }
+  }
+
+  /// Tamanho dos grupos para formatação visual do número.
+  /// Sempre agrupa de 4 em 4 dígitos, independentemente da bandeira.
+  /// Para 15 dígitos (Amex): 4-4-4-3 | 14 (Diners): 4-4-4-2 | 16: 4-4-4-4.
+  static List<int> getGroupSizes(CardBrand brand) {
+    return const [4, 4, 4, 4];
+  }
+
+  /// Comprimento esperado do CVV/CID para a bandeira.
+  static int getCvvLength(CardBrand brand) {
+    return brand == CardBrand.amex ? 4 : 3;
+  }
+
   /// Retorna o ícone/asset path para a bandeira
   static String? getBrandAssetPath(CardBrand brand) {
     switch (brand) {

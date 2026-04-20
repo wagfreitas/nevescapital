@@ -209,23 +209,27 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: GlassAppBar(
-        title: const Text(
-          'Resumo da Venda',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(16),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-            child: PaymentStepHelper.buildProgressIndicator(currentStep, totalSteps),
-          ),
-        ),
-      ),
+      resizeToAvoidBottomInset: true,
+      appBar: _isProcessing
+          ? null
+          : GlassAppBar(
+              title: const Text(
+                'Resumo da Venda',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(16),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  child: PaymentStepHelper.buildProgressIndicator(
+                      currentStep, totalSteps),
+                ),
+              ),
+            ),
       body: _isProcessing
           ? const Center(
               child: Column(
@@ -257,14 +261,13 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
                     valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
                   ),
                 )
-              : SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 24.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Card de resumo
-                          Expanded(
+              : Padding(
+                  padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Card de resumo
+                      Expanded(
                             child: Card(
                               elevation: 2,
                               color: AppTheme.cardColor,
@@ -389,18 +392,18 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 24),
-                          // Botão Finalizar a Venda
-                          CustomButton(
-                            text: 'Finalizar a Venda',
-                            icon: Icons.lock,
-                            onPressed: _concluirVenda,
-                            capitalizeText: false,
-                          ),
-                        ],
+                      const SizedBox(height: 24),
+                      // Botão Finalizar a Venda
+                      CustomButton(
+                        text: 'Finalizar a Venda',
+                        icon: Icons.lock,
+                        onPressed: _concluirVenda,
+                        capitalizeText: false,
                       ),
-                    ),
+                      const SizedBox(height: 24),
+                    ],
                   ),
+                ),
     );
   }
 

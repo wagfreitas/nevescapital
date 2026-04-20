@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
+import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'package:neves_capital/shared/helpers/format_helpers.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/glass_app_bar.dart';
@@ -148,6 +149,7 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
+      resizeToAvoidBottomInset: true,
       appBar: GlassAppBar(
         title: const Text(
           'Valor da Venda',
@@ -173,15 +175,14 @@ class _PaymentStep2ScreenState extends State<PaymentStep2Screen> {
                 valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
               ),
             )
-          : SafeArea(
+          : KeyboardDismissWrapper(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 0),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const SizedBox(height: 16),
                   TextFormField(
                     controller: _valorController,
                     focusNode: _valorFocusNode,
