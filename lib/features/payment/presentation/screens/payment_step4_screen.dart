@@ -147,6 +147,7 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
     
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
+      resizeToAvoidBottomInset: true,
       appBar: GlassAppBar(
         title: const Text(
           'Dados do Cartão',
@@ -164,23 +165,23 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
           ),
         ),
       ),
-      body: SafeArea(
-                child: KeyboardDismissWrapper(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 0),
-                    child: Form(
-                      key: _formKey,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(
-                            child: SingleChildScrollView(
-                              clipBehavior: Clip.none,
-                              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
+      body: KeyboardDismissWrapper(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Form(
+                  key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  child: SingleChildScrollView(
+                    clipBehavior: Clip.none,
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                           // Nome Impresso no Cartão
                           TextFormField(
                   controller: _nomeTitularController,
@@ -238,8 +239,8 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                   style: const TextStyle(color: Colors.white),
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(19), // 16 dígitos + 3 espaços
-                    _CardNumberFormatter(), // Limita a 16 dígitos
+                    LengthLimitingTextInputFormatter(23), // margem para 19 dígitos + espaços
+                    _CardNumberFormatter(), // Limita e agrupa conforme bandeira
                   ],
                   decoration: InputDecoration(
                     labelText: 'Número do Cartão',
@@ -279,8 +280,10 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                       return 'Insira o número do cartão';
                     }
                     final digits = value.replaceAll(' ', '');
-                    if (digits.length < 16) {
-                      return 'O número do cartão deve ter 16 dígitos';
+                    final brand = CardBrandDetector.detectBrand(digits);
+                    final expected = CardBrandDetector.getExpectedDigits(brand);
+                    if (digits.length < expected) {
+                      return 'O número do cartão deve ter $expected dígitos';
                     }
                     if (!CardValidator.isValidLuhn(digits)) {
                       return 'Número do cartão inválido';
@@ -343,7 +346,9 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                           if (value == null || value.isEmpty) {
                             return _submitted ? 'Insira o CVV' : null;
                           }
-                          if (value.length < 3) {
+                          final expectedCvv =
+                              CardBrandDetector.getCvvLength(_detectedBrand);
+                          if (value.length < expectedCvv) {
                             return _submitted ? 'CVV inválido' : null;
                           }
                           return null;
@@ -426,41 +431,39 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 32),
-                ],
-              ),
-            ),
-          ),
-                // Botão Avançar
-                CustomButton(
-                  text: 'Avançar',
-                  onPressed: _continuar,
-                ),
                 const SizedBox(height: 24),
 
-                          // Aviso de segurança
-                          const Row(
-                            children: [
-                              Icon(Icons.lock_outline, size: 16, color: Colors.grey),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Seus dados estão protegidos com criptografia',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-                        ],
+                // Aviso de segurança
+                const Row(
+                  children: [
+                    Icon(Icons.lock_outline, size: 16, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Seus dados estão protegidos com criptografia',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
                       ),
+                    ),
+                  ],
+                ),
+                      ],
                     ),
                   ),
                 ),
               ),
+              const SizedBox(height: 24),
+              CustomButton(
+                text: 'Avançar',
+                onPressed: _continuar,
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -530,41 +533,35 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
 
 }
 
-/// Formatador para número do cartão (adiciona espaços e limita a 16 dígitos)
+/// Formatador para número do cartão.
+/// Limita e agrupa conforme a bandeira detectada:
+/// Amex (15) → 4-6-5 | Diners (14) → 4-6-4 | Demais (16) → 4-4-4-4.
 class _CardNumberFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    // Remove espaços e limita a 16 dígitos
-    final text = newValue.text.replaceAll(' ', '');
-    if (text.length > 16) {
-      // Se exceder 16 dígitos, mantém apenas os primeiros 16
-      final limitedText = text.substring(0, 16);
-      final buffer = StringBuffer();
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final brand = CardBrandDetector.detectBrand(digits);
+    final maxDigits = CardBrandDetector.getMaxDigits(brand);
+    final limited = digits.length > maxDigits
+        ? digits.substring(0, maxDigits)
+        : digits;
+    final groups = CardBrandDetector.getGroupSizes(brand);
 
-      for (int i = 0; i < limitedText.length; i++) {
-        if (i > 0 && i % 4 == 0) {
-          buffer.write(' ');
-        }
-        buffer.write(limitedText[i]);
-      }
-
-      final formatted = buffer.toString();
-      return TextEditingValue(
-        text: formatted,
-        selection: TextSelection.collapsed(offset: formatted.length),
-      );
-    }
-
-    // Formata normalmente se não exceder 16 dígitos
     final buffer = StringBuffer();
-    for (int i = 0; i < text.length; i++) {
-      if (i > 0 && i % 4 == 0) {
-        buffer.write(' ');
-      }
-      buffer.write(text[i]);
+    int index = 0;
+    for (final size in groups) {
+      if (index >= limited.length) break;
+      if (index > 0) buffer.write(' ');
+      final end = (index + size) > limited.length ? limited.length : index + size;
+      buffer.write(limited.substring(index, end));
+      index = end;
+    }
+    // Se sobrarem dígitos além dos grupos definidos, acrescenta.
+    if (index < limited.length) {
+      buffer.write(limited.substring(index));
     }
 
     final formatted = buffer.toString();

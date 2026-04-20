@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:neves_capital/shared/components/custom_button.dart';
+import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
 import 'package:neves_capital/shared/components/glass_app_bar.dart';
 import 'package:neves_capital/shared/data/brazilian_banks.dart';
@@ -41,13 +42,33 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
 
   // Armazenar dados originais para comparar alterações
   String? _originalBankCode;
-  String? _originalBranch;
-  String? _originalAccount;
+  String _originalBranch = '';
+  String _originalAccount = '';
+  bool _hasChanges = false;
 
   @override
   void initState() {
     super.initState();
+    _branchController.addListener(_checkForChanges);
+    _accountController.addListener(_checkForChanges);
     _loadBankAccountData();
+  }
+
+  /// Habilita o botão "Avançar" somente quando há alterações nos dados bancários.
+  void _checkForChanges() {
+    final currentBankCode = _selectedBank?.code;
+    final currentBranch = _branchController.text.trim();
+    final currentAccount = _accountController.text.trim();
+
+    final hasChanges = currentBankCode != _originalBankCode ||
+        currentBranch != _originalBranch ||
+        currentAccount != _originalAccount;
+
+    if (_hasChanges != hasChanges) {
+      setState(() {
+        _hasChanges = hasChanges;
+      });
+    }
   }
 
   /// Carregar dados bancários existentes (se houver)
@@ -103,15 +124,17 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
           _originalBankCode = bankCode;
           _originalBranch = branch;
           _originalAccount = account;
+          _hasChanges = false;
         });
-        
+
         AppLogger.info('✅ Dados bancários carregados com sucesso no fluxo de pagamento');
       } else {
         AppLogger.info('Dados bancários não encontrados - usuário precisará preencher');
         setState(() {
           _originalBankCode = null;
-          _originalBranch = null;
-          _originalAccount = null;
+          _originalBranch = '';
+          _originalAccount = '';
+          _hasChanges = false;
         });
       }
     } catch (e) {
@@ -127,6 +150,8 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
 
   @override
   void dispose() {
+    _branchController.removeListener(_checkForChanges);
+    _accountController.removeListener(_checkForChanges);
     _bankController.dispose();
     _branchController.dispose();
     _accountController.dispose();
@@ -142,6 +167,7 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
             _selectedBank = bank;
             _bankController.text = bank.displayName;
           });
+          _checkForChanges();
           Navigator.pop(context);
         },
       ),
@@ -167,13 +193,9 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
     final currentBankCode = _selectedBank!.code;
     final currentBranch = _branchController.text.trim();
     final currentAccount = _accountController.text.trim();
-    
-    final hasChanges = _originalBankCode != currentBankCode ||
-        _originalBranch != currentBranch ||
-        _originalAccount != currentAccount;
 
     // Se houver alterações, salvar na collection de user
-    if (hasChanges) {
+    if (_hasChanges) {
       setState(() {
         _isSaving = true;
       });
@@ -226,6 +248,7 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
           _originalBankCode = currentBankCode;
           _originalBranch = currentBranch;
           _originalAccount = currentAccount;
+          _hasChanges = false;
         });
       } catch (e) {
         AppLogger.error('Erro ao salvar dados bancários no fluxo de vendas', e);
@@ -275,6 +298,7 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
     
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
+      resizeToAvoidBottomInset: true,
       appBar: GlassAppBar(
         title: const Text(
           'Dados Bancários',
@@ -298,15 +322,19 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
                 valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
               ),
             )
-          : SafeArea(
-              child: Column(
+          : KeyboardDismissWrapper(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(
-                      child: SingleChildScrollView(
-                        clipBehavior: Clip.none,
-                        padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 24.0),
-                        child: Form(
-                          key: _formKey,
+                      child: Form(
+                        key: _formKey,
+                        child: SingleChildScrollView(
+                          clipBehavior: Clip.none,
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
@@ -369,17 +397,16 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
                         ),
                       ),
                     ),
-                    // Botão Avançar fixo na parte inferior
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 24.0),
-                      child: CustomButton(
-                        text: _isSaving ? 'Salvando...' : 'Avançar',
-                        onPressed: _isSaving ? null : _continuar,
-                      ),
+                    const SizedBox(height: 24),
+                    CustomButton(
+                      text: _isSaving ? 'Salvando...' : 'Avançar',
+                      onPressed: _isSaving ? null : _continuar,
                     ),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
+            ),
     );
   }
 

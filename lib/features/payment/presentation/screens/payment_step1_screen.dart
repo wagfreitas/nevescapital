@@ -222,6 +222,7 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
+      resizeToAvoidBottomInset: true,
       appBar: GlassAppBar(
         title: const Text(
           'Dados da Loja',
@@ -239,21 +240,22 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
           ),
         ),
       ),
-      body: SafeArea(
-        child: KeyboardDismissWrapper(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      clipBehavior: Clip.none,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
+      body: KeyboardDismissWrapper(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Form(
+                  key: _formKey,
+                  child: SingleChildScrollView(
+                    clipBehavior: Clip.none,
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                   TextFormField(
                     controller: _nomeEstabelecimentoController,
                     textInputAction: TextInputAction.next,
@@ -355,22 +357,21 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
                       return null;
                     },
                   ),
-                        ],
-                      ),
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 24),
-                  CustomButton(
-                    text: 'Avançar',
-                    onPressed: _continuar,
-                  ),
-                  const SizedBox(height: 24),
-                ],
+                ),
               ),
             ),
-          ),
+            const SizedBox(height: 24),
+            CustomButton(
+              text: 'Avançar',
+              onPressed: _continuar,
+            ),
+            const SizedBox(height: 24),
+          ],
         ),
       ),
+    ),
     );
   }
 }
@@ -408,12 +409,34 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
   }
 
   String _removeAccents(String text) {
-    const accented =  'àáâãäåèéêëìíîïòóôõöùúûüýñçÀÁÂÃÄÅÈÉÊËÌÍÎÏÒÓÔÕÖÙÚÛÜÝÑÇ';
-    const unaccented = 'aaaaaaeeeeiiiioooooouuuuyncAAAAAAEEEEIIIIOOOOOUUUUYNC';
-    return text.split('').map((char) {
-      final index = accented.indexOf(char);
-      return index >= 0 ? unaccented[index] : char;
-    }).join();
+    return text
+        .replaceAll(RegExp('[àáâãäå]'), 'a')
+        .replaceAll(RegExp('[èéêë]'), 'e')
+        .replaceAll(RegExp('[ìíîï]'), 'i')
+        .replaceAll(RegExp('[òóôõö]'), 'o')
+        .replaceAll(RegExp('[ùúûü]'), 'u')
+        .replaceAll(RegExp('[ýÿ]'), 'y')
+        .replaceAll('ñ', 'n')
+        .replaceAll('ç', 'c')
+        .replaceAll(RegExp('[ÀÁÂÃÄÅ]'), 'A')
+        .replaceAll(RegExp('[ÈÉÊË]'), 'E')
+        .replaceAll(RegExp('[ÌÍÎÏ]'), 'I')
+        .replaceAll(RegExp('[ÒÓÔÕÖ]'), 'O')
+        .replaceAll(RegExp('[ÙÚÛÜ]'), 'U')
+        .replaceAll(RegExp('[ÝŸ]'), 'Y')
+        .replaceAll('Ñ', 'N')
+        .replaceAll('Ç', 'C');
+  }
+
+  /// Verifica se [query] é uma subsequência de [target] — os caracteres
+  /// da query aparecem em [target] na mesma ordem (permite caracteres faltando).
+  /// Tolera digitação como "acogue" casando com "acougue".
+  bool _isSubsequence(String query, String target) {
+    int qi = 0;
+    for (int ti = 0; ti < target.length && qi < query.length; ti++) {
+      if (target[ti] == query[qi]) qi++;
+    }
+    return qi == query.length;
   }
 
   void _filterTypes() {
@@ -422,10 +445,13 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
       if (query.isEmpty) {
         _filteredTypes = List.from(widget.businessTypes);
       } else {
-        _filteredTypes = widget.businessTypes
-            .where((type) =>
-                _removeAccents((type['label'] ?? '').toLowerCase()).contains(query))
-            .toList();
+        _filteredTypes = widget.businessTypes.where((type) {
+          final normalized =
+              _removeAccents((type['label'] ?? '').toLowerCase());
+          if (normalized.contains(query)) return true;
+          if (query.length >= 3) return _isSubsequence(query, normalized);
+          return false;
+        }).toList();
       }
     });
   }
