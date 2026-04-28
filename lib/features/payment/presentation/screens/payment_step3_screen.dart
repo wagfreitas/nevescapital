@@ -158,20 +158,20 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
     super.dispose();
   }
 
-  void _openBankSearch() {
-    showDialog(
-      context: context,
-      builder: (context) => _BankSearchDialog(
-        onBankSelected: (bank) {
-          setState(() {
-            _selectedBank = bank;
-            _bankController.text = bank.displayName;
-          });
-          _checkForChanges();
-          Navigator.pop(context);
-        },
+  Future<void> _openBankSearch() async {
+    final selected = await Navigator.push<BrazilianBank>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const _BankSearchScreen(),
       ),
     );
+    if (selected != null && mounted) {
+      setState(() {
+        _selectedBank = selected;
+        _bankController.text = selected.displayName;
+      });
+      _checkForChanges();
+    }
   }
 
   Future<void> _continuar() async {
@@ -323,88 +323,78 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
               ),
             )
           : KeyboardDismissWrapper(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: Form(
-                        key: _formKey,
-                        child: SingleChildScrollView(
-                          clipBehavior: Clip.none,
-                          keyboardDismissBehavior:
-                              ScrollViewKeyboardDismissBehavior.onDrag,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // Texto de instrução
-                              const Text(
-                                'Confirme a conta em que receberá a venda:',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.white70,
-                                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Form(
+                      key: _formKey,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 0),
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text(
+                              'Confirme a conta em que receberá a venda:',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white70,
                               ),
-                              const SizedBox(height: 24),
-
-                              // Campo: Banco
-                              GestureDetector(
-                                onTap: _openBankSearch,
-                                child: _buildBankField(),
-                              ),
-                              const SizedBox(height: 24),
-
-                              // Campo: Agência
-                              _buildTextField(
-                                label: 'Agência',
-                                controller: _branchController,
-                                keyboardType: TextInputType.number,
-                                maxLength: 4,
-                                prefixIcon: Icons.location_on,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Informe sua Agência';
-                                  }
-                                  if (value.length != 4) {
-                                    return 'Agência deve ter 4 dígitos';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 24),
-
-                              // Campo: Conta com dígito
-                              _buildTextField(
-                                label: 'Conta com Dígito',
-                                controller: _accountController,
-                                keyboardType: TextInputType.number,
-                                maxLength: 10,
-                                prefixIcon: Icons.account_balance_wallet,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Informe sua Conta com Dígito';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 32),
-
-                              // Aviso sobre regras de preenchimento
-                              _buildRulesWarning(),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(height: 24),
+                            GestureDetector(
+                              onTap: _openBankSearch,
+                              child: _buildBankField(),
+                            ),
+                            const SizedBox(height: 24),
+                            _buildTextField(
+                              label: 'Agência',
+                              controller: _branchController,
+                              keyboardType: TextInputType.number,
+                              maxLength: 4,
+                              prefixIcon: Icons.location_on,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Informe sua Agência';
+                                }
+                                if (value.length != 4) {
+                                  return 'Agência deve ter 4 dígitos';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 24),
+                            _buildTextField(
+                              label: 'Conta com Dígito',
+                              controller: _accountController,
+                              keyboardType: TextInputType.number,
+                              maxLength: 10,
+                              prefixIcon: Icons.account_balance_wallet,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Informe sua Conta com Dígito';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 32),
+                            _buildRulesWarning(),
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    CustomButton(
+                  ),
+                  Container(
+                    color: AppTheme.backgroundColor,
+                    padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 24.0),
+                    child: CustomButton(
                       text: _isSaving ? 'Salvando...' : 'Avançar',
                       onPressed: _isSaving ? null : _continuar,
                     ),
-                    const SizedBox(height: 24),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
     );
@@ -569,17 +559,15 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
   }
 }
 
-/// Dialog para busca de bancos
-class _BankSearchDialog extends StatefulWidget {
-  final Function(BrazilianBank) onBankSelected;
-
-  const _BankSearchDialog({required this.onBankSelected});
+/// Tela fullscreen para busca de bancos
+class _BankSearchScreen extends StatefulWidget {
+  const _BankSearchScreen();
 
   @override
-  State<_BankSearchDialog> createState() => _BankSearchDialogState();
+  State<_BankSearchScreen> createState() => _BankSearchScreenState();
 }
 
-class _BankSearchDialogState extends State<_BankSearchDialog> {
+class _BankSearchScreenState extends State<_BankSearchScreen> {
   final _searchController = TextEditingController();
   List<BrazilianBank> _filteredBanks = BrazilianBanks.getAllBanks();
 
@@ -605,45 +593,27 @@ class _BankSearchDialogState extends State<_BankSearchDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: const Color(0xFF1A2B1F),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
+      extendBodyBehindAppBar: true,
+      appBar: GlassAppBar(
+        onBackPressed: () => Navigator.of(context).pop(),
+        title: const Text(
+          'Selecione o Banco',
+          style: TextStyle(color: Colors.white, fontSize: 18),
+        ),
       ),
-      child: Container(
-        constraints: const BoxConstraints(maxHeight: 600),
+      resizeToAvoidBottomInset: true,
+      body: SafeArea(
         child: Column(
           children: [
-            // Header
             Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Text(
-                    'Selecione o Banco',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            // Search field — teclado já aberto ao abrir o diálogo
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 4.0),
               child: TextField(
                 controller: _searchController,
-                autofocus: true,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: 'Buscar banco...',
+                  hintText: 'Digite o nome ou código do banco',
                   hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                   prefixIcon: Icon(Icons.search, color: AppTheme.textSecondary),
                   filled: true,
@@ -652,27 +622,44 @@ class _BankSearchDialogState extends State<_BankSearchDialog> {
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 8),
-            // List
             Expanded(
-              child: ListView.builder(
-                itemCount: _filteredBanks.length,
-                itemBuilder: (context, index) {
-                  final bank = _filteredBanks[index];
-                  return ListTile(
-                    title: Text(
-                      bank.displayName,
-                      style: const TextStyle(color: Colors.white),
+              child: _filteredBanks.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Nenhum banco encontrado',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: EdgeInsets.zero,
+                      itemCount: _filteredBanks.length,
+                      itemBuilder: (context, index) {
+                        final bank = _filteredBanks[index];
+                        return ListTile(
+                          title: Text(
+                            bank.displayName,
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          trailing: const Icon(
+                            Icons.arrow_forward_ios,
+                            size: 16,
+                            color: AppTheme.textSecondary,
+                          ),
+                          onTap: () => Navigator.of(context).pop(bank),
+                        );
+                      },
                     ),
-                    onTap: () {
-                      widget.onBankSelected(bank);
-                    },
-                  );
-                },
-              ),
             ),
           ],
         ),

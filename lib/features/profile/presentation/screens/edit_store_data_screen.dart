@@ -268,134 +268,111 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
               child: CircularProgressIndicator(color: AppTheme.primaryColor),
             )
           : SafeArea(
+              top: false,
               child: KeyboardDismissWrapper(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(24.0, kToolbarHeight, 24.0, 0),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minHeight: constraints.maxHeight - kToolbarHeight,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        clipBehavior: Clip.none,
+                        padding: EdgeInsets.fromLTRB(
+                          24.0,
+                          MediaQuery.of(context).padding.top + kToolbarHeight + 24,
+                          24.0,
+                          0,
                         ),
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
                         child: Form(
                           key: _formKey,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  TextFormField(
-                                    controller: _storeNameController,
-                                    autofocus: false,
-                                    textInputAction: TextInputAction.next,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16.0,
-                                      fontWeight: FontWeight.normal,
-                                      height: 1.0,
-                                      letterSpacing: 0.0,
-                                    ),
-                                    onChanged: (value) => _checkForChanges(),
-                                    decoration: InputDecoration(
-                                      labelText: 'Nome da Loja',
-                                      labelStyle: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.7),
-                                        fontSize: 16,
-                                      ),
-                                      filled: true,
-                                      fillColor: AppTheme.inputEditableBackgroundColor,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide(
-                                            color: Colors.white.withValues(alpha: 0.2)),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide(
-                                            color: AppTheme.primaryColor, width: 2),
-                                      ),
-                                    ),
-                                    validator: (value) {
-                                      if (value == null || value.trim().isEmpty) {
-                                        return 'Nome da loja é obrigatório';
-                                      }
-                                      if (value.trim().length < 3) {
-                                        return 'Nome deve ter pelo menos 3 caracteres';
-                                      }
-                                      return null;
-                                    },
+                              TextFormField(
+                                controller: _storeNameController,
+                                autofocus: false,
+                                textInputAction: TextInputAction.next,
+                                style: const TextStyle(color: Colors.white),
+                                onChanged: (value) => _checkForChanges(),
+                                decoration: InputDecoration(
+                                  labelText: 'Nome da Loja',
+                                  labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                                  filled: true,
+                                  fillColor: AppTheme.inputEditableBackgroundColor,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none,
                                   ),
-                                  const SizedBox(height: 24.0),
-                                  GestureDetector(
-                                    onTap: () => _showRamoSearch(context),
-                                    child: Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.inputEditableBackgroundColor,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: Colors.white.withValues(alpha: 0.2),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(Icons.store, color: Colors.white70),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  'Ramo de Atuação',
-                                                  style: TextStyle(
-                                                    color: Colors.white.withValues(alpha: 0.7),
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  _getSelectedRamoLabel() ?? 'Selecione o ramo',
-                                                  style: TextStyle(
-                                                    color: _selectedBusinessType != null
-                                                        ? Colors.white
-                                                        : Colors.white.withValues(alpha: 0.45),
-                                                    fontSize: 16,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const Icon(Icons.keyboard_arrow_down, color: Colors.white70),
-                                        ],
-                                      ),
-                                    ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                                   ),
-                                ],
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                                  ),
+                                ),
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Nome da loja é obrigatório';
+                                  }
+                                  if (value.trim().length < 3) {
+                                    return 'Nome deve ter pelo menos 3 caracteres';
+                                  }
+                                  return null;
+                                },
                               ),
-                              Padding(
-                                padding: const EdgeInsets.only(top: 24, bottom: 24),
-                                child: CustomButton(
-                                  text: 'Atualizar',
-                                  onPressed: (_isLoading || !_hasChanges)
-                                      ? null
-                                      : _saveStoreData,
-                                  isLoading: _isLoading,
+                              const SizedBox(height: 20),
+                              TextFormField(
+                                controller: _ramoController,
+                                readOnly: true,
+                                onTap: () => _showRamoSearch(context),
+                                style: const TextStyle(color: Colors.white),
+                                decoration: InputDecoration(
+                                  labelText: 'Ramo de Atuação',
+                                  labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                                  floatingLabelBehavior: FloatingLabelBehavior.auto,
+                                  prefixIcon: const Icon(
+                                    Icons.store,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                  suffixIcon: const Icon(
+                                    Icons.arrow_drop_down,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                  filled: true,
+                                  fillColor: AppTheme.inputEditableBackgroundColor,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ),
                       ),
-                    );
-                  },
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 24.0),
+                      child: CustomButton(
+                        text: 'Atualizar',
+                        onPressed: (_isLoading || !_hasChanges)
+                            ? null
+                            : _saveStoreData,
+                        isLoading: _isLoading,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

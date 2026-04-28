@@ -241,22 +241,23 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
       body: SafeArea(
         top: false,
         child: KeyboardDismissWrapper(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              24.0,
-              MediaQuery.of(context).padding.top + kToolbarHeight + 40,
-              24.0,
-              0,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    24.0,
+                    MediaQuery.of(context).padding.top + kToolbarHeight + 24,
+                    24.0,
+                    0,
+                  ),
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                       // CEP
                       TextFormField(
                         controller: _cepController,
@@ -265,7 +266,7 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                         keyboardAppearance: Brightness.dark, // Teclado escuro para uniformidade
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(9), // xxxxx-xxx
+                          LengthLimitingTextInputFormatter(8),
                         ],
                         style: const TextStyle(color: Colors.white),
                         onChanged: (value) {
@@ -637,15 +638,17 @@ class _PersonalDataScreenState extends State<PersonalDataScreen> {
                         ],
                       ),
                     ),
-                const Spacer(),
-                CustomButton(
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 24.0),
+                child: CustomButton(
                   text: widget.isEditMode ? 'Atualizar' : 'Finalizar Cadastro',
                   onPressed: (_isLoading || (widget.isEditMode && !_hasChanges)) ? null : _handleContinue,
                   isLoading: _isLoading,
                 ),
-                const SizedBox(height: 24),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

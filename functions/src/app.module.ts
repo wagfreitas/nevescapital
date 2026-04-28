@@ -5,6 +5,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { HealthController } from './health.controller';
 import { FirebaseRestModule } from './firebase-rest/firebase-rest.module';
+import { EfiModule } from './efi/efi.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { FirebaseRestModule } from './firebase-rest/firebase-rest.module';
     // Modules
     UsersModule,
     AuthModule,
+    EfiModule,
   ],
   controllers: [HealthController],
 })
