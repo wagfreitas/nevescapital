@@ -204,10 +204,16 @@ class CardBrandDetector {
   }
 
   /// Tamanho dos grupos para formatação visual do número.
-  /// Sempre agrupa de 4 em 4 dígitos, independentemente da bandeira.
-  /// Para 15 dígitos (Amex): 4-4-4-3 | 14 (Diners): 4-4-4-2 | 16: 4-4-4-4.
+  /// Amex: 4-6-5 | Diners: 4-6-4 | Demais: 4-4-4-4.
   static List<int> getGroupSizes(CardBrand brand) {
-    return const [4, 4, 4, 4];
+    switch (brand) {
+      case CardBrand.amex:
+        return const [4, 6, 5];
+      case CardBrand.diners:
+        return const [4, 6, 4];
+      default:
+        return const [4, 4, 4, 4];
+    }
   }
 
   /// Comprimento esperado do CVV/CID para a bandeira.

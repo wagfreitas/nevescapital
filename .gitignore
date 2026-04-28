@@ -6,6 +6,15 @@ functions/.env
 functions/.env.*
 !functions/.env.example
 
+# Credenciais e certificados (NUNCA commitar)
+credenciais/
+**/credenciais/
+*.p12
+*.pfx
+*.pem
+*.key
+*.crt
+
 # Miscellaneous
 *.class
 *.log

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
@@ -34,10 +35,11 @@ class WhatsAppOtpScreen extends StatefulWidget {
 class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
   int _otpLength = 4;
 
-  List<TextEditingController> _controllers =
-      List.generate(4, (_) => TextEditingController(text: '\u200B'));
-  List<FocusNode> _focusNodes = List.generate(4, (_) => FocusNode());
-  List<String> _previousValues = List.generate(4, (_) => '\u200B');
+  // Campo único que recebe o OTP. A UI mostra 4/6 caixas, mas por baixo é um
+  // único TextField — isso é o que o iOS 26 precisa para oferecer o autofill
+  // do código do WhatsApp na barra do teclado.
+  final TextEditingController _otpController = TextEditingController();
+  final FocusNode _otpFocus = FocusNode();
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -50,36 +52,45 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
   bool _isSmsMode = false;
   String? _smsVerificationId;
 
-  static const String _zwsp = '\u200B';
+  bool get _isOtpComplete => _otpController.text.length == _otpLength;
 
-  bool get _isOtpComplete =>
-      _controllers.every((c) => c.text != _zwsp && c.text.isNotEmpty);
-
-  String get _otpCode =>
-      _controllers.map((c) => c.text == _zwsp ? '' : c.text).join();
+  String get _otpCode => _otpController.text;
 
   @override
   void initState() {
     super.initState();
     _startCountdowns();
+    _otpController.addListener(_onOtpChanged);
+    _otpFocus.addListener(_onFocusChanged);
 
-    // Auto-focus no primeiro campo
+    // Auto-focus no campo
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _focusNodes[0].canRequestFocus) {
-        _focusNodes[0].requestFocus();
+      if (mounted && _otpFocus.canRequestFocus) {
+        _otpFocus.requestFocus();
       }
     });
   }
 
   @override
   void dispose() {
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    for (final f in _focusNodes) {
-      f.dispose();
-    }
+    _otpController.removeListener(_onOtpChanged);
+    _otpFocus.removeListener(_onFocusChanged);
+    _otpController.dispose();
+    _otpFocus.dispose();
     super.dispose();
+  }
+
+  void _onFocusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _onOtpChanged() {
+    if (_errorMessage != null) {
+      setState(() => _errorMessage = null);
+    } else {
+      // Redesenha as caixas quando o texto muda.
+      setState(() {});
+    }
   }
 
   void _startCountdowns() {
@@ -103,70 +114,6 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
         _startSmsCountdown();
       }
     });
-  }
-
-  void _onDigitChanged(int index, String value) {
-    final digits = value.replaceAll(_zwsp, '').replaceAll(RegExp(r'\D'), '');
-
-    // Paste: múltiplos dígitos colados
-    if (digits.length > 1) {
-      _pasteCode(digits);
-      return;
-    }
-
-    final hadDigit = _previousValues[index] != _zwsp &&
-        _previousValues[index].isNotEmpty;
-
-    if (value.isEmpty) {
-      // Backspace apagou o conteúdo (ZWSP ou dígito)
-      _controllers[index].value = TextEditingValue(
-        text: _zwsp,
-        selection: const TextSelection.collapsed(offset: 1),
-      );
-      _previousValues[index] = _zwsp;
-
-      if (hadDigit) {
-        // Tinha dígito → apagou o dígito, fica no mesmo campo
-      } else {
-        // Estava "vazio" (ZWSP) → mover para campo anterior
-        if (index > 0) {
-          _focusNodes[index - 1].requestFocus();
-        }
-      }
-      setState(() => _errorMessage = null);
-      return;
-    }
-
-    // Digitou um número
-    if (digits.length == 1) {
-      _controllers[index].value = TextEditingValue(
-        text: digits,
-        selection: TextSelection.collapsed(offset: digits.length),
-      );
-      _previousValues[index] = digits;
-      if (index < _otpLength - 1) {
-        _focusNodes[index + 1].requestFocus();
-      }
-    }
-
-    setState(() => _errorMessage = null);
-  }
-
-  void _pasteCode(String code) {
-    final digits = code.replaceAll(RegExp(r'\D'), '');
-    for (int i = 0; i < _otpLength; i++) {
-      final text = i < digits.length ? digits[i] : _zwsp;
-      _controllers[i].value = TextEditingValue(
-        text: text,
-        selection: TextSelection.collapsed(offset: text.length),
-      );
-      _previousValues[i] = text;
-    }
-    final focusIndex = (digits.length >= _otpLength) ? _otpLength - 1 : digits.length;
-    if (focusIndex < _otpLength) {
-      _focusNodes[focusIndex].requestFocus();
-    }
-    setState(() => _errorMessage = null);
   }
 
   Future<void> _handleVerify() async {
@@ -317,14 +264,8 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
         _startResendCountdown();
 
         if (result['success'] == true) {
-          for (int i = 0; i < _controllers.length; i++) {
-            _controllers[i].value = TextEditingValue(
-              text: _zwsp,
-              selection: const TextSelection.collapsed(offset: 1),
-            );
-            _previousValues[i] = _zwsp;
-          }
-          _focusNodes[0].requestFocus();
+          _otpController.clear();
+          _otpFocus.requestFocus();
         } else {
           _errorMessage = result['message'] as String? ?? 'Erro ao reenviar código';
         }
@@ -388,31 +329,21 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
     }
   }
 
-  /// Muda a tela para modo SMS: 6 campos em vez de 4
+  /// Muda a tela para modo SMS: 6 dígitos em vez de 4
   void _switchToSmsMode(String verificationId) {
-    // Limpar controllers antigos
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    for (final f in _focusNodes) {
-      f.dispose();
-    }
-
     setState(() {
       _isSmsMode = true;
       _smsVerificationId = verificationId;
       _otpLength = 6;
       _isLoading = false;
       _errorMessage = null;
-      _controllers = List.generate(6, (_) => TextEditingController(text: _zwsp));
-      _focusNodes = List.generate(6, (_) => FocusNode());
-      _previousValues = List.generate(6, (_) => _zwsp);
     });
+    _otpController.clear();
 
-    // Focar no primeiro campo
+    // Focar no campo
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _focusNodes[0].canRequestFocus) {
-        _focusNodes[0].requestFocus();
+      if (mounted && _otpFocus.canRequestFocus) {
+        _otpFocus.requestFocus();
       }
     });
   }
@@ -520,6 +451,98 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
     );
   }
 
+  /// Campo OTP: um único TextField invisível por baixo (para autofill do iOS 26
+  /// e Android) com caixas visuais por cima. A largura/altura das caixas
+  /// acompanha `_otpLength` (4 WhatsApp / 6 SMS).
+  Widget _buildOtpField() {
+    final double boxSize = _isSmsMode ? 48 : 64;
+    final double boxMargin = _isSmsMode ? 4 : 8;
+    final double totalWidth =
+        (boxSize + boxMargin * 2) * _otpLength;
+    final String text = _otpController.text;
+
+    return SizedBox(
+      width: totalWidth,
+      height: boxSize,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Campo real (transparente, por baixo). Recebe o autofill.
+          Positioned.fill(
+            child: AutofillGroup(
+              child: TextField(
+                controller: _otpController,
+                focusNode: _otpFocus,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                maxLength: _otpLength,
+                autofillHints: const [AutofillHints.oneTimeCode],
+                // Torna o texto real invisível — as caixas acima mostram os dígitos.
+                showCursor: false,
+                style: const TextStyle(
+                  color: Colors.transparent,
+                  // Fonte grande para ampliar a área de toque por caractere.
+                  fontSize: 1,
+                  height: 1,
+                ),
+                cursorColor: Colors.transparent,
+                decoration: const InputDecoration(
+                  counterText: '',
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(_otpLength),
+                ],
+                onSubmitted: (_) {
+                  if (_isOtpComplete) _handleVerify();
+                },
+              ),
+            ),
+          ),
+          // Caixas visuais por cima. IgnorePointer para os toques chegarem
+          // no TextField de baixo e abrirem o teclado normalmente.
+          IgnorePointer(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(_otpLength, (index) {
+                final bool hasDigit = index < text.length;
+                final bool isActive = index == text.length && _otpFocus.hasFocus;
+                return Container(
+                  width: boxSize,
+                  height: boxSize,
+                  margin: EdgeInsets.symmetric(horizontal: boxMargin),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppTheme.inputEditableBackgroundColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isActive
+                          ? AppTheme.primaryColor
+                          : Colors.white.withValues(alpha: 0.2),
+                      width: isActive ? 2 : 1,
+                    ),
+                  ),
+                  child: Text(
+                    hasDigit ? text[index] : '',
+                    style: TextStyle(
+                      fontSize: _isSmsMode ? 20 : 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
@@ -573,60 +596,9 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
               ),
               const SizedBox(height: 40),
 
-              // 4 caixas de OTP
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(_otpLength, (index) {
-                  return Container(
-                    width: _isSmsMode ? 48 : 64,
-                    height: _isSmsMode ? 48 : 64,
-                    margin: EdgeInsets.symmetric(horizontal: _isSmsMode ? 4 : 8),
-                    child: TextFormField(
-                        controller: _controllers[index],
-                        focusNode: _focusNodes[index],
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        maxLength: 2,
-                        inputFormatters: const [],
-                        onChanged: (value) => _onDigitChanged(index, value),
-                        style: TextStyle(
-                          fontSize: _isSmsMode ? 20 : 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                        decoration: InputDecoration(
-                          counterText: '',
-                          filled: true,
-                          fillColor: AppTheme.inputEditableBackgroundColor,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.2),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: AppTheme.primaryColor,
-                              width: 2,
-                            ),
-                          ),
-                          errorBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Colors.red,
-                              width: 2,
-                            ),
-                          ),
-                        ),
-                      ),
-                  );
-                }),
-              ),
+              // Caixas de OTP: Stack com campo único (para autofill do iOS 26
+              // e Android) por baixo, e caixas visuais por cima.
+              _buildOtpField(),
               const SizedBox(height: 16),
 
               // Mensagem de erro

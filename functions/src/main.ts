@@ -40,9 +40,22 @@ async function bootstrap() {
         });
 
         const status = exception.status || 500;
+
+        // Se for HttpException com response estruturado (objeto), preserva os campos extras.
+        // Ex: BadGateway com { message, efiStatus, efiBody } → retorna tudo.
+        const exceptionResponse =
+          typeof exception.getResponse === 'function'
+            ? exception.getResponse()
+            : null;
+
+        const baseBody =
+          exceptionResponse && typeof exceptionResponse === 'object'
+            ? exceptionResponse
+            : { message: exception.message || 'Internal server error' };
+
         response.status(status).json({
           statusCode: status,
-          message: exception.message || 'Internal server error',
+          ...baseBody,
           ...(process.env.NODE_ENV === 'development' && { stack: exception.stack }),
         });
       },
