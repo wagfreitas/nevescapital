@@ -10,6 +10,7 @@ import 'package:neves_capital/shared/services/firestore_service.dart';
 import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/shared/data/brazilian_banks.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
+import 'package:neves_capital/shared/services/efi_pix_api_service.dart';
 import '../helpers/payment_step_helper.dart';
 import 'sale_completion_screen.dart';
 
@@ -123,7 +124,7 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
     });
 
     try {
-      // 1. Buscar userId do usuário atual
+      // 1. Buscar dados do usuário atual
       final cpf = await SecureStorageService.getLastCpf();
       if (cpf == null || cpf.isEmpty) {
         throw Exception('CPF não encontrado. Faça login novamente.');
@@ -135,6 +136,7 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
       }
 
       final userId = userData['id'] as String;
+      final fullName = userData['full_name'] as String? ?? '';
 
       // 2. Detectar bandeira e obter últimos 4 dígitos do cartão
       final detectedBrand = CardBrandDetector.detectBrand(widget.numeroCartao);
@@ -145,7 +147,40 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
           : '';
       final cardNumberDisplay = '•••• $cardLastFour';
 
-      // 3. Salvar venda no Firestore (inclui conta de destino para o histórico)
+      // 3. Enviar PIX via EFI sandbox
+      final valorReais = (widget.valorCentavos * 0.97 / 100).toStringAsFixed(2);
+
+      Map<String, dynamic> pixResult;
+
+      if (_bankCode != null && _branch != null && _account != null) {
+        pixResult = await EfiPixApiService.sendPix(
+          valor: valorReais,
+          dadosBancarios: {
+            'banco': _bankCode,
+            'agencia': _branch,
+            'conta': _account,
+            'cpfCnpj': cpf.replaceAll(RegExp(r'[^\d]'), ''),
+            'nome': fullName,
+          },
+          descricao: 'Venda ${widget.nomeEstabelecimento}',
+        );
+      } else {
+        pixResult = {
+          'success': false,
+          'message': 'Dados bancários incompletos para envio do PIX.',
+        };
+      }
+
+      AppLogger.info('[EFI PIX] Resultado: $pixResult');
+
+      if (!mounted) return;
+
+      final pixSuccess = pixResult['success'] == true;
+      final pixIdEnvio = pixResult['idEnvio'] as String?;
+      final pixE2eId = pixResult['e2eId'] as String?;
+      final pixStatusStr = pixSuccess ? 'enviado' : 'erro';
+
+      // 4. Salvar venda no Firestore com resultado do PIX
       final saleId = await FirestoreService.saveSale(
         userId: userId,
         valorCentavos: widget.valorCentavos,
@@ -157,22 +192,30 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
         bankCode: _bankCode,
         branch: _branch,
         account: _account,
-        status: 'completed',
+        pixIdEnvio: pixIdEnvio,
+        pixE2eId: pixE2eId,
+        pixStatus: pixStatusStr,
+        status: pixSuccess ? 'pix_enviado' : 'pix_erro',
       );
 
       if (saleId == null) {
         throw Exception('Erro ao salvar venda');
       }
 
-      AppLogger.info('✅ Venda cadastrada com sucesso: $saleId');
+      AppLogger.info('Venda salva: $saleId (PIX: $pixStatusStr)');
 
       if (!mounted) return;
 
-      // 4. Navegar para tela de conclusão da venda
+      // 5. Navegar para tela de conclusão (mesmo com erro no PIX, a venda foi registrada)
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => const SaleCompletionScreen(),
+          builder: (context) => SaleCompletionScreen(
+            pixSuccess: pixSuccess,
+            pixMessage: pixSuccess
+                ? 'PIX enviado com sucesso'
+                : (pixResult['message'] as String? ?? 'Erro ao enviar PIX'),
+          ),
         ),
       );
       

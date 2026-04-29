@@ -575,6 +575,9 @@ class FirestoreService {
     String? bankCode,
     String? branch,
     String? account,
+    String? pixIdEnvio,
+    String? pixE2eId,
+    String? pixStatus,
     String status = 'completed',
   }) async {
     try {
@@ -610,6 +613,9 @@ class FirestoreService {
       if (bankCode != null) saleData['bankCode'] = bankCode;
       if (branch != null) saleData['branch'] = branch;
       if (account != null) saleData['account'] = account;
+      if (pixIdEnvio != null) saleData['pixIdEnvio'] = pixIdEnvio;
+      if (pixE2eId != null) saleData['pixE2eId'] = pixE2eId;
+      if (pixStatus != null) saleData['pixStatus'] = pixStatus;
 
       // Salvar na subcollection
       await _firestore
