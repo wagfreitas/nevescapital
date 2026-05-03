@@ -3,15 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
 
-/**
- * Carrega configuração da Efí (URLs, credenciais, certificado mTLS).
- *
- * Suporta dois modos de fornecer o certificado:
- *   - EFI_CERT_PATH: caminho para o arquivo .p12 (uso local em dev)
- *   - EFI_CERT_BASE64: conteúdo do .p12 em base64 (uso em produção/Railway)
- *
- * O .p12 da Efí é gerado SEM passphrase (string vazia).
- */
 @Injectable()
 export class EfiConfigService implements OnModuleInit {
   private readonly logger = new Logger(EfiConfigService.name);
@@ -22,6 +13,8 @@ export class EfiConfigService implements OnModuleInit {
   private _clientSecret: string;
   private _certBuffer: Buffer;
   private _certPassphrase: string;
+  private _pagadorChave: string;
+  private _isConfigValid = false;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -45,30 +38,62 @@ export class EfiConfigService implements OnModuleInit {
       'EFI_CERT_PASSPHRASE',
       '',
     );
+    this._pagadorChave = this.configService.get<string>(
+      'EFI_PAGADOR_CHAVE',
+      '',
+    );
 
     this._certBuffer = this.loadCertBuffer();
+    this._isConfigValid = this.validate();
 
-    if (!this._clientId || !this._clientSecret) {
-      this.logger.warn(
-        'EFI_CLIENT_ID ou EFI_CLIENT_SECRET não configurados — chamadas falharão.',
+    this.logger.log(
+      `Efí configurada: ambiente=${this._ambiente}, baseUrl=${this._baseUrl}, ` +
+        `certBytes=${this._certBuffer?.length ?? 0}, valid=${this._isConfigValid}`,
+    );
+  }
+
+  private validate(): boolean {
+    const errors: string[] = [];
+
+    if (!this._clientId) {
+      errors.push('EFI_CLIENT_ID não configurado');
+    }
+    if (!this._clientSecret) {
+      errors.push('EFI_CLIENT_SECRET não configurado');
+    }
+    if (!this._certBuffer || this._certBuffer.length === 0) {
+      errors.push(
+        'Certificado .p12 não carregado (configure EFI_CERT_BASE64 ou EFI_CERT_PATH)',
+      );
+    }
+    if (!this._pagadorChave) {
+      errors.push(
+        'EFI_PAGADOR_CHAVE não configurada (obrigatória para PIX-out)',
       );
     }
 
-    this.logger.log(
-      `Efí configurada: ambiente=${this._ambiente}, baseUrl=${this._baseUrl}, certBytes=${this._certBuffer?.length ?? 0}`,
-    );
+    if (errors.length > 0) {
+      this.logger.error(
+        `Configuração Efí INCOMPLETA — PIX não funcionará:\n  - ${errors.join('\n  - ')}`,
+      );
+      return false;
+    }
+
+    return true;
   }
 
   private loadCertBuffer(): Buffer {
     const base64 = this.configService.get<string>('EFI_CERT_BASE64');
     if (base64) {
-      this.logger.debug('Certificado Efí carregado via EFI_CERT_BASE64');
-      return Buffer.from(base64, 'base64');
+      const buf = Buffer.from(base64, 'base64');
+      this.logger.debug(
+        `Certificado Efí carregado via EFI_CERT_BASE64 (${buf.length} bytes)`,
+      );
+      return buf;
     }
 
     const certPath = this.configService.get<string>('EFI_CERT_PATH');
     if (certPath) {
-      // Resolve path relativo ao cwd do processo (geralmente functions/)
       const resolved = path.isAbsolute(certPath)
         ? certPath
         : path.resolve(process.cwd(), certPath);
@@ -76,13 +101,13 @@ export class EfiConfigService implements OnModuleInit {
         this.logger.error(`Certificado não encontrado em: ${resolved}`);
         return Buffer.alloc(0);
       }
-      this.logger.debug(`Certificado Efí carregado de: ${resolved}`);
-      return fs.readFileSync(resolved);
+      const buf = fs.readFileSync(resolved);
+      this.logger.debug(
+        `Certificado Efí carregado de: ${resolved} (${buf.length} bytes)`,
+      );
+      return buf;
     }
 
-    this.logger.warn(
-      'Nenhum certificado configurado (EFI_CERT_BASE64 ou EFI_CERT_PATH).',
-    );
     return Buffer.alloc(0);
   }
 
@@ -108,5 +133,13 @@ export class EfiConfigService implements OnModuleInit {
 
   get certPassphrase() {
     return this._certPassphrase;
+  }
+
+  get pagadorChave() {
+    return this._pagadorChave;
+  }
+
+  get isConfigValid() {
+    return this._isConfigValid;
   }
 }
