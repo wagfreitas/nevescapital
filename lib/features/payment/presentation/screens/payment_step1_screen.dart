@@ -460,25 +460,25 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      extendBodyBehindAppBar: true,
-      appBar: GlassAppBar(
-        onBackPressed: () => Navigator.of(context).pop(widget.selectedValue),
+      appBar: AppBar(
+        backgroundColor: AppTheme.backgroundColor,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(widget.selectedValue),
+        ),
         title: const Text(
           'Selecione o Ramo de Atuação',
-          style: TextStyle(color: Colors.white, fontSize: 18),
+          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
         ),
+        centerTitle: true,
       ),
-      body: Container(
-        color: AppTheme.backgroundColor,
-        child: Builder(
-          builder: (context) {
-            // Caixa de busca colada ao titulo (usando toolbarHeight reduzido)
-            final topPadding = MediaQuery.of(context).padding.top + 36;
-            return Column(
-              children: [
-                Padding(
-                  padding: EdgeInsets.only(left: 16.0, right: 16.0, top: topPadding, bottom: 4.0),
-                  child: TextField(
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 4.0, bottom: 4.0),
+            child: TextField(
               controller: _searchController,
               autofocus: false,
               style: const TextStyle(color: Colors.white),
@@ -501,10 +501,10 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
                   borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                 ),
               ),
-                ),
-              ),
-              Expanded(
-                child: _filteredTypes.isEmpty
+            ),
+          ),
+          Expanded(
+            child: _filteredTypes.isEmpty
                 ? Center(
                     child: Text(
                       'Nenhum ramo encontrado',
@@ -537,11 +537,8 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
                       );
                     },
                   ),
-              ),
-            ],
-            );
-          },
-        ),
+          ),
+        ],
       ),
     );
   }

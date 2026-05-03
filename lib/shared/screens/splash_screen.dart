@@ -6,7 +6,6 @@ import 'package:neves_capital/features/home/presentation/screens/main_tab_screen
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/shared/services/biometric_service.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
-import 'package:neves_capital/features/auth/data/services/registration_service.dart';
 import 'package:neves_capital/features/auth/data/services/local_registration_storage.dart';
 import 'package:neves_capital/features/auth/presentation/helpers/registration_navigator.dart';
 
@@ -260,7 +259,7 @@ class _SplashScreenState extends State<SplashScreen> {
           );
           return;
         } else {
-          await RegistrationService.deleteProgress(progress.cpf);
+          await LocalRegistrationStorage.clearLocal();
         }
       }
     } catch (e) {

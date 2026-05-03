@@ -244,6 +244,18 @@ class RegistrationProgress {
 
   /// Verifica se foi abandonado há mais de 30 dias
   bool get isStale => DateTime.now().difference(lastUpdated).inDays > 30;
+
+  static const List<String> _stepOrder = [
+    'phone', 'otp', 'email', 'personal1', 'address', 'personal2',
+    'selfie', 'document', 'completed',
+  ];
+
+  /// Retorna o step mais avançado entre [a] e [b].
+  static String furthestStep(String a, String b) {
+    final ia = _stepOrder.indexOf(a);
+    final ib = _stepOrder.indexOf(b);
+    return (ia >= ib) ? a : b;
+  }
 }
 
 /// Status do cadastro

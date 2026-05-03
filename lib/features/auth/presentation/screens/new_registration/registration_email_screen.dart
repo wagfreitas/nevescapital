@@ -5,7 +5,6 @@ import 'package:neves_capital/shared/helpers/email_helper.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
-import 'package:neves_capital/features/auth/presentation/controllers/registration_lifecycle_observer.dart';
 import 'package:neves_capital/features/auth/domain/entities/registration_progress.dart';
 import 'package:neves_capital/features/auth/data/services/local_registration_storage.dart';
 import 'package:neves_capital/shared/components/keyboard_dismiss_button.dart';
@@ -41,7 +40,6 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   String? _errorMessage;
-  late RegistrationLifecycleObserver _lifecycleObserver;
 
   @override
   void initState() {
@@ -50,21 +48,6 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
     if (widget.initialEmail != null && widget.initialEmail!.isNotEmpty) {
       _emailController.text = widget.initialEmail!;
     }
-
-    _lifecycleObserver = RegistrationLifecycleObserver(
-      getCurrentProgress: () => RegistrationProgress(
-        cpf: widget.cpf,
-        currentStep: 'email',
-        status: RegistrationStatus.inProgress,
-        lastUpdated: DateTime.now(),
-        phone: widget.phone,
-        email: _emailController.text.isNotEmpty
-            ? EmailHelper.cleanEmail(_emailController.text)
-            : null,
-      ),
-      shouldSaveProgress: () => ModalRoute.of(context)?.isCurrent ?? false,
-    );
-    WidgetsBinding.instance.addObserver(_lifecycleObserver);
 
     if (widget.initialEmail == null || widget.initialEmail!.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -75,8 +58,7 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
 
   @override
   void dispose() {
-    _lifecycleObserver.dispose();
-    WidgetsBinding.instance.removeObserver(_lifecycleObserver);
+    _saveBeforePop();
     _emailFocusNode.dispose();
     _emailController.dispose();
     super.dispose();
@@ -136,19 +118,44 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
     }
   }
 
+  void _saveBeforePop() {
+    final email = _emailController.text.isNotEmpty
+        ? EmailHelper.cleanEmail(_emailController.text)
+        : null;
+    LocalRegistrationStorage.getLocal().then((existing) {
+      final keepStep = RegistrationProgress.furthestStep(
+        existing?.currentStep ?? 'email', 'email',
+      );
+      final progress = (existing ?? RegistrationProgress(
+        cpf: widget.cpf,
+        currentStep: keepStep,
+        status: RegistrationStatus.inProgress,
+        lastUpdated: DateTime.now(),
+      )).copyWith(
+        currentStep: keepStep,
+        lastUpdated: DateTime.now(),
+        phone: widget.phone,
+        email: email,
+      );
+      LocalRegistrationStorage.saveLocal(progress);
+    });
+  }
+
   Future<void> _handleBack() async {
-    // Carregar progresso existente e fazer merge para nao perder dados de outras telas
     final existing = await LocalRegistrationStorage.getLocal();
     final email = _emailController.text.isNotEmpty
         ? EmailHelper.cleanEmail(_emailController.text)
         : null;
+    final keepStep = RegistrationProgress.furthestStep(
+      existing?.currentStep ?? 'email', 'email',
+    );
     final progress = (existing ?? RegistrationProgress(
       cpf: widget.cpf,
-      currentStep: 'email',
+      currentStep: keepStep,
       status: RegistrationStatus.inProgress,
       lastUpdated: DateTime.now(),
     )).copyWith(
-      currentStep: 'email',
+      currentStep: keepStep,
       lastUpdated: DateTime.now(),
       phone: widget.phone,
       email: email,
@@ -176,12 +183,7 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _handleBack();
-      },
-      child: Scaffold(
+    return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: false,
       extendBodyBehindAppBar: true,
@@ -325,7 +327,6 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
           ),
         ),
       ),
-    ),
     );
   }
 }

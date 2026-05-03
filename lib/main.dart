@@ -10,9 +10,6 @@ import 'core/theme/theme_controller.dart';
 import 'core/config/env_service.dart';
 import 'core/utils/app_logger.dart';
 import 'features/auth/presentation/controllers/auth_controller.dart';
-import 'features/auth/data/services/local_registration_storage.dart';
-import 'features/auth/data/services/registration_service.dart';
-import 'features/auth/domain/entities/registration_progress.dart';
 import 'shared/services/keyboard_accessory_service.dart';
 import 'shared/screens/splash_screen.dart';
 
@@ -358,47 +355,7 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-
-    AppLogger.info('🔔 [GLOBAL] Lifecycle mudou para: $state');
-
-    // Sincroniza progresso local com Firestore quando app vai para background
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached) {
-      AppLogger.info(
-          '🔔 [GLOBAL] Detectado app indo para background - iniciando sincronização');
-      // Não podemos await aqui, mas a função é executada
-      _syncRegistrationProgress();
-    }
-  }
-
-  Future<void> _syncRegistrationProgress() async {
-    try {
-      AppLogger.info('🔄 [GLOBAL] Buscando progresso local...');
-
-      final progress = await LocalRegistrationStorage.getLocal();
-
-      if (progress == null) {
-        AppLogger.debug(
-            '🔄 [GLOBAL] Nenhum progresso local encontrado - nada a sincronizar');
-        return;
-      }
-
-      AppLogger.info(
-          '🔄 [GLOBAL] Progresso encontrado: step=${progress.currentStep}, status=${progress.status}');
-
-      if (progress.status != RegistrationStatus.inProgress) {
-        AppLogger.debug(
-            '🔄 [GLOBAL] Progresso não está in_progress - ignorando sincronização');
-        return;
-      }
-
-      AppLogger.info('🔄 [GLOBAL] INICIANDO sincronização com Firestore...');
-      await RegistrationService.saveProgress(progress);
-      AppLogger.info('✅ [GLOBAL] Progresso sincronizado com SUCESSO!');
-    } catch (e, stackTrace) {
-      AppLogger.error(
-          '❌ [GLOBAL] ERRO ao sincronizar progresso: $e', e, stackTrace);
-    }
+    AppLogger.debug('[GLOBAL] Lifecycle mudou para: $state');
   }
 
   @override

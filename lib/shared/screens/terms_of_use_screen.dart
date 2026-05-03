@@ -1,25 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:neves_capital/core/theme/app_theme.dart';
-import 'package:neves_capital/shared/components/glass_app_bar.dart';
 
 class TermsOfUseScreen extends StatelessWidget {
   const TermsOfUseScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight;
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      extendBodyBehindAppBar: true,
-      appBar: GlassAppBar(
-        onBackPressed: () => Navigator.of(context).pop(),
+      appBar: AppBar(
+        backgroundColor: AppTheme.backgroundColor,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text(
           'Termos de Uso',
-          style: TextStyle(color: Colors.white, fontSize: 18),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
         ),
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(24, 24 + topPadding, 24, 24),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
         child: Text(
           'TERMOS DE USO - PagPag\n\n'
           'Última atualização: Fevereiro de 2026\n\n'
