@@ -3,7 +3,6 @@ import 'package:neves_capital/features/auth/presentation/controllers/auth_contro
 import 'package:neves_capital/features/auth/presentation/screens/phone_login_screen.dart';
 import 'package:neves_capital/features/auth/presentation/screens/unified_cpf_screen.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
-import 'package:neves_capital/features/auth/data/services/registration_service.dart';
 import 'package:neves_capital/features/auth/data/services/local_registration_storage.dart';
 import 'package:neves_capital/features/auth/presentation/helpers/registration_navigator.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
@@ -44,24 +43,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       AppLogger.debug('Verificando cadastro pendente...');
 
       // 1. Primeiro tenta buscar do storage LOCAL (rápido)
-      var progress = await LocalRegistrationStorage.getLocal();
-
-      if (progress == null) {
-        // 2. Se não encontrou local, verifica se tem CPF salvo e busca no Firestore
-        final lastCpf = await LocalRegistrationStorage.getLastCpf();
-        if (lastCpf != null) {
-          AppLogger.debug(
-              'CPF encontrado localmente, buscando no Firestore...');
-          progress = await RegistrationService.getProgress(lastCpf);
-
-          // Se encontrou no Firestore, salva localmente para próxima vez
-          if (progress != null) {
-            await LocalRegistrationStorage.saveLocal(progress);
-            AppLogger.debug(
-                'Progresso do Firestore copiado para storage local');
-          }
-        }
-      }
+      final progress = await LocalRegistrationStorage.getLocal();
 
       if (progress == null || progress.isComplete || progress.isStale) {
         // Limpar armazenamento se cadastro completo ou expirado
@@ -132,10 +114,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           AppLogger.info('Telefone obtido do progresso: ${authenticatedPhone.substring(0, 4)}****');
         }
         
-        // Deletar progresso local e do Firestore
         await LocalRegistrationStorage.clearLocal();
-        await RegistrationService.deleteProgress(progress.cpf);
-        AppLogger.info('Usuário optou por recomeçar - progresso deletado');
+        AppLogger.info('Usuário optou por recomeçar - progresso local limpo');
         
         // Navegar para a tela de cadastro de CPF para iniciar novo cadastro
         // O usuário já fez a autenticação normal, então pode iniciar o cadastro

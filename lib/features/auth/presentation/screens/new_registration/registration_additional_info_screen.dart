@@ -113,13 +113,16 @@ class _RegistrationAdditionalInfoScreenState
 
   Future<void> _saveProgressLocally() async {
     final existing = await LocalRegistrationStorage.getLocal();
+    final keepStep = RegistrationProgress.furthestStep(
+      existing?.currentStep ?? 'personal2', 'personal2',
+    );
     final progress = (existing ?? RegistrationProgress(
       cpf: widget.cpf,
-      currentStep: 'personal2',
+      currentStep: keepStep,
       status: RegistrationStatus.inProgress,
       lastUpdated: DateTime.now(),
     )).copyWith(
-      currentStep: 'personal2',
+      currentStep: keepStep,
       lastUpdated: DateTime.now(),
       phone: widget.phone,
       email: widget.email,
@@ -387,12 +390,7 @@ class _RegistrationAdditionalInfoScreenState
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _handleBack();
-      },
-      child: Scaffold(
+    return Scaffold(
         backgroundColor: AppTheme.backgroundColor,
         resizeToAvoidBottomInset: false,
         extendBodyBehindAppBar: true,
@@ -641,7 +639,6 @@ class _RegistrationAdditionalInfoScreenState
               ),
             ),
           ),
-        ),
       ),
     );
   }
@@ -754,46 +751,75 @@ class _OccupationSearchScreenState extends State<_OccupationSearchScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context, widget.selectedOccupation),
         ),
-        title: TextField(
-          controller: _searchController,
-          focusNode: _searchFocusNode,
-          autofocus: false,
-          style: const TextStyle(color: Colors.white),
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _searchFocusNode.unfocus(),
-          decoration: InputDecoration(
-            hintText: 'Buscar ocupação',
-            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-            border: InputBorder.none,
-            prefixIcon: const Icon(Icons.search, color: Colors.white70),
-            suffixIcon: _searchController.text.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear, color: Colors.white70),
-                    onPressed: () => _searchController.clear(),
-                  )
-                : null,
-          ),
+        title: const Text(
+          'Selecione a Ocupação',
+          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
         ),
+        centerTitle: true,
       ),
-      body: ListView.builder(
-        itemCount: _filtered.length,
-        itemBuilder: (context, index) {
-          final occupation = _filtered[index];
-          final isSelected = occupation == widget.selectedOccupation;
-          return ListTile(
-            title: Text(
-              occupation,
-              style: TextStyle(
-                color: isSelected ? AppTheme.primaryColor : Colors.white,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-            trailing: isSelected
-                ? const Icon(Icons.check, color: AppTheme.primaryColor)
-                : null,
-            onTap: () => Navigator.pop(context, occupation),
-          );
-        },
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 4.0, bottom: 4.0),
+                  child: TextField(
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    autofocus: false,
+                    style: const TextStyle(color: Colors.white),
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _searchFocusNode.unfocus(),
+                    decoration: InputDecoration(
+                      hintText: 'Digite o nome da ocupação',
+                      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                      prefixIcon: Icon(Icons.search, color: AppTheme.textSecondary),
+                      filled: true,
+                      fillColor: AppTheme.inputEditableBackgroundColor,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                      ),
+                    ),
+                  ),
+          ),
+          Expanded(
+            child: _filtered.isEmpty
+                ? Center(
+                    child: Text(
+                      'Nenhuma ocupação encontrada',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemCount: _filtered.length,
+                    itemBuilder: (context, index) {
+                      final occupation = _filtered[index];
+                      final isSelected = occupation == widget.selectedOccupation;
+                      return ListTile(
+                        title: Text(
+                          occupation,
+                          style: TextStyle(
+                            color: isSelected ? AppTheme.primaryColor : Colors.white,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(Icons.check, color: AppTheme.primaryColor)
+                            : null,
+                        onTap: () => Navigator.pop(context, occupation),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }

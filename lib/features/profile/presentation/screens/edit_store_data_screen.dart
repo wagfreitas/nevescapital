@@ -466,32 +466,32 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      extendBodyBehindAppBar: true,
-      appBar: GlassAppBar(
-        onBackPressed: () => Navigator.pop(context, widget.selectedValue),
+      appBar: AppBar(
+        backgroundColor: AppTheme.backgroundColor,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context, widget.selectedValue),
+        ),
         title: const Text(
           'Selecione o Ramo de Atuação',
-          style: TextStyle(color: Colors.white, fontSize: 18),
+          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
         ),
+        centerTitle: true,
       ),
-      body: Container(
-        color: AppTheme.backgroundColor,
-        child: Builder(
-          builder: (context) {
-            final topPadding = MediaQuery.of(context).padding.top + 36;
-            return Column(
-              children: [
-                Padding(
-                  padding: EdgeInsets.only(left: 16.0, right: 16.0, top: topPadding, bottom: 4.0),
-                  child: TextField(
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 4.0, bottom: 4.0),
+            child: TextField(
               controller: _searchController,
               focusNode: _searchFocusNode,
               autofocus: false,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Digite o nome do ramo de atuação',
-                hintStyle:
-                    TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                 prefixIcon: Icon(Icons.search, color: AppTheme.textSecondary),
                 filled: true,
                 fillColor: AppTheme.inputEditableBackgroundColor,
@@ -501,24 +501,21 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      BorderSide(color: AppTheme.primaryColor, width: 2),
+                  borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
                 ),
               ),
-                ),
-              ),
-              Expanded(
-                child: _filteredTypes.isEmpty
+            ),
+          ),
+          Expanded(
+            child: _filteredTypes.isEmpty
                 ? Center(
                     child: Text(
                       'Nenhum ramo encontrado',
-                      style:
-                          TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                     ),
                   )
                 : ListView.builder(
@@ -529,7 +526,6 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
                       final value = type['value']!;
                       final label = type['label']!;
                       final isSelected = value == widget.selectedValue;
-
                       return ListTile(
                         title: Text(
                           label,
@@ -549,11 +545,8 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
                       );
                     },
                   ),
-              ),
-            ],
-            );
-          },
-        ),
+          ),
+        ],
       ),
     );
   }

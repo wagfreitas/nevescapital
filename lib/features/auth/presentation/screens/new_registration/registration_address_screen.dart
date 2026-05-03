@@ -113,6 +113,7 @@ class _RegistrationAddressScreenState extends State<RegistrationAddressScreen> {
   void dispose() {
     _saveDebounceTimer?.cancel();
     _cepSearchTimer?.cancel();
+    _saveProgressLocally();
     _cepController.removeListener(_scheduleSave);
     _numberController.removeListener(_scheduleSave);
     _complementController.removeListener(_scheduleSave);
@@ -141,13 +142,16 @@ class _RegistrationAddressScreenState extends State<RegistrationAddressScreen> {
 
   Future<void> _saveProgressLocally() async {
     final existing = await LocalRegistrationStorage.getLocal();
+    final keepStep = RegistrationProgress.furthestStep(
+      existing?.currentStep ?? 'address', 'address',
+    );
     final progress = (existing ?? RegistrationProgress(
       cpf: widget.cpf,
-      currentStep: 'address',
+      currentStep: keepStep,
       status: RegistrationStatus.inProgress,
       lastUpdated: DateTime.now(),
     )).copyWith(
-      currentStep: 'address',
+      currentStep: keepStep,
       lastUpdated: DateTime.now(),
       phone: widget.phone,
       email: widget.email,
@@ -387,12 +391,7 @@ class _RegistrationAddressScreenState extends State<RegistrationAddressScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _handleBack();
-      },
-      child: Scaffold(
+    return Scaffold(
         backgroundColor: AppTheme.backgroundColor,
         resizeToAvoidBottomInset: true,
         appBar: GlassAppBar(
@@ -619,7 +618,6 @@ class _RegistrationAddressScreenState extends State<RegistrationAddressScreen> {
               ],
             ),
           ),
-        ),
       ),
     );
   }

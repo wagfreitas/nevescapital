@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
@@ -32,14 +31,25 @@ class WhatsAppOtpScreen extends StatefulWidget {
   State<WhatsAppOtpScreen> createState() => _WhatsAppOtpScreenState();
 }
 
-class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
+class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
+    with WidgetsBindingObserver {
   int _otpLength = 4;
 
-  // Campo único que recebe o OTP. A UI mostra 4/6 caixas, mas por baixo é um
-  // único TextField — isso é o que o iOS 26 precisa para oferecer o autofill
-  // do código do WhatsApp na barra do teclado.
-  final TextEditingController _otpController = TextEditingController();
-  final FocusNode _otpFocus = FocusNode();
+  /// Flag pra detectar volta do background. Vira true quando o app sai
+  /// (paused/hidden/inactive); ao voltar (resumed), redireciona pra CPF.
+  bool _wasBackgrounded = false;
+
+  // ZWSP "fantasma" em cada caixa pra detectar backspace em caixa vazia.
+  // Se o controller cai pra string vazia, é porque o backspace apagou o ZWSP →
+  // sabemos que veio um backspace, mesmo na caixa vazia.
+  static const String _zwsp = '​';
+
+  // Lista de controllers/focus, um por caixa.
+  late List<TextEditingController> _boxControllers;
+  late List<FocusNode> _boxFocuses;
+  // _boxFilled[i] = true se a caixa i tem um dígito real (não só ZWSP).
+  // Usado pra distinguir backspace em caixa cheia vs vazia.
+  late List<bool> _boxFilled;
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -48,48 +58,208 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
   int _failedAttempts = 0;
   static const int _maxFailedAttempts = 3;
 
-  /// Modo SMS: usa Firebase Phone Auth (6 dígitos) em vez do backend WhatsApp (4 dígitos)
   bool _isSmsMode = false;
   String? _smsVerificationId;
 
-  bool get _isOtpComplete => _otpController.text.length == _otpLength;
+  String _digitOf(int index) {
+    final t = _boxControllers[index].text.replaceAll(_zwsp, '');
+    return t.isEmpty ? '' : t;
+  }
 
-  String get _otpCode => _otpController.text;
+  bool get _isOtpComplete =>
+      List.generate(_otpLength, _digitOf).every((d) => d.isNotEmpty);
+
+  String get _otpCode =>
+      List.generate(_otpLength, _digitOf).join();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initBoxes(_otpLength);
     _startCountdowns();
-    _otpController.addListener(_onOtpChanged);
-    _otpFocus.addListener(_onFocusChanged);
 
-    // Auto-focus no campo
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _otpFocus.canRequestFocus) {
-        _otpFocus.requestFocus();
+      if (mounted && _boxFocuses[0].canRequestFocus) {
+        _boxFocuses[0].requestFocus();
       }
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.inactive) {
+      _wasBackgrounded = true;
+    } else if (state == AppLifecycleState.resumed && _wasBackgrounded) {
+      _wasBackgrounded = false;
+      _redirectToCpfScreen();
+    }
+  }
+
+  /// Quando o usuário volta do background pra tela de OTP, redireciona pro
+  /// início do fluxo (UnifiedCpfScreen). O OTP pode ter expirado e o melhor
+  /// é reiniciar a identificação por CPF — daí o app decide login ou cadastro.
+  void _redirectToCpfScreen() {
+    if (!mounted) return;
+    AppLogger.info(
+        'OTP: app voltou do background — redirecionando pra UnifiedCpfScreen');
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (context) => UnifiedCpfScreen(
+          authController: widget.authController,
+          themeController: widget.themeController,
+          initialPhone: widget.phone,
+        ),
+      ),
+      (route) => false,
+    );
+  }
+
+  void _initBoxes(int length) {
+    _boxControllers = List.generate(length, (_) {
+      final c = TextEditingController(text: _zwsp);
+      c.selection = const TextSelection.collapsed(offset: 1);
+      return c;
+    });
+    _boxFocuses = List.generate(
+        length, (_) => FocusNode()..addListener(_onAnyFocusChanged));
+    _boxFilled = List.filled(length, false);
+  }
+
+  @override
   void dispose() {
-    _otpController.removeListener(_onOtpChanged);
-    _otpFocus.removeListener(_onFocusChanged);
-    _otpController.dispose();
-    _otpFocus.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    for (final c in _boxControllers) {
+      c.dispose();
+    }
+    for (final f in _boxFocuses) {
+      f
+        ..removeListener(_onAnyFocusChanged)
+        ..dispose();
+    }
     super.dispose();
   }
 
-  void _onFocusChanged() {
+  void _onAnyFocusChanged() {
     if (mounted) setState(() {});
   }
 
-  void _onOtpChanged() {
+  /// Reset visual de todas as caixas pro estado "vazio" (ZWSP).
+  void _resetBoxes() {
+    for (int i = 0; i < _boxControllers.length; i++) {
+      _boxControllers[i].text = _zwsp;
+      _boxControllers[i].selection =
+          const TextSelection.collapsed(offset: 1);
+      _boxFilled[i] = false;
+    }
+  }
+
+  /// Distribui um código colado/autofill nas caixas (pad com vazios se for menor).
+  void _distributeCode(String digits) {
+    for (int i = 0; i < _otpLength; i++) {
+      final ch = i < digits.length ? digits[i] : '';
+      _boxControllers[i].text = ch.isEmpty ? _zwsp : ch;
+      _boxControllers[i].selection = TextSelection.collapsed(
+        offset: _boxControllers[i].text.length,
+      );
+      _boxFilled[i] = ch.isNotEmpty;
+    }
+    final focusIdx =
+        digits.length >= _otpLength ? _otpLength - 1 : digits.length;
+    if (focusIdx < _otpLength) {
+      _boxFocuses[focusIdx].requestFocus();
+    }
+    if (digits.length >= _otpLength && !_isLoading) {
+      _handleVerify();
+    }
+  }
+
+  /// Lida com mudanças em uma caixa específica.
+  ///
+  /// Convenção: cada caixa tem ZWSP como conteúdo "vazio" e o dígito real
+  /// quando preenchida (sem ZWSP). Isso permite distinguir backspace em caixa
+  /// vazia (text vai pra '') de digitação (text vai pra `<digit>` ou
+  /// `<zwsp><digit>`).
+  void _onBoxChanged(int index, String value) {
+    final cleanDigits = value.replaceAll(_zwsp, '').replaceAll(RegExp(r'\D'), '');
+
+    // Autofill / paste: vários dígitos chegaram de uma vez na primeira caixa.
+    if (cleanDigits.length > 1) {
+      _distributeCode(cleanDigits);
+      if (_errorMessage != null) {
+        setState(() => _errorMessage = null);
+      } else {
+        setState(() {});
+      }
+      return;
+    }
+
+    if (value.isEmpty) {
+      // Backspace foi pressionado. Distingue dois casos pelo estado anterior:
+      //   (a) Caixa estava CHEIA → apaga só ela, foco vai pra anterior, NÃO
+      //       toca em nenhuma outra (atende req do usuário).
+      //   (b) Caixa estava VAZIA → só pula foco pra anterior. NÃO apaga a
+      //       anterior nesse passo (o usuário pode dar backspace de novo).
+      final wasFilled = _boxFilled[index];
+
+      // Restaura ZWSP pra próxima detecção.
+      _boxControllers[index].text = _zwsp;
+      _boxControllers[index].selection =
+          const TextSelection.collapsed(offset: 1);
+      _boxFilled[index] = false;
+
+      if (wasFilled) {
+        // Caso (a): apaga só esta caixa, foco pra anterior se houver.
+        if (index > 0) {
+          _boxFocuses[index - 1].requestFocus();
+        }
+      } else {
+        // Caso (b): só pula foco pra anterior.
+        if (index > 0) {
+          _boxFocuses[index - 1].requestFocus();
+        }
+      }
+
+      if (_errorMessage != null) {
+        setState(() => _errorMessage = null);
+      } else {
+        setState(() {});
+      }
+      return;
+    }
+
+    // Houve digitação. Pega só o último dígito (substituição) e normaliza.
+    if (cleanDigits.isEmpty) {
+      // Algo não-numérico foi tentado. Restaura ZWSP.
+      _boxControllers[index].text = _zwsp;
+      _boxControllers[index].selection =
+          const TextSelection.collapsed(offset: 1);
+      return;
+    }
+    final digit = cleanDigits[cleanDigits.length - 1];
+    _boxControllers[index].text = digit;
+    _boxControllers[index].selection = const TextSelection.collapsed(offset: 1);
+    _boxFilled[index] = true;
+
+    // Avança foco se não for a última.
+    if (index < _otpLength - 1) {
+      _boxFocuses[index + 1].requestFocus();
+    } else {
+      _boxFocuses[index].unfocus();
+    }
+
     if (_errorMessage != null) {
       setState(() => _errorMessage = null);
     } else {
-      // Redesenha as caixas quando o texto muda.
       setState(() {});
+    }
+
+    // Se completou, dispara verificação automaticamente.
+    if (_isOtpComplete && !_isLoading) {
+      _handleVerify();
     }
   }
 
@@ -264,8 +434,8 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
         _startResendCountdown();
 
         if (result['success'] == true) {
-          _otpController.clear();
-          _otpFocus.requestFocus();
+          _resetBoxes();
+          _boxFocuses[0].requestFocus();
         } else {
           _errorMessage = result['message'] as String? ?? 'Erro ao reenviar código';
         }
@@ -331,19 +501,27 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
 
   /// Muda a tela para modo SMS: 6 dígitos em vez de 4
   void _switchToSmsMode(String verificationId) {
+    // Limpa controllers/focuses antigos antes de recriar com tamanho 6.
+    for (final c in _boxControllers) {
+      c.dispose();
+    }
+    for (final f in _boxFocuses) {
+      f
+        ..removeListener(_onAnyFocusChanged)
+        ..dispose();
+    }
     setState(() {
       _isSmsMode = true;
       _smsVerificationId = verificationId;
       _otpLength = 6;
       _isLoading = false;
       _errorMessage = null;
+      _initBoxes(_otpLength);
     });
-    _otpController.clear();
 
-    // Focar no campo
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _otpFocus.canRequestFocus) {
-        _otpFocus.requestFocus();
+      if (mounted && _boxFocuses[0].canRequestFocus) {
+        _boxFocuses[0].requestFocus();
       }
     });
   }
@@ -451,94 +629,68 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
     );
   }
 
-  /// Campo OTP: um único TextField invisível por baixo (para autofill do iOS 26
-  /// e Android) com caixas visuais por cima. A largura/altura das caixas
-  /// acompanha `_otpLength` (4 WhatsApp / 6 SMS).
   Widget _buildOtpField() {
     final double boxSize = _isSmsMode ? 48 : 64;
     final double boxMargin = _isSmsMode ? 4 : 8;
-    final double totalWidth =
-        (boxSize + boxMargin * 2) * _otpLength;
-    final String text = _otpController.text;
 
-    return SizedBox(
-      width: totalWidth,
-      height: boxSize,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Campo real (transparente, por baixo). Recebe o autofill.
-          Positioned.fill(
-            child: AutofillGroup(
+    return AutofillGroup(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(_otpLength, (index) {
+          final bool isFocused = _boxFocuses[index].hasFocus;
+
+          return Container(
+            width: boxSize,
+            height: boxSize,
+            margin: EdgeInsets.symmetric(horizontal: boxMargin),
+            // clipBehavior + ClipRRect garantem que o TextField interno
+            // respeite as bordas arredondadas do container.
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: AppTheme.inputEditableBackgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isFocused
+                    ? AppTheme.primaryColor
+                    : Colors.white.withValues(alpha: 0.2),
+                width: isFocused ? 2 : 1,
+              ),
+            ),
+            child: Center(
               child: TextField(
-                controller: _otpController,
-                focusNode: _otpFocus,
+                controller: _boxControllers[index],
+                focusNode: _boxFocuses[index],
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.center,
-                maxLength: _otpLength,
-                autofillHints: const [AutofillHints.oneTimeCode],
-                // Torna o texto real invisível — as caixas acima mostram os dígitos.
-                showCursor: false,
-                style: const TextStyle(
-                  color: Colors.transparent,
-                  // Fonte grande para ampliar a área de toque por caractere.
-                  fontSize: 1,
-                  height: 1,
+                // Autofill hint só na primeira caixa — quando iOS preenche, o
+                // _onBoxChanged detecta vários dígitos e distribui entre as outras.
+                autofillHints:
+                    index == 0 ? const [AutofillHints.oneTimeCode] : null,
+                maxLength: 2, // ZWSP + dígito; permite paste maior.
+                style: TextStyle(
+                  fontSize: _isSmsMode ? 20 : 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  // height 1.0 → linha de texto sem espaço extra acima/abaixo,
+                  // o Center fica responsável pelo centralizado.
+                  height: 1.0,
                 ),
-                cursorColor: Colors.transparent,
                 decoration: const InputDecoration(
                   counterText: '',
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
+                  // isCollapsed: campo fica exatamente da altura do texto,
+                  // sem padding interno do Material — o Center centraliza.
+                  isCollapsed: true,
                   contentPadding: EdgeInsets.zero,
+                  filled: false,
                 ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(_otpLength),
-                ],
-                onSubmitted: (_) {
-                  if (_isOtpComplete) _handleVerify();
-                },
+                onChanged: (value) => _onBoxChanged(index, value),
               ),
             ),
-          ),
-          // Caixas visuais por cima. IgnorePointer para os toques chegarem
-          // no TextField de baixo e abrirem o teclado normalmente.
-          IgnorePointer(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(_otpLength, (index) {
-                final bool hasDigit = index < text.length;
-                final bool isActive = index == text.length && _otpFocus.hasFocus;
-                return Container(
-                  width: boxSize,
-                  height: boxSize,
-                  margin: EdgeInsets.symmetric(horizontal: boxMargin),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppTheme.inputEditableBackgroundColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isActive
-                          ? AppTheme.primaryColor
-                          : Colors.white.withValues(alpha: 0.2),
-                      width: isActive ? 2 : 1,
-                    ),
-                  ),
-                  child: Text(
-                    hasDigit ? text[index] : '',
-                    style: TextStyle(
-                      fontSize: _isSmsMode ? 20 : 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                );
-              }),
-            ),
-          ),
-        ],
+          );
+        }),
       ),
     );
   }
@@ -719,3 +871,4 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen> {
     );
   }
 }
+

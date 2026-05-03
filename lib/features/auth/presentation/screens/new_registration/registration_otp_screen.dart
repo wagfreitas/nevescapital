@@ -7,7 +7,6 @@ import 'package:neves_capital/shared/helpers/phone_helper.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
-import 'package:neves_capital/features/auth/presentation/controllers/registration_lifecycle_observer.dart';
 import 'package:neves_capital/features/auth/domain/entities/registration_progress.dart';
 import 'package:neves_capital/features/auth/data/services/local_registration_storage.dart';
 import 'package:neves_capital/features/auth/data/services/auth_api_service.dart';
@@ -43,23 +42,10 @@ class _RegistrationOtpScreenState extends State<RegistrationOtpScreen> {
   String? _errorMessage;
   int _resendCountdown = 30;
   bool _isOtpComplete = false;
-  late RegistrationLifecycleObserver _lifecycleObserver;
 
   @override
   void initState() {
     super.initState();
-
-    _lifecycleObserver = RegistrationLifecycleObserver(
-      getCurrentProgress: () => RegistrationProgress(
-        cpf: widget.cpf,
-        currentStep: 'otp',
-        status: RegistrationStatus.inProgress,
-        lastUpdated: DateTime.now(),
-        phone: widget.phone,
-      ),
-      shouldSaveProgress: () => ModalRoute.of(context)?.isCurrent ?? false,
-    );
-    WidgetsBinding.instance.addObserver(_lifecycleObserver);
 
     _otpController.addListener(() {
       final hasFullCode = _otpController.text.trim().length == _otpLength;
@@ -77,8 +63,7 @@ class _RegistrationOtpScreenState extends State<RegistrationOtpScreen> {
 
   @override
   void dispose() {
-    _lifecycleObserver.dispose();
-    WidgetsBinding.instance.removeObserver(_lifecycleObserver);
+    _saveBeforePop();
     _otpFocusNode.dispose();
     _otpController.dispose();
     super.dispose();
@@ -100,6 +85,25 @@ class _RegistrationOtpScreenState extends State<RegistrationOtpScreen> {
       );
     }
     setState(() => _errorMessage = null);
+  }
+
+  void _saveBeforePop() {
+    LocalRegistrationStorage.getLocal().then((existing) {
+      final keepStep = RegistrationProgress.furthestStep(
+        existing?.currentStep ?? 'otp', 'otp',
+      );
+      final progress = (existing ?? RegistrationProgress(
+        cpf: widget.cpf,
+        currentStep: keepStep,
+        status: RegistrationStatus.inProgress,
+        lastUpdated: DateTime.now(),
+      )).copyWith(
+        currentStep: keepStep,
+        lastUpdated: DateTime.now(),
+        phone: widget.phone,
+      );
+      LocalRegistrationStorage.saveLocal(progress);
+    });
   }
 
   Future<void> _handleVerifyOtp() async {
@@ -164,15 +168,17 @@ class _RegistrationOtpScreenState extends State<RegistrationOtpScreen> {
   }
 
   Future<void> _handleBack() async {
-    // Carregar progresso existente e fazer merge para nao perder dados de outras telas
     final existing = await LocalRegistrationStorage.getLocal();
+    final keepStep = RegistrationProgress.furthestStep(
+      existing?.currentStep ?? 'otp', 'otp',
+    );
     final progress = (existing ?? RegistrationProgress(
       cpf: widget.cpf,
-      currentStep: 'otp',
+      currentStep: keepStep,
       status: RegistrationStatus.inProgress,
       lastUpdated: DateTime.now(),
     )).copyWith(
-      currentStep: 'otp',
+      currentStep: keepStep,
       lastUpdated: DateTime.now(),
       phone: widget.phone,
     );
@@ -274,12 +280,7 @@ class _RegistrationOtpScreenState extends State<RegistrationOtpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _handleBack();
-      },
-      child: Scaffold(
+    return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: false,
       extendBodyBehindAppBar: true,
@@ -472,7 +473,6 @@ class _RegistrationOtpScreenState extends State<RegistrationOtpScreen> {
           ),
         ),
       ),
-    ),
     );
   }
 }

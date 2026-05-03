@@ -275,16 +275,24 @@ class _PaymentStep4ScreenState extends State<PaymentStep4Screen> {
                     ),
                   ),
                   validator: (value) {
-                    if (!_cardNumberTouched && !_submitted) return null;
+                    // Vazio: só reclama em submit.
                     if (value == null || value.isEmpty) {
-                      return 'Insira o número do cartão';
+                      return _submitted ? 'Insira o número do cartão' : null;
                     }
                     final digits = value.replaceAll(' ', '');
                     final brand = CardBrandDetector.detectBrand(digits);
                     final expected = CardBrandDetector.getExpectedDigits(brand);
+
+                    // Tamanho insuficiente: só reclama em submit.
+                    // Enquanto o usuário ainda digita (length < expected),
+                    // não polui a tela com erro.
                     if (digits.length < expected) {
-                      return 'O número do cartão deve ter $expected dígitos';
+                      return _submitted
+                          ? 'O número do cartão deve ter $expected dígitos'
+                          : null;
                     }
+
+                    // Já completou a digitação: agora sim valida Luhn.
                     if (!CardValidator.isValidLuhn(digits)) {
                       return 'Número do cartão inválido';
                     }

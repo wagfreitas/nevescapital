@@ -100,6 +100,7 @@ class _RegistrationPersonalDataScreenState
   @override
   void dispose() {
     _saveDebounceTimer?.cancel();
+    _saveProgressLocally();
     _fullNameController.removeListener(_scheduleSave);
     _birthDateController.removeListener(_scheduleSave);
     _motherNameController.removeListener(_scheduleSave);
@@ -122,13 +123,16 @@ class _RegistrationPersonalDataScreenState
 
   Future<void> _saveProgressLocally() async {
     final existing = await LocalRegistrationStorage.getLocal();
+    final keepStep = RegistrationProgress.furthestStep(
+      existing?.currentStep ?? 'personal1', 'personal1',
+    );
     final progress = (existing ?? RegistrationProgress(
       cpf: widget.cpf,
-      currentStep: 'personal1',
+      currentStep: keepStep,
       status: RegistrationStatus.inProgress,
       lastUpdated: DateTime.now(),
     )).copyWith(
-      currentStep: 'personal1',
+      currentStep: keepStep,
       lastUpdated: DateTime.now(),
       phone: widget.phone,
       email: widget.email,
@@ -299,12 +303,7 @@ class _RegistrationPersonalDataScreenState
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _handleBack();
-      },
-      child: Scaffold(
+    return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: true,
       extendBodyBehindAppBar: true,
@@ -507,7 +506,6 @@ class _RegistrationPersonalDataScreenState
           ),
         ),
       ),
-    ),
     );
   }
 }

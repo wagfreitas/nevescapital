@@ -12,11 +12,26 @@ import 'package:neves_capital/features/auth/presentation/screens/new_registratio
 import 'package:neves_capital/features/auth/presentation/screens/new_registration/step8_document_screen.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 
-/// Helper para navegar para a tela correta baseado no progresso do cadastro
 class RegistrationNavigator {
+  static const List<String> _stepOrder = [
+    'phone', 'otp', 'email', 'personal1', 'address', 'personal2',
+    'selfie', 'document',
+  ];
+
+  /// Primeiro step que o swipe-back pode alcançar ao retomar um cadastro.
+  /// `phone` e `otp` ficam de fora porque são autenticação, não entrada de dados.
+  static const String _firstResumableStep = 'email';
+
   /// Navega para a tela correspondente ao passo atual do cadastro.
-  /// [replaceRoute] = true quando retomando cadastro abandonado (Splash/Onboarding)
-  /// [replaceRoute] = false quando avançando entre steps (permite swipe back)
+  ///
+  /// Quando [replaceRoute] = true (retomada de cadastro abandonado), empilha
+  /// TODA a sequência de telas (`phone → otp → ... → currentStep`) na pilha
+  /// do Navigator. As telas intermediárias são empurradas com transição
+  /// instantânea (sem animação) — só a tela final anima. Assim:
+  ///   - O usuário só "vê" a tela alvo aparecendo (UX limpa).
+  ///   - Mas o gesto de swipe-back (iOS) e o botão de voltar (Android)
+  ///     navegam por toda a sequência, com cada tela já populada via
+  ///     constructor (dados vindos do `LocalRegistrationStorage`).
   static void navigateToStep({
     required BuildContext context,
     required RegistrationProgress progress,
@@ -26,272 +41,297 @@ class RegistrationNavigator {
   }) {
     AppLogger.debug('Navegando para step: ${progress.currentStep}');
 
-    Widget? targetScreen;
-
-    switch (progress.currentStep) {
-      case 'phone':
-        targetScreen = RegistrationPhoneScreen(
-          authController: authController,
-          themeController: themeController,
-          cpf: progress.cpf,
-          initialPhone: progress.phone,
-        );
-        break;
-
-      case 'otp':
-        if (progress.phone != null) {
-          targetScreen = RegistrationOtpScreen(
-            authController: authController,
-            themeController: themeController,
-            cpf: progress.cpf,
-            phone: progress.phone!,
-          );
-        }
-        break;
-
-      case 'email':
-        if (progress.phone != null) {
-          targetScreen = RegistrationEmailScreen(
-            authController: authController,
-            themeController: themeController,
-            cpf: progress.cpf,
-            phone: progress.phone!,
-            initialEmail: progress.email,
-          );
-        }
-        break;
-
-      case 'personal1':
-        if (progress.phone != null && progress.email != null) {
-          targetScreen = RegistrationPersonalDataScreen(
-            authController: authController,
-            themeController: themeController,
-            cpf: progress.cpf,
-            phone: progress.phone!,
-            email: progress.email!,
-            initialFullName: progress.fullName,
-            initialBirthDate: progress.birthDate,
-            initialMotherName: progress.motherName,
-          );
-        }
-        break;
-
-      case 'address':
-        if (progress.phone != null &&
-            progress.email != null &&
-            progress.fullName != null &&
-            progress.birthDate != null &&
-            progress.motherName != null) {
-          targetScreen = RegistrationAddressScreen(
-            authController: authController,
-            themeController: themeController,
-            cpf: progress.cpf,
-            phone: progress.phone!,
-            email: progress.email!,
-            fullName: progress.fullName!,
-            birthDate: progress.birthDate!,
-            motherName: progress.motherName!,
-            initialCep: progress.cep,
-            initialStreet: progress.street,
-            initialNumber: progress.number,
-            initialComplement: progress.complement,
-            initialNeighborhood: progress.neighborhood,
-            initialCity: progress.city,
-            initialState: progress.state,
-          );
-        }
-        break;
-
-      case 'personal2':
-        if (progress.phone != null &&
-            progress.email != null &&
-            progress.fullName != null &&
-            progress.birthDate != null &&
-            progress.motherName != null &&
-            progress.cep != null &&
-            progress.street != null &&
-            progress.number != null &&
-            progress.neighborhood != null &&
-            progress.city != null &&
-            progress.state != null) {
-          targetScreen = RegistrationAdditionalInfoScreen(
-            authController: authController,
-            themeController: themeController,
-            cpf: progress.cpf,
-            phone: progress.phone!,
-            email: progress.email!,
-            fullName: progress.fullName!,
-            birthDate: progress.birthDate!,
-            motherName: progress.motherName!,
-            cep: progress.cep!,
-            street: progress.street!,
-            number: progress.number!,
-            complement: progress.complement ?? '',
-            neighborhood: progress.neighborhood!,
-            city: progress.city!,
-            state: progress.state!,
-            initialIsPep: progress.isPep,
-            initialOccupation: progress.occupation,
-            initialIncomeRange: progress.incomeRange,
-          );
-        }
-        break;
-
-      case 'selfie':
-        AppLogger.debug('Navegando para step selfie - verificando dados...');
-        AppLogger.debug('  phone: ${progress.phone != null}');
-        AppLogger.debug('  email: ${progress.email != null}');
-        AppLogger.debug('  fullName: ${progress.fullName != null}');
-        AppLogger.debug('  birthDate: ${progress.birthDate != null}');
-        AppLogger.debug('  motherName: ${progress.motherName != null}');
-        AppLogger.debug('  occupation: ${progress.occupation != null}');
-        AppLogger.debug('  incomeRange: ${progress.incomeRange != null}');
-        AppLogger.debug('  selfiePath: ${progress.selfiePath != null}');
-        
-        // Se a selfie já foi tirada, avançar para a tela de documentos
-        if (progress.selfiePath != null) {
-          AppLogger.info('✅ Selfie já foi tirada - avançando para step document');
-          // Recursivamente navegar para document (que já tem toda a lógica)
-          navigateToStep(
-            context: context,
-            progress: progress.copyWith(currentStep: 'document'),
-            authController: authController,
-            themeController: themeController,
-          );
-          return; // Sair para evitar processamento duplicado
-        }
-        
-        if (progress.phone != null &&
-            progress.email != null &&
-            progress.fullName != null &&
-            progress.birthDate != null &&
-            progress.motherName != null &&
-            progress.cep != null &&
-            progress.street != null &&
-            progress.number != null &&
-            progress.neighborhood != null &&
-            progress.city != null &&
-            progress.state != null &&
-            progress.occupation != null &&
-            progress.incomeRange != null) {
-          AppLogger.info('✅ Todos os dados necessários presentes - navegando para Step7SelfieScreen');
-          targetScreen = Step7SelfieScreen(
-            authController: authController,
-            themeController: themeController,
-            cpf: progress.cpf,
-            phone: progress.phone!,
-            email: progress.email!,
-            fullName: progress.fullName!,
-            birthDate: progress.birthDate!,
-            motherName: progress.motherName!,
-            cep: progress.cep!,
-            street: progress.street!,
-            number: progress.number!,
-            complement: progress.complement ?? '',
-            neighborhood: progress.neighborhood!,
-            city: progress.city!,
-            state: progress.state!,
-            isPep: progress.isPep ?? false,
-            occupation: progress.occupation!,
-            incomeRange: progress.incomeRange!,
-          );
-        } else {
-          AppLogger.error('❌ Dados incompletos para step selfie - faltando dados necessários');
-        }
-        break;
-
-      case 'document':
-        AppLogger.debug('Navegando para step document - verificando dados...');
-        AppLogger.debug('  phone: ${progress.phone != null}');
-        AppLogger.debug('  email: ${progress.email != null}');
-        AppLogger.debug('  fullName: ${progress.fullName != null}');
-        AppLogger.debug('  birthDate: ${progress.birthDate != null}');
-        AppLogger.debug('  motherName: ${progress.motherName != null}');
-        AppLogger.debug('  occupation: ${progress.occupation != null}');
-        AppLogger.debug('  incomeRange: ${progress.incomeRange != null}');
-        AppLogger.debug('  selfiePath: ${progress.selfiePath != null}');
-        AppLogger.debug('  documentFrontPath: ${progress.documentFrontPath != null}');
-        AppLogger.debug('  documentBackPath: ${progress.documentBackPath != null}');
-        
-        if (progress.phone != null &&
-            progress.email != null &&
-            progress.fullName != null &&
-            progress.birthDate != null &&
-            progress.motherName != null &&
-            progress.cep != null &&
-            progress.street != null &&
-            progress.number != null &&
-            progress.neighborhood != null &&
-            progress.city != null &&
-            progress.state != null &&
-            progress.occupation != null &&
-            progress.incomeRange != null &&
-            progress.selfiePath != null) {
-          AppLogger.info('✅ Todos os dados necessários presentes - navegando para Step8DocumentScreen');
-          targetScreen = Step8DocumentScreen(
-            authController: authController,
-            themeController: themeController,
-            cpf: progress.cpf,
-            phone: progress.phone!,
-            email: progress.email!,
-            fullName: progress.fullName!,
-            birthDate: progress.birthDate!,
-            motherName: progress.motherName!,
-            cep: progress.cep!,
-            street: progress.street!,
-            number: progress.number!,
-            complement: progress.complement ?? '',
-            neighborhood: progress.neighborhood!,
-            city: progress.city!,
-            state: progress.state!,
-            isPep: progress.isPep ?? false,
-            occupation: progress.occupation!,
-            incomeRange: progress.incomeRange!,
-            selfiePath: progress.selfiePath!,
-            initialFrontDocumentPath: progress.documentFrontPath,
-            initialBackDocumentPath: progress.documentBackPath,
-            initialDocumentType: progress.documentType,
-          );
-        } else {
-          AppLogger.error('❌ Dados incompletos para step document - faltando dados necessários');
-        }
-        break;
-
-      default:
-        AppLogger.warning('Step desconhecido: ${progress.currentStep}');
-        // Fallback para tela de telefone
-        targetScreen = RegistrationPhoneScreen(
-          authController: authController,
-          themeController: themeController,
-          cpf: progress.cpf,
-          initialPhone: progress.phone,
-        );
+    if (progress.currentStep == 'selfie' && progress.selfiePath != null) {
+      navigateToStep(
+        context: context,
+        progress: progress.copyWith(currentStep: 'document'),
+        authController: authController,
+        themeController: themeController,
+        replaceRoute: replaceRoute,
+      );
+      return;
     }
 
-    if (targetScreen != null) {
-      final route = MaterialPageRoute(builder: (context) => targetScreen!);
-      if (replaceRoute) {
-        // Retomando cadastro: substituir rota atual (Splash/Onboarding)
-        Navigator.pushReplacement(context, route);
-      } else {
-        // Avançando entre steps: manter pilha para swipe back
-        Navigator.push(context, route);
-      }
-    } else {
+    final targetScreen = _buildScreen(
+      step: progress.currentStep,
+      progress: progress,
+      authController: authController,
+      themeController: themeController,
+    );
+
+    if (targetScreen == null) {
       AppLogger.error(
           'Não foi possível navegar: dados incompletos para o step ${progress.currentStep}');
-      final fallbackRoute = MaterialPageRoute(
-        builder: (context) => RegistrationPhoneScreen(
+      final fallback = RegistrationPhoneScreen(
+        authController: authController,
+        themeController: themeController,
+        cpf: progress.cpf,
+      );
+      if (replaceRoute) {
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (_) => fallback));
+      } else {
+        Navigator.push(
+            context, MaterialPageRoute(builder: (_) => fallback));
+      }
+      return;
+    }
+
+    if (!replaceRoute) {
+      Navigator.push(
+          context, MaterialPageRoute(builder: (_) => targetScreen));
+      return;
+    }
+
+    // === Empilhar a sequência (a partir de _firstResumableStep) ===
+    final navigator = Navigator.of(context);
+    final targetIdx = _stepOrder.indexOf(progress.currentStep);
+    final startIdx = _stepOrder.indexOf(_firstResumableStep);
+
+    // Constrói as telas desde _firstResumableStep até a tela alvo (inclusive).
+    // Se o usuário ainda está em phone/otp (antes do startIdx), empilha só
+    // a tela alvo (não tem o que pré-popular).
+    final List<Widget> screensInOrder = [];
+    final from = targetIdx < startIdx ? targetIdx : startIdx;
+    for (var i = from; i <= targetIdx; i++) {
+      final isTarget = i == targetIdx;
+      // Para garantir que a tela alvo seja exatamente a esperada (mesmo
+      // se _buildScreen rejeitar por validação), reusamos o targetScreen.
+      final screen = isTarget
+          ? targetScreen
+          : _buildScreen(
+              step: _stepOrder[i],
+              progress: progress,
+              authController: authController,
+              themeController: themeController,
+            );
+      if (screen != null) screensInOrder.add(screen);
+    }
+
+    if (screensInOrder.isEmpty) {
+      // Fallback: empurra só a tela alvo
+      navigator.pushReplacement(
+        MaterialPageRoute(builder: (_) => targetScreen),
+      );
+      return;
+    }
+
+    // 1) Substitui a rota atual pela PRIMEIRA tela da sequência (sem animação).
+    navigator.pushReplacement(
+      _InstantMaterialPageRoute(builder: (_) => screensInOrder.first),
+    );
+
+    // 2) Empurra as intermediárias (sem animação).
+    for (var i = 1; i < screensInOrder.length - 1; i++) {
+      final screen = screensInOrder[i];
+      navigator.push(
+        _InstantMaterialPageRoute(builder: (_) => screen),
+      );
+    }
+
+    // 3) Empurra a tela alvo COM animação normal — única que o usuário "vê".
+    if (screensInOrder.length > 1) {
+      navigator.push(
+        MaterialPageRoute(builder: (_) => screensInOrder.last),
+      );
+    }
+  }
+
+  static Widget? _buildScreen({
+    required String step,
+    required RegistrationProgress progress,
+    AuthController? authController,
+    ThemeController? themeController,
+  }) {
+    switch (step) {
+      case 'phone':
+        return RegistrationPhoneScreen(
           authController: authController,
           themeController: themeController,
           cpf: progress.cpf,
-        ),
-      );
-      if (replaceRoute) {
-        Navigator.pushReplacement(context, fallbackRoute);
-      } else {
-        Navigator.push(context, fallbackRoute);
-      }
+          initialPhone: progress.phone,
+        );
+
+      case 'otp':
+        if (progress.phone == null) return null;
+        return RegistrationOtpScreen(
+          authController: authController,
+          themeController: themeController,
+          cpf: progress.cpf,
+          phone: progress.phone!,
+        );
+
+      case 'email':
+        if (progress.phone == null) return null;
+        return RegistrationEmailScreen(
+          authController: authController,
+          themeController: themeController,
+          cpf: progress.cpf,
+          phone: progress.phone!,
+          initialEmail: progress.email,
+        );
+
+      case 'personal1':
+        if (progress.phone == null || progress.email == null) return null;
+        return RegistrationPersonalDataScreen(
+          authController: authController,
+          themeController: themeController,
+          cpf: progress.cpf,
+          phone: progress.phone!,
+          email: progress.email!,
+          initialFullName: progress.fullName,
+          initialBirthDate: progress.birthDate,
+          initialMotherName: progress.motherName,
+        );
+
+      case 'address':
+        if (progress.phone == null ||
+            progress.email == null ||
+            progress.fullName == null ||
+            progress.birthDate == null ||
+            progress.motherName == null) {
+          return null;
+        }
+        return RegistrationAddressScreen(
+          authController: authController,
+          themeController: themeController,
+          cpf: progress.cpf,
+          phone: progress.phone!,
+          email: progress.email!,
+          fullName: progress.fullName!,
+          birthDate: progress.birthDate!,
+          motherName: progress.motherName!,
+          initialCep: progress.cep,
+          initialStreet: progress.street,
+          initialNumber: progress.number,
+          initialComplement: progress.complement,
+          initialNeighborhood: progress.neighborhood,
+          initialCity: progress.city,
+          initialState: progress.state,
+        );
+
+      case 'personal2':
+        if (progress.phone == null ||
+            progress.email == null ||
+            progress.fullName == null ||
+            progress.birthDate == null ||
+            progress.motherName == null ||
+            progress.cep == null ||
+            progress.street == null ||
+            progress.number == null ||
+            progress.neighborhood == null ||
+            progress.city == null ||
+            progress.state == null) {
+          return null;
+        }
+        return RegistrationAdditionalInfoScreen(
+          authController: authController,
+          themeController: themeController,
+          cpf: progress.cpf,
+          phone: progress.phone!,
+          email: progress.email!,
+          fullName: progress.fullName!,
+          birthDate: progress.birthDate!,
+          motherName: progress.motherName!,
+          cep: progress.cep!,
+          street: progress.street!,
+          number: progress.number!,
+          complement: progress.complement ?? '',
+          neighborhood: progress.neighborhood!,
+          city: progress.city!,
+          state: progress.state!,
+          initialIsPep: progress.isPep,
+          initialOccupation: progress.occupation,
+          initialIncomeRange: progress.incomeRange,
+        );
+
+      case 'selfie':
+        if (progress.phone == null ||
+            progress.email == null ||
+            progress.fullName == null ||
+            progress.birthDate == null ||
+            progress.motherName == null ||
+            progress.cep == null ||
+            progress.street == null ||
+            progress.number == null ||
+            progress.neighborhood == null ||
+            progress.city == null ||
+            progress.state == null ||
+            progress.occupation == null ||
+            progress.incomeRange == null) {
+          return null;
+        }
+        return Step7SelfieScreen(
+          authController: authController,
+          themeController: themeController,
+          cpf: progress.cpf,
+          phone: progress.phone!,
+          email: progress.email!,
+          fullName: progress.fullName!,
+          birthDate: progress.birthDate!,
+          motherName: progress.motherName!,
+          cep: progress.cep!,
+          street: progress.street!,
+          number: progress.number!,
+          complement: progress.complement ?? '',
+          neighborhood: progress.neighborhood!,
+          city: progress.city!,
+          state: progress.state!,
+          isPep: progress.isPep ?? false,
+          occupation: progress.occupation!,
+          incomeRange: progress.incomeRange!,
+        );
+
+      case 'document':
+        if (progress.phone == null ||
+            progress.email == null ||
+            progress.fullName == null ||
+            progress.birthDate == null ||
+            progress.motherName == null ||
+            progress.cep == null ||
+            progress.street == null ||
+            progress.number == null ||
+            progress.neighborhood == null ||
+            progress.city == null ||
+            progress.state == null ||
+            progress.occupation == null ||
+            progress.incomeRange == null ||
+            progress.selfiePath == null) {
+          return null;
+        }
+        return Step8DocumentScreen(
+          authController: authController,
+          themeController: themeController,
+          cpf: progress.cpf,
+          phone: progress.phone!,
+          email: progress.email!,
+          fullName: progress.fullName!,
+          birthDate: progress.birthDate!,
+          motherName: progress.motherName!,
+          cep: progress.cep!,
+          street: progress.street!,
+          number: progress.number!,
+          complement: progress.complement ?? '',
+          neighborhood: progress.neighborhood!,
+          city: progress.city!,
+          state: progress.state!,
+          isPep: progress.isPep ?? false,
+          occupation: progress.occupation!,
+          incomeRange: progress.incomeRange!,
+          selfiePath: progress.selfiePath!,
+          initialFrontDocumentPath: progress.documentFrontPath,
+          initialBackDocumentPath: progress.documentBackPath,
+          initialDocumentType: progress.documentType,
+        );
+
+      default:
+        AppLogger.warning('Step desconhecido: $step');
+        return RegistrationPhoneScreen(
+          authController: authController,
+          themeController: themeController,
+          cpf: progress.cpf,
+          initialPhone: progress.phone,
+        );
     }
   }
 
@@ -365,4 +405,17 @@ class RegistrationNavigator {
         ) ??
         false;
   }
+}
+
+/// PageRoute que empurra sem animação (entrada instantânea), mas mantém
+/// a animação reversa normal — preserva o swipe-back do iOS e o botão
+/// voltar do Android com transição suave de saída.
+class _InstantMaterialPageRoute<T> extends MaterialPageRoute<T> {
+  _InstantMaterialPageRoute({required super.builder});
+
+  @override
+  Duration get transitionDuration => Duration.zero;
+
+  @override
+  Duration get reverseTransitionDuration => const Duration(milliseconds: 300);
 }

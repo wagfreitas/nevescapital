@@ -66,17 +66,18 @@ class EfiPixApiService {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         AppLogger.info('[EFI PIX] PIX enviado com sucesso');
         return {
-          'success': true,
           ...data,
+          'success': true,
+          'message': _parseErrorMessage(data),
         };
       } else {
         final message = _parseErrorMessage(data);
         AppLogger.error('[EFI PIX] Erro: $message');
         return {
+          ...data,
           'success': false,
           'message': message,
           'statusCode': response.statusCode,
-          ...data,
         };
       }
     } catch (e) {

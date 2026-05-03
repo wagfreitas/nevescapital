@@ -136,7 +136,7 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
       }
 
       final userId = userData['id'] as String;
-      final fullName = userData['full_name'] as String? ?? '';
+      final fullName = userData['displayName'] as String? ?? '';
 
       // 2. Detectar bandeira e obter últimos 4 dígitos do cartão
       final detectedBrand = CardBrandDetector.detectBrand(widget.numeroCartao);
