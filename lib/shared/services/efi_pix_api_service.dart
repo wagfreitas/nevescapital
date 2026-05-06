@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:neves_capital/core/config/env_service.dart';
 import 'package:neves_capital/core/utils/app_logger.dart';
 
-/// Service para chamar os endpoints EFI PIX do backend (sandbox).
+/// Service para chamar os endpoints EFI PIX do backend.
 class EfiPixApiService {
   static String get _baseUrl => EnvService.apiBaseUrl;
   static String get _apiKey => EnvService.apiKey;
@@ -13,7 +13,7 @@ class EfiPixApiService {
         'x-api-key': _apiKey,
       };
 
-  /// Envia PIX via sandbox EFI.
+  /// Envia PIX via EFI.
   ///
   /// Suporta 3 modalidades (uma OU outra):
   /// - [chave]: chave PIX do destinatario
@@ -28,10 +28,10 @@ class EfiPixApiService {
     String? pixCopiaECola,
     String? descricao,
   }) async {
-    final url = Uri.parse('$_baseUrl/api/_internal/efi/test/pix');
+    final url = Uri.parse('$_baseUrl/api/pix/send');
 
     try {
-      AppLogger.info('[EFI PIX] Enviando PIX sandbox...');
+      AppLogger.info('[EFI PIX] Enviando PIX...');
       AppLogger.debug('[EFI PIX] URL: $url');
       AppLogger.debug('[EFI PIX] Valor: R\$ $valor');
 
@@ -91,7 +91,7 @@ class EfiPixApiService {
 
   /// Consulta status de um PIX enviado.
   static Future<Map<String, dynamic>> getPixStatus(String idEnvio) async {
-    final url = Uri.parse('$_baseUrl/api/_internal/efi/test/pix/$idEnvio');
+    final url = Uri.parse('$_baseUrl/api/pix/status/$idEnvio');
 
     try {
       AppLogger.info('[EFI PIX] Consultando status do PIX: $idEnvio');
@@ -103,12 +103,15 @@ class EfiPixApiService {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        return {'success': true, ...data};
+        return {
+          ...data,
+          'success': true,
+        };
       } else {
         return {
+          ...data,
           'success': false,
           'message': _parseErrorMessage(data),
-          ...data,
         };
       }
     } catch (e) {

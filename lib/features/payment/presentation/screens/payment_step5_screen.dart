@@ -147,8 +147,9 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
           : '';
       final cardNumberDisplay = '•••• $cardLastFour';
 
-      // 3. Enviar PIX via EFI sandbox
-      final valorReais = (widget.valorCentavos * 0.97 / 100).toStringAsFixed(2);
+      // 3. PIX com valor líquido (desconto de antecipação 3%) — mesma base que FirestoreService.saveSale
+      final valorLiquidoCentavos = (widget.valorCentavos * 0.97).round();
+      final valorReais = (valorLiquidoCentavos / 100).toStringAsFixed(2);
 
       Map<String, dynamic> pixResult;
 
@@ -238,8 +239,9 @@ class _PaymentStep5ScreenState extends State<PaymentStep5Screen> {
   @override
   Widget build(BuildContext context) {
     final valorFormatado = FormatHelpers.formatCurrency(widget.valorCentavos / 100);
-    final valorLiquido = (widget.valorCentavos * 0.97) / 100;
-    final valorLiquidoFormatado = FormatHelpers.formatCurrency(valorLiquido);
+    final valorLiquidoCentavos = (widget.valorCentavos * 0.97).round();
+    final valorLiquidoFormatado =
+        FormatHelpers.formatCurrency(valorLiquidoCentavos / 100);
     
     // Calcular passo atual baseado se tem conta ou não
     final currentStep = PaymentStepHelper.calculateCurrentStep(5, widget.hasAccount);
