@@ -163,6 +163,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text('Cancelar'),
           ),
           TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
             onPressed: () async {
               // Fechar dialog primeiro usando o contexto do dialog
               Navigator.of(dialogContext).pop();
@@ -239,7 +240,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               
               AppLogger.info('✅ Navegação para OnboardingScreen concluída');
             },
-            child: const Text('Sair'),
+            child: const Text(
+              'Sair',
+              style: TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
