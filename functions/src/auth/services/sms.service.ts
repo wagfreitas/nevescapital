@@ -7,15 +7,20 @@ const Twilio = require('twilio');
 export class SmsService {
   private readonly logger = new Logger(SmsService.name);
   private client: any;
-  private fromSenderId: string;
+  private messagingServiceSid: string;
 
   constructor(private readonly configService: ConfigService) {
     const accountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID', '');
     const authToken = this.configService.get<string>('TWILIO_AUTH_TOKEN', '');
-    this.fromSenderId = this.configService.get<string>('TWILIO_SMS_FROM', 'PAGPAG');
+    this.messagingServiceSid = this.configService.get<string>(
+      'TWILIO_MESSAGING_SERVICE_SID',
+      '',
+    );
 
     this.client = Twilio(accountSid, authToken);
-    this.logger.log(`SMS service initialized (Twilio, sender: ${this.fromSenderId})`);
+    this.logger.log(
+      `SMS service initialized (Twilio, messagingServiceSid: ${this.messagingServiceSid || 'NOT_SET'})`,
+    );
   }
 
   /**
@@ -28,8 +33,9 @@ export class SmsService {
   }
 
   /**
-   * Envia codigo OTP via SMS.
-   * Texto sem acentos para garantir encoding GSM-7 (1 segmento = 1 cobranca).
+   * Envia codigo OTP via SMS usando Messaging Service.
+   * O Messaging Service contem o Alpha Sender ID (ex: PAGPAG) cadastrado
+   * para Brasil. Texto sem acentos garante encoding GSM-7 (1 segmento = 1 cobranca).
    *
    * @param phone Telefone no formato 55XXXXXXXXXXX (apenas digitos, com codigo do pais)
    * @param code Codigo OTP
@@ -44,12 +50,19 @@ export class SmsService {
         return false;
       }
 
+      if (!this.messagingServiceSid) {
+        this.logger.error(
+          'TWILIO_MESSAGING_SERVICE_SID nao configurado — SMS nao pode ser enviado',
+        );
+        return false;
+      }
+
       this.logger.log(`Enviando OTP via SMS para: ${cleanPhone.substring(0, 4)}***`);
 
       const body = `Pag Pag: seu codigo de verificacao e ${code}. Nao compartilhe.`;
 
       const message = await this.client.messages.create({
-        from: this.fromSenderId,
+        messagingServiceSid: this.messagingServiceSid,
         to: this.formatPhone(cleanPhone),
         body,
       });
