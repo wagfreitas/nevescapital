@@ -22,7 +22,7 @@ class EnvService {
   // API Backend
   static String get apiBaseUrl =>
       dotenv.env['API_BASE_URL'] ??
-      'https://pagpagapp-production.up.railway.app';
+      'https://nevescapital-production.up.railway.app';
 
   static String get apiKey =>
       dotenv.env['API_KEY'] ?? '';
