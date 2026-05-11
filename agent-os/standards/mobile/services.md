@@ -16,7 +16,7 @@ class SomeService {
 ### EnvService (`lib/core/config/env_service.dart`)
 Loads `.env` via `flutter_dotenv`. Provides typed getters:
 ```dart
-static String get apiBaseUrl => dotenv.env['API_BASE_URL'] ?? 'https://pagpagapp-production.up.railway.app';
+static String get apiBaseUrl => dotenv.env['API_BASE_URL'] ?? 'https://nevescapital-production.up.railway.app';
 static String get apiKey => dotenv.env['API_KEY'] ?? '';
 static String get pagarmeApiKey => dotenv.env['PAGARME_API_KEY'] ?? '';
 ```
