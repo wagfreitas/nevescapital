@@ -6,6 +6,7 @@ import { AuthJwtService } from '../firebase-rest/auth-jwt.service';
 import { EmailSenderService } from './email-sender.service';
 import { SimpleOtpService } from './services/simple-otp.service';
 import { WhatsAppService } from './services/whatsapp.service';
+import { SmsService } from './services/sms.service';
 import { UsersService } from '../users/users.service';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SendPhoneOtpDto, VerifyPhoneOtpDto, CheckUserStatusDto } from './dto/send-phone-otp.dto';
@@ -19,6 +20,7 @@ export class AuthController {
     private readonly emailSenderService: EmailSenderService,
     private readonly simpleOtpService: SimpleOtpService,
     private readonly whatsAppService: WhatsAppService,
+    private readonly smsService: SmsService,
     private readonly usersService: UsersService,
     private readonly authJwt: AuthJwtService,
   ) { }
@@ -129,6 +131,50 @@ export class AuthController {
     return {
       success: true,
       message: 'Codigo de verificacao enviado via WhatsApp',
+    };
+  }
+
+  @Post('send-otp-sms')
+  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 requests por minuto
+  @ApiOperation({
+    summary: 'Enviar codigo OTP via SMS (canal alternativo ao WhatsApp)',
+    description: 'Gera codigo OTP e envia via SMS (Twilio). Usado quando usuario nao recebeu WhatsApp.'
+  })
+  @ApiResponse({ status: 200, description: 'OTP enviado via SMS com sucesso' })
+  @ApiResponse({ status: 400, description: 'Telefone invalido ou falha no envio' })
+  async sendOtpSms(@Body() body: SendPhoneOtpDto) {
+    const t0 = Date.now();
+
+    // 1. Gerar e salvar OTP no Firestore (reusa mesmo store do WhatsApp)
+    const t1 = Date.now();
+    const result = await this.simpleOtpService.sendOtp(body.phone);
+    const t2 = Date.now();
+    console.log(`[OTP-SMS-TIMING] Firestore (gerar+salvar OTP): ${t2 - t1}ms`);
+
+    if (!result.success) {
+      throw new BadRequestException(result.message);
+    }
+
+    // 2. Enviar OTP via SMS (fire-and-forget -- nao bloqueia a resposta)
+    if (result.code) {
+      const t3 = Date.now();
+      this.smsService.sendOtpMessage(body.phone, result.code)
+        .then((sent) => {
+          console.log(`[OTP-SMS-TIMING] Twilio SMS: ${Date.now() - t3}ms`);
+          if (!sent) {
+            console.warn(`[AuthController] Falha ao enviar OTP via SMS para ${body.phone.substring(0, 4)}***`);
+          }
+        })
+        .catch((err) => {
+          console.error(`[AuthController] Erro ao enviar OTP via SMS: ${err.message}`);
+        });
+    }
+
+    console.log(`[OTP-SMS-TIMING] TOTAL (ate response): ${Date.now() - t0}ms`);
+
+    return {
+      success: true,
+      message: 'Codigo de verificacao enviado via SMS',
     };
   }
 

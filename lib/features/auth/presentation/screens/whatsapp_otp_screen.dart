@@ -33,7 +33,7 @@ class WhatsAppOtpScreen extends StatefulWidget {
 
 class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
     with WidgetsBindingObserver {
-  int _otpLength = 4;
+  static const int _otpLength = 4;
 
   /// Flag pra detectar volta do background. Vira true quando o app sai
   /// (paused/hidden/inactive); ao voltar (resumed), redireciona pra CPF.
@@ -57,9 +57,6 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
   int _smsCountdown = 30;
   int _failedAttempts = 0;
   static const int _maxFailedAttempts = 3;
-
-  bool _isSmsMode = false;
-  String? _smsVerificationId;
 
   String _digitOf(int index) {
     final t = _boxControllers[index].text.replaceAll(_zwsp, '');
@@ -297,14 +294,7 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
     try {
       final code = _otpCode;
 
-      // Modo SMS: verificar via Firebase Phone Auth
-      if (_isSmsMode && _smsVerificationId != null) {
-        await _verifySmsCode(code);
-        return;
-      }
-
-      // Modo WhatsApp: verificar via backend
-      AppLogger.info('🔐 Verificando OTP WhatsApp: $code');
+      AppLogger.info('🔐 Verificando OTP: $code');
 
       final result =
           await AuthApiService.verifyOtpLogin(widget.phone, code);
@@ -450,6 +440,9 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
     }
   }
 
+  /// Envia o OTP via SMS (Twilio) quando o usuário não recebeu pelo WhatsApp.
+  /// Reusa o mesmo store de OTP do backend (SimpleOtpService) — mesma UI de
+  /// 4 dígitos, mesmo endpoint de verificação (verify-otp-login).
   Future<void> _handleSmsFallback() async {
     if (_smsCountdown > 0) return;
 
@@ -459,156 +452,38 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
     });
 
     try {
-      AppLogger.info('📱 Fallback SMS: Enviando OTP via Firebase Phone Auth');
+      AppLogger.info('📱 Solicitando OTP via SMS (Twilio)');
 
-      await FirebaseAuth.instance.verifyPhoneNumber(
-        phoneNumber: widget.formattedPhone,
-        verificationCompleted: (PhoneAuthCredential credential) {
-          AppLogger.debug('✅ Verificação automática no fallback SMS');
-        },
-        verificationFailed: (FirebaseAuthException e) {
-          AppLogger.error('❌ Erro no fallback SMS: ${e.code}');
-          if (mounted) {
-            setState(() {
-              _isLoading = false;
-              _errorMessage = e.code == 'too-many-requests'
-                  ? 'Muitas tentativas. Aguarde alguns minutos.'
-                  : 'Erro ao enviar SMS: ${e.message ?? e.code}';
-            });
-          }
-        },
-        codeSent: (String verificationId, int? resendToken) {
-          AppLogger.info('✅ SMS enviado com sucesso!');
-          if (!mounted) return;
+      final result = await AuthApiService.sendOtpSms(widget.phone);
 
-          // Mudar para modo SMS na mesma tela (6 dígitos)
-          _switchToSmsMode(verificationId);
-        },
-        codeAutoRetrievalTimeout: (String verificationId) {
-          AppLogger.debug('⏰ Timeout de auto-retrieval no fallback SMS');
-        },
-      );
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+        _smsCountdown = 30;
+      });
+      _startSmsCountdown();
+
+      if (result['success'] == true) {
+        _resetBoxes();
+        _boxFocuses[0].requestFocus();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Código enviado por SMS'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      } else {
+        setState(() {
+          _errorMessage = result['message'] as String? ?? 'Erro ao enviar SMS';
+        });
+      }
     } catch (e) {
-      AppLogger.error('❌ Erro no fallback SMS: $e');
+      AppLogger.error('❌ Erro ao enviar SMS: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
           _errorMessage = 'Erro ao enviar SMS. Tente novamente.';
-        });
-      }
-    }
-  }
-
-  /// Muda a tela para modo SMS: 6 dígitos em vez de 4
-  void _switchToSmsMode(String verificationId) {
-    // Limpa controllers/focuses antigos antes de recriar com tamanho 6.
-    for (final c in _boxControllers) {
-      c.dispose();
-    }
-    for (final f in _boxFocuses) {
-      f
-        ..removeListener(_onAnyFocusChanged)
-        ..dispose();
-    }
-    setState(() {
-      _isSmsMode = true;
-      _smsVerificationId = verificationId;
-      _otpLength = 6;
-      _isLoading = false;
-      _errorMessage = null;
-      _initBoxes(_otpLength);
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _boxFocuses[0].canRequestFocus) {
-        _boxFocuses[0].requestFocus();
-      }
-    });
-  }
-
-  /// Verifica o código SMS via Firebase Phone Auth
-  Future<void> _verifySmsCode(String code) async {
-    try {
-      AppLogger.info('🔐 Verificando código SMS via Firebase...');
-
-      final credential = PhoneAuthProvider.credential(
-        verificationId: _smsVerificationId!,
-        smsCode: code,
-      );
-
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      final user = userCredential.user;
-
-      if (!mounted) return;
-
-      if (user != null) {
-        AppLogger.info('✅ SMS verificado com sucesso! UID: ${user.uid}');
-
-        // Buscar dados do usuário no Firestore
-        final userId = user.uid;
-        final userData = await FirestoreService.getUserByDocumentId(userId);
-        final cpf = userData?['cpf'] as String?;
-
-        if (cpf != null && widget.authController != null) {
-          final loginSuccess = await widget.authController!.loginWithOtpDirect(
-            cpf: cpf,
-            userId: userId,
-          );
-
-          if (!loginSuccess && mounted) {
-            setState(() {
-              _isLoading = false;
-              _errorMessage = widget.authController?.errorMessage ?? 'Erro ao fazer login';
-            });
-            return;
-          }
-        }
-
-        // Navegar para Dashboard
-        if (mounted) {
-          Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (context) => MainTabScreen(
-                authController: widget.authController ?? AuthController(),
-                themeController: widget.themeController ?? ThemeController(),
-              ),
-            ),
-            (route) => false,
-          );
-        }
-      }
-    } on FirebaseAuthException catch (e) {
-      AppLogger.error('❌ Erro ao verificar SMS: ${e.code}');
-      if (!mounted) return;
-
-      _failedAttempts++;
-      if (_failedAttempts >= _maxFailedAttempts) {
-        _redirectToOnboarding();
-        return;
-      }
-
-      String errorMsg;
-      switch (e.code) {
-        case 'invalid-verification-code':
-          errorMsg = 'Código inválido. Tentativas restantes: ${_maxFailedAttempts - _failedAttempts}';
-          break;
-        case 'session-expired':
-          errorMsg = 'Sessão expirada. Solicite um novo código.';
-          break;
-        default:
-          errorMsg = 'Erro ao verificar código: ${e.message ?? e.code}';
-      }
-
-      setState(() {
-        _isLoading = false;
-        _errorMessage = errorMsg;
-      });
-    } catch (e) {
-      AppLogger.error('❌ Erro inesperado ao verificar SMS: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Erro ao verificar código. Tente novamente.';
         });
       }
     }
@@ -630,8 +505,8 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
   }
 
   Widget _buildOtpField() {
-    final double boxSize = _isSmsMode ? 48 : 64;
-    final double boxMargin = _isSmsMode ? 4 : 8;
+    const double boxSize = 64;
+    const double boxMargin = 8;
 
     return AutofillGroup(
       child: Row(
@@ -667,8 +542,8 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
                 autofillHints:
                     index == 0 ? const [AutofillHints.oneTimeCode] : null,
                 maxLength: 2, // ZWSP + dígito; permite paste maior.
-                style: TextStyle(
-                  fontSize: _isSmsMode ? 20 : 24,
+                style: const TextStyle(
+                  fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                   // height 1.0 → linha de texto sem espaço extra acima/abaixo,
@@ -737,9 +612,7 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
 
               // Subtítulo
               Text(
-                _isSmsMode
-                    ? 'Informe o código de verificação que enviamos por SMS para +55 $formattedDisplay'
-                    : 'Informe o código de verificação que enviamos para o WhatsApp do número +55 $formattedDisplay',
+                'Informe o código de verificação que enviamos para o WhatsApp do número +55 $formattedDisplay',
                 style: const TextStyle(
                   fontSize: 16,
                   color: Colors.white70,
@@ -846,7 +719,7 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
               Center(
                 child: _smsCountdown > 0
                     ? Text(
-                        'Prefere receber por SMS? Clique Aqui ${_smsCountdown}s',
+                        'Não recebi, enviar por SMS ${_smsCountdown}s',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.5),
                           fontSize: 14,
@@ -855,7 +728,7 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
                     : TextButton(
                         onPressed: _isLoading ? null : _handleSmsFallback,
                         child: const Text(
-                          'Prefere receber por SMS? Clique Aqui',
+                          'Não recebi, enviar por SMS',
                           style: TextStyle(
                             color: AppTheme.primaryColor,
                             fontSize: 14,
