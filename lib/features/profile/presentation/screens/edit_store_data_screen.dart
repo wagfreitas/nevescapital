@@ -293,6 +293,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                                 controller: _storeNameController,
                                 autofocus: false,
                                 textInputAction: TextInputAction.next,
+                                textCapitalization: TextCapitalization.words,
                                 style: const TextStyle(color: Colors.white),
                                 onChanged: (value) => _checkForChanges(),
                                 decoration: InputDecoration(
@@ -327,7 +328,10 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                               TextFormField(
                                 controller: _ramoController,
                                 readOnly: true,
-                                onTap: () => _showRamoSearch(context),
+                                onTap: () {
+                                  FocusScope.of(context).unfocus();
+                                  _showRamoSearch(context);
+                                },
                                 style: const TextStyle(color: Colors.white),
                                 decoration: InputDecoration(
                                   labelText: 'Ramo de Atuação',
