@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:neves_capital/shared/services/firestore_service.dart';
 import 'package:neves_capital/shared/services/secure_storage_service.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
@@ -26,6 +27,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
   final _formKey = GlobalKey<FormState>();
   final _storeNameController = TextEditingController();
   final _ramoController = TextEditingController();
+  final _storeNameFocus = FocusNode();
 
   bool _isLoading = false;
   bool _isLoadingData = true;
@@ -73,6 +75,7 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
     _storeNameController.removeListener(_checkForChanges);
     _storeNameController.dispose();
     _ramoController.dispose();
+    _storeNameFocus.dispose();
     super.dispose();
   }
 
@@ -291,9 +294,10 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                             children: [
                               TextFormField(
                                 controller: _storeNameController,
+                                focusNode: _storeNameFocus,
                                 autofocus: false,
                                 textInputAction: TextInputAction.next,
-                                textCapitalization: TextCapitalization.words,
+                                inputFormatters: [_TitleCasePtBrFormatter()],
                                 style: const TextStyle(color: Colors.white),
                                 onChanged: (value) => _checkForChanges(),
                                 decoration: InputDecoration(
@@ -329,7 +333,8 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
                                 controller: _ramoController,
                                 readOnly: true,
                                 onTap: () {
-                                  FocusScope.of(context).unfocus();
+                                  _storeNameFocus.unfocus();
+                                  FocusManager.instance.primaryFocus?.unfocus();
                                   _showRamoSearch(context);
                                 },
                                 style: const TextStyle(color: Colors.white),
@@ -552,6 +557,53 @@ class _RamoSearchScreenState extends State<_RamoSearchScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Aplica title case PT-BR: capitaliza cada palavra, exceto stopwords
+/// (de, do, da, e, etc.). A primeira palavra sempre fica capitalizada.
+/// Exemplos: "loja do zé" → "Loja do Zé", "comercio e representacoes" → "Comercio e Representacoes".
+class _TitleCasePtBrFormatter extends TextInputFormatter {
+  static const Set<String> _stopwords = {
+    'de', 'do', 'da', 'dos', 'das',
+    'e',
+    'a', 'o', 'as', 'os',
+    'em', 'no', 'na', 'nos', 'nas',
+    'um', 'uma', 'uns', 'umas',
+    'por', 'para', 'com',
+    'ao', 'aos', 'à', 'às',
+  };
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+    if (text.isEmpty) return newValue;
+
+    final words = text.split(' ');
+    final result = <String>[];
+
+    for (int i = 0; i < words.length; i++) {
+      final w = words[i];
+      if (w.isEmpty) {
+        result.add(w);
+        continue;
+      }
+      final lower = w.toLowerCase();
+      if (i > 0 && _stopwords.contains(lower)) {
+        result.add(lower);
+      } else {
+        result.add(w[0].toUpperCase() + (w.length > 1 ? w.substring(1).toLowerCase() : ''));
+      }
+    }
+
+    final formatted = result.join(' ');
+    return newValue.copyWith(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }
