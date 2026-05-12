@@ -58,6 +58,10 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
   int _failedAttempts = 0;
   static const int _maxFailedAttempts = 3;
 
+  /// true quando o último envio foi por SMS (Twilio Verify);
+  /// muda o endpoint de verificação para check-otp-verify.
+  bool _usingSmsVerify = false;
+
   String _digitOf(int index) {
     final t = _boxControllers[index].text.replaceAll(_zwsp, '');
     return t.isEmpty ? '' : t;
@@ -294,102 +298,13 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
     try {
       final code = _otpCode;
 
-      AppLogger.info('🔐 Verificando OTP: $code');
-
-      final result =
-          await AuthApiService.verifyOtpLogin(widget.phone, code);
-
-      if (!mounted) return;
-
-      final success = result['success'] as bool? ?? false;
-      final status = result['status'] as String?;
-
-      if (!success) {
-        _failedAttempts++;
-        if (_failedAttempts >= _maxFailedAttempts) {
-          _redirectToOnboarding();
-          return;
-        }
-        setState(() {
-          _isLoading = false;
-          _errorMessage = result['message'] as String? ??
-              'Código inválido. Tentativas restantes: ${_maxFailedAttempts - _failedAttempts}';
-        });
-        return;
-      }
-
-      // Resetar tentativas
-      _failedAttempts = 0;
-
-      if (status == 'LOGGED_IN') {
-        final customToken = result['customToken'] as String?;
-        final userId = result['userId'] as String?;
-
-        if (customToken != null) {
-          // Fazer login com Custom Token
-          AppLogger.info('🔑 Fazendo login com Custom Token...');
-          await FirebaseAuth.instance.signInWithCustomToken(customToken);
-        }
-
-        if (userId != null && widget.authController != null) {
-          // Buscar CPF do usuário para login
-          final userData = await FirestoreService.getUserByDocumentId(userId);
-          final cpf = userData?['cpf'] as String?;
-
-          if (cpf != null) {
-            final loginSuccess =
-                await widget.authController!.loginWithOtpDirect(
-              cpf: cpf,
-              userId: userId,
-            );
-
-            if (!loginSuccess) {
-              if (mounted) {
-                setState(() {
-                  _isLoading = false;
-                  _errorMessage =
-                      widget.authController?.errorMessage ?? 'Erro ao fazer login';
-                });
-              }
-              return;
-            }
-          }
-        }
-
-        // Navegar para Dashboard
-        if (mounted) {
-          Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (context) => MainTabScreen(
-                authController: widget.authController ?? AuthController(),
-                themeController: widget.themeController ?? ThemeController(),
-              ),
-            ),
-            (route) => false,
-          );
-        }
-      } else if (status == 'REGISTER') {
-        // Navegar para cadastro (push para manter pilha e permitir voltar)
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => UnifiedCpfScreen(
-                authController: widget.authController,
-                themeController: widget.themeController,
-                initialPhone: widget.phone,
-              ),
-            ),
-          );
-        }
+      if (_usingSmsVerify) {
+        await _handleVerifySms(code);
       } else {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Status desconhecido: $status';
-        });
+        await _handleVerifyWhatsApp(code);
       }
     } catch (e) {
-      AppLogger.error('❌ Erro ao verificar OTP: $e');
+      AppLogger.error('Erro ao verificar OTP: $e');
       if (mounted) {
         _failedAttempts++;
         if (_failedAttempts >= _maxFailedAttempts) {
@@ -402,6 +317,141 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
               'Erro ao verificar código. Tentativas restantes: ${_maxFailedAttempts - _failedAttempts}';
         });
       }
+    }
+  }
+
+  /// Verificação via Twilio Verify (canal SMS).
+  /// Após sucesso, navega para UnifiedCpfScreen que decide login ou cadastro.
+  Future<void> _handleVerifySms(String code) async {
+    AppLogger.info('Verificando OTP via Twilio Verify (SMS)');
+
+    final result =
+        await AuthApiService.checkVerifyOtp(widget.phone, code);
+
+    if (!mounted) return;
+
+    final success = result['success'] as bool? ?? false;
+
+    if (!success) {
+      _failedAttempts++;
+      if (_failedAttempts >= _maxFailedAttempts) {
+        _redirectToOnboarding();
+        return;
+      }
+      setState(() {
+        _isLoading = false;
+        _errorMessage = result['message'] as String? ??
+            'Código inválido. Tentativas restantes: ${_maxFailedAttempts - _failedAttempts}';
+      });
+      return;
+    }
+
+    _failedAttempts = 0;
+
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => UnifiedCpfScreen(
+            authController: widget.authController,
+            themeController: widget.themeController,
+            initialPhone: widget.phone,
+          ),
+        ),
+      );
+    }
+  }
+
+  /// Verificação padrão via WhatsApp (simpleOtpService + user lookup).
+  Future<void> _handleVerifyWhatsApp(String code) async {
+    AppLogger.info('Verificando OTP via WhatsApp');
+
+    final result =
+        await AuthApiService.verifyOtpLogin(widget.phone, code);
+
+    if (!mounted) return;
+
+    final success = result['success'] as bool? ?? false;
+    final status = result['status'] as String?;
+
+    if (!success) {
+      _failedAttempts++;
+      if (_failedAttempts >= _maxFailedAttempts) {
+        _redirectToOnboarding();
+        return;
+      }
+      setState(() {
+        _isLoading = false;
+        _errorMessage = result['message'] as String? ??
+            'Código inválido. Tentativas restantes: ${_maxFailedAttempts - _failedAttempts}';
+      });
+      return;
+    }
+
+    _failedAttempts = 0;
+
+    if (status == 'LOGGED_IN') {
+      final customToken = result['customToken'] as String?;
+      final userId = result['userId'] as String?;
+
+      if (customToken != null) {
+        AppLogger.info('Fazendo login com Custom Token...');
+        await FirebaseAuth.instance.signInWithCustomToken(customToken);
+      }
+
+      if (userId != null && widget.authController != null) {
+        final userData = await FirestoreService.getUserByDocumentId(userId);
+        final cpf = userData?['cpf'] as String?;
+
+        if (cpf != null) {
+          final loginSuccess =
+              await widget.authController!.loginWithOtpDirect(
+            cpf: cpf,
+            userId: userId,
+          );
+
+          if (!loginSuccess) {
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _errorMessage =
+                    widget.authController?.errorMessage ?? 'Erro ao fazer login';
+              });
+            }
+            return;
+          }
+        }
+      }
+
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => MainTabScreen(
+              authController: widget.authController ?? AuthController(),
+              themeController: widget.themeController ?? ThemeController(),
+            ),
+          ),
+          (route) => false,
+        );
+      }
+    } else if (status == 'REGISTER') {
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => UnifiedCpfScreen(
+              authController: widget.authController,
+              themeController: widget.themeController,
+              initialPhone: widget.phone,
+            ),
+          ),
+        );
+      }
+    } else {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Status desconhecido: $status';
+      });
     }
   }
 
@@ -420,6 +470,7 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
         setState(() {
           _isLoading = false;
           _resendCountdown = 30;
+          _usingSmsVerify = false;
         });
         _startResendCountdown();
 
@@ -427,7 +478,8 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
           _resetBoxes();
           _boxFocuses[0].requestFocus();
         } else {
-          _errorMessage = result['message'] as String? ?? 'Erro ao reenviar código';
+          _errorMessage =
+              result['message'] as String? ?? 'Erro ao reenviar código';
         }
       }
     } catch (e) {
@@ -440,9 +492,8 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
     }
   }
 
-  /// Envia o OTP via SMS (Twilio) quando o usuário não recebeu pelo WhatsApp.
-  /// Reusa o mesmo store de OTP do backend (SimpleOtpService) — mesma UI de
-  /// 4 dígitos, mesmo endpoint de verificação (verify-otp-login).
+  /// Envia OTP via SMS usando Twilio Verify Service.
+  /// Marca [_usingSmsVerify] = true para que a verificação use check-otp-verify.
   Future<void> _handleSmsFallback() async {
     if (_smsCountdown > 0) return;
 
@@ -452,34 +503,41 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
     });
 
     try {
-      AppLogger.info('📱 Solicitando OTP via SMS (Twilio)');
+      AppLogger.info('Solicitando OTP via SMS (Twilio Verify)');
 
-      final result = await AuthApiService.sendOtpSms(widget.phone);
+      final result =
+          await AuthApiService.sendVerifyOtp(widget.phone, 'sms');
 
       if (!mounted) return;
 
       setState(() {
         _isLoading = false;
         _smsCountdown = 30;
+        _resendCountdown = 30;
       });
       _startSmsCountdown();
+      _startResendCountdown();
 
       if (result['success'] == true) {
+        setState(() => _usingSmsVerify = true);
         _resetBoxes();
         _boxFocuses[0].requestFocus();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Código enviado por SMS'),
-            duration: Duration(seconds: 3),
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Código enviado por SMS!'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
       } else {
         setState(() {
-          _errorMessage = result['message'] as String? ?? 'Erro ao enviar SMS';
+          _errorMessage =
+              result['message'] as String? ?? 'Erro ao enviar SMS';
         });
       }
     } catch (e) {
-      AppLogger.error('❌ Erro ao enviar SMS: $e');
+      AppLogger.error('Erro ao enviar SMS via Verify: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -612,7 +670,9 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
 
               // Subtítulo
               Text(
-                'Informe o código de verificação que enviamos para o WhatsApp do número +55 $formattedDisplay',
+                _usingSmsVerify
+                    ? 'Informe o código de verificação enviado por SMS para o número +55 $formattedDisplay'
+                    : 'Informe o código de verificação que enviamos para o WhatsApp do número +55 $formattedDisplay',
                 style: const TextStyle(
                   fontSize: 16,
                   color: Colors.white70,
