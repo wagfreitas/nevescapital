@@ -33,7 +33,9 @@ class WhatsAppOtpScreen extends StatefulWidget {
 
 class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
     with WidgetsBindingObserver {
-  static const int _otpLength = 4;
+  static const int _whatsappOtpLength = 4;
+  static const int _smsOtpLength = 6;
+  int get _otpLength => _usingSmsVerify ? _smsOtpLength : _whatsappOtpLength;
 
   /// Flag pra detectar volta do background. Vira true quando o app sai
   /// (paused/hidden/inactive); ao voltar (resumed), redireciona pra CPF.
@@ -149,12 +151,29 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
   }
 
   /// Reset visual de todas as caixas pro estado "vazio" (ZWSP).
+  /// Se o tamanho mudou (ex: WhatsApp→SMS), recria controllers e focus nodes.
   void _resetBoxes() {
+    if (_boxControllers.length != _otpLength) {
+      _disposeBoxes();
+      _initBoxes(_otpLength);
+      return;
+    }
     for (int i = 0; i < _boxControllers.length; i++) {
       _boxControllers[i].text = _zwsp;
       _boxControllers[i].selection =
           const TextSelection.collapsed(offset: 1);
       _boxFilled[i] = false;
+    }
+  }
+
+  void _disposeBoxes() {
+    for (final c in _boxControllers) {
+      c.dispose();
+    }
+    for (final f in _boxFocuses) {
+      f
+        ..removeListener(_onAnyFocusChanged)
+        ..dispose();
     }
   }
 
@@ -467,16 +486,17 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
       final result = await AuthApiService.sendOtpWhatsApp(widget.phone);
 
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _resendCountdown = 30;
-          _usingSmsVerify = false;
-        });
+        _isLoading = false;
+        _resendCountdown = 30;
+        _usingSmsVerify = false;
+        _resetBoxes();
+        setState(() {});
         _startResendCountdown();
 
         if (result['success'] == true) {
-          _resetBoxes();
-          _boxFocuses[0].requestFocus();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _boxFocuses[0].requestFocus();
+          });
         } else {
           _errorMessage =
               result['message'] as String? ?? 'Erro ao reenviar código';
@@ -519,17 +539,20 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
       _startResendCountdown();
 
       if (result['success'] == true) {
-        setState(() => _usingSmsVerify = true);
+        _usingSmsVerify = true;
         _resetBoxes();
-        _boxFocuses[0].requestFocus();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Código enviado por SMS!'),
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
+        setState(() {});
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _boxFocuses[0].requestFocus();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Código enviado por SMS!'),
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        });
       } else {
         setState(() {
           _errorMessage =
@@ -563,8 +586,8 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
   }
 
   Widget _buildOtpField() {
-    const double boxSize = 64;
-    const double boxMargin = 8;
+    final double boxSize = _otpLength <= 4 ? 64 : 48;
+    final double boxMargin = _otpLength <= 4 ? 8 : 6;
 
     return AutofillGroup(
       child: Row(
