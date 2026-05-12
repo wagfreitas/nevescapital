@@ -311,7 +311,9 @@ class _PaymentStep1ScreenState extends State<PaymentStep1Screen> {
                           ),
                         ),
                       );
-                      if (value != null && mounted) {
+                      if (!mounted) return;
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      if (value != null) {
                         setState(() {
                           _ramoAtuacao = value;
                         });

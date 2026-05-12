@@ -158,7 +158,8 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
         builder: (context) => const _BankSearchScreen(),
       ),
     );
-
+    if (!mounted) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     if (selected != null) {
       setState(() {
         _selectedBank = selected;
