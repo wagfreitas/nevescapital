@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:neves_capital/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:neves_capital/core/theme/theme_controller.dart';
@@ -41,17 +42,8 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
   /// (paused/hidden/inactive); ao voltar (resumed), redireciona pra CPF.
   bool _wasBackgrounded = false;
 
-  // ZWSP "fantasma" em cada caixa pra detectar backspace em caixa vazia.
-  // Se o controller cai pra string vazia, é porque o backspace apagou o ZWSP →
-  // sabemos que veio um backspace, mesmo na caixa vazia.
-  static const String _zwsp = '​';
-
-  // Lista de controllers/focus, um por caixa.
   late List<TextEditingController> _boxControllers;
   late List<FocusNode> _boxFocuses;
-  // _boxFilled[i] = true se a caixa i tem um dígito real (não só ZWSP).
-  // Usado pra distinguir backspace em caixa cheia vs vazia.
-  late List<bool> _boxFilled;
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -64,10 +56,7 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
   /// muda o endpoint de verificação para check-otp-verify.
   bool _usingSmsVerify = false;
 
-  String _digitOf(int index) {
-    final t = _boxControllers[index].text.replaceAll(_zwsp, '');
-    return t.isEmpty ? '' : t;
-  }
+  String _digitOf(int index) => _boxControllers[index].text;
 
   bool get _isOtpComplete =>
       List.generate(_otpLength, _digitOf).every((d) => d.isNotEmpty);
@@ -122,14 +111,27 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
   }
 
   void _initBoxes(int length) {
-    _boxControllers = List.generate(length, (_) {
-      final c = TextEditingController(text: _zwsp);
-      c.selection = const TextSelection.collapsed(offset: 1);
-      return c;
+    _boxControllers = List.generate(length, (_) => TextEditingController());
+    _boxFocuses = List.generate(length, (i) {
+      final node = FocusNode();
+      node.addListener(_onAnyFocusChanged);
+      node.onKeyEvent = (_, event) => _handleKeyEvent(i, event);
+      return node;
     });
-    _boxFocuses = List.generate(
-        length, (_) => FocusNode()..addListener(_onAnyFocusChanged));
-    _boxFilled = List.filled(length, false);
+  }
+
+  KeyEventResult _handleKeyEvent(int index, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey != LogicalKeyboardKey.backspace) {
+      return KeyEventResult.ignored;
+    }
+    if (_boxControllers[index].text.isEmpty && index > 0) {
+      _boxControllers[index - 1].clear();
+      _boxFocuses[index - 1].requestFocus();
+      setState(() {});
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   @override
@@ -150,19 +152,14 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
     if (mounted) setState(() {});
   }
 
-  /// Reset visual de todas as caixas pro estado "vazio" (ZWSP).
-  /// Se o tamanho mudou (ex: WhatsApp→SMS), recria controllers e focus nodes.
   void _resetBoxes() {
     if (_boxControllers.length != _otpLength) {
       _disposeBoxes();
       _initBoxes(_otpLength);
       return;
     }
-    for (int i = 0; i < _boxControllers.length; i++) {
-      _boxControllers[i].text = _zwsp;
-      _boxControllers[i].selection =
-          const TextSelection.collapsed(offset: 1);
-      _boxFilled[i] = false;
+    for (final c in _boxControllers) {
+      c.clear();
     }
   }
 
@@ -177,15 +174,9 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
     }
   }
 
-  /// Distribui um código colado/autofill nas caixas (pad com vazios se for menor).
   void _distributeCode(String digits) {
     for (int i = 0; i < _otpLength; i++) {
-      final ch = i < digits.length ? digits[i] : '';
-      _boxControllers[i].text = ch.isEmpty ? _zwsp : ch;
-      _boxControllers[i].selection = TextSelection.collapsed(
-        offset: _boxControllers[i].text.length,
-      );
-      _boxFilled[i] = ch.isNotEmpty;
+      _boxControllers[i].text = i < digits.length ? digits[i] : '';
     }
     final focusIdx =
         digits.length >= _otpLength ? _otpLength - 1 : digits.length;
@@ -199,85 +190,37 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
 
   /// Lida com mudanças em uma caixa específica.
   ///
-  /// Convenção: cada caixa tem ZWSP como conteúdo "vazio" e o dígito real
-  /// quando preenchida (sem ZWSP). Isso permite distinguir backspace em caixa
-  /// vazia (text vai pra '') de digitação (text vai pra `<digit>` ou
-  /// `<zwsp><digit>`).
   void _onBoxChanged(int index, String value) {
-    final cleanDigits = value.replaceAll(_zwsp, '').replaceAll(RegExp(r'\D'), '');
+    final digits = value.replaceAll(RegExp(r'\D'), '');
 
-    // Autofill / paste: vários dígitos chegaram de uma vez na primeira caixa.
-    if (cleanDigits.length > 1) {
-      _distributeCode(cleanDigits);
-      if (_errorMessage != null) {
-        setState(() => _errorMessage = null);
-      } else {
-        setState(() {});
-      }
+    // Autofill / paste: vários dígitos de uma vez.
+    if (digits.length > 1) {
+      _distributeCode(digits);
+      setState(() => _errorMessage = null);
       return;
     }
 
-    if (value.isEmpty) {
-      // Backspace foi pressionado. Distingue dois casos pelo estado anterior:
-      //   (a) Caixa estava CHEIA → apaga só ela, foco vai pra anterior, NÃO
-      //       toca em nenhuma outra (atende req do usuário).
-      //   (b) Caixa estava VAZIA → só pula foco pra anterior. NÃO apaga a
-      //       anterior nesse passo (o usuário pode dar backspace de novo).
-      final wasFilled = _boxFilled[index];
-
-      // Restaura ZWSP pra próxima detecção.
-      _boxControllers[index].text = _zwsp;
-      _boxControllers[index].selection =
-          const TextSelection.collapsed(offset: 1);
-      _boxFilled[index] = false;
-
-      if (wasFilled) {
-        // Caso (a): apaga só esta caixa, foco pra anterior se houver.
-        if (index > 0) {
-          _boxFocuses[index - 1].requestFocus();
-        }
-      } else {
-        // Caso (b): só pula foco pra anterior.
-        if (index > 0) {
-          _boxFocuses[index - 1].requestFocus();
-        }
+    if (digits.isEmpty) {
+      _boxControllers[index].clear();
+      if (index > 0) {
+        _boxFocuses[index - 1].requestFocus();
       }
-
-      if (_errorMessage != null) {
-        setState(() => _errorMessage = null);
-      } else {
-        setState(() {});
-      }
+      setState(() => _errorMessage = null);
       return;
     }
 
-    // Houve digitação. Pega só o último dígito (substituição) e normaliza.
-    if (cleanDigits.isEmpty) {
-      // Algo não-numérico foi tentado. Restaura ZWSP.
-      _boxControllers[index].text = _zwsp;
-      _boxControllers[index].selection =
-          const TextSelection.collapsed(offset: 1);
-      return;
-    }
-    final digit = cleanDigits[cleanDigits.length - 1];
-    _boxControllers[index].text = digit;
-    _boxControllers[index].selection = const TextSelection.collapsed(offset: 1);
-    _boxFilled[index] = true;
+    _boxControllers[index].text = digits[0];
+    _boxControllers[index].selection =
+        const TextSelection.collapsed(offset: 1);
 
-    // Avança foco se não for a última.
     if (index < _otpLength - 1) {
       _boxFocuses[index + 1].requestFocus();
     } else {
       _boxFocuses[index].unfocus();
     }
 
-    if (_errorMessage != null) {
-      setState(() => _errorMessage = null);
-    } else {
-      setState(() {});
-    }
+    setState(() => _errorMessage = null);
 
-    // Se completou, dispara verificação automaticamente.
     if (_isOtpComplete && !_isLoading) {
       _handleVerify();
     }
@@ -618,11 +561,9 @@ class _WhatsAppOtpScreenState extends State<WhatsAppOtpScreen>
                 focusNode: _boxFocuses[index],
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.center,
-                // Autofill hint só na primeira caixa — quando iOS preenche, o
-                // _onBoxChanged detecta vários dígitos e distribui entre as outras.
                 autofillHints:
                     index == 0 ? const [AutofillHints.oneTimeCode] : null,
-                maxLength: 2, // ZWSP + dígito; permite paste maior.
+                maxLength: 1,
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
