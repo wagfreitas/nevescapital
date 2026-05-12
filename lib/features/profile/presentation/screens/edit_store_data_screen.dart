@@ -182,7 +182,9 @@ class _EditStoreDataScreenState extends State<EditStoreDataScreen> {
         ),
       ),
     );
-    if (selected != null && mounted) {
+    if (!mounted) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (selected != null) {
       setState(() {
         _selectedBusinessType = selected;
         _ramoController.text = _getSelectedRamoLabel() ?? '';

@@ -79,3 +79,17 @@ android/key.properties
 *.jks
 *.keystore
 upload-keystore.jks
+
+# Scripts de desenvolvimento (não versionados)
+*.sh
+!ios/Flutter/flutter_export_environment.sh
+scripts/
+
+# Dependências Node (raiz) — nunca versionar
+node_modules/
+
+# Agent-OS standards (gerados por ferramentas de IA)
+agent-os/
+
+# Docs gerados / temporários
+docs/

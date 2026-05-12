@@ -7,9 +7,11 @@ import { EmailSenderService } from './email-sender.service';
 import { SimpleOtpService } from './services/simple-otp.service';
 import { WhatsAppService } from './services/whatsapp.service';
 import { SmsService } from './services/sms.service';
+import { VerifyService } from './services/verify.service';
 import { UsersService } from '../users/users.service';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SendPhoneOtpDto, VerifyPhoneOtpDto, CheckUserStatusDto } from './dto/send-phone-otp.dto';
+import { SendVerifyOtpDto, CheckVerifyOtpDto } from './dto/verify-otp.dto';
 
 @ApiTags('Auth')
 @Controller('api/auth')
@@ -21,6 +23,7 @@ export class AuthController {
     private readonly simpleOtpService: SimpleOtpService,
     private readonly whatsAppService: WhatsAppService,
     private readonly smsService: SmsService,
+    private readonly verifyService: VerifyService,
     private readonly usersService: UsersService,
     private readonly authJwt: AuthJwtService,
   ) { }
@@ -175,6 +178,51 @@ export class AuthController {
     return {
       success: true,
       message: 'Codigo de verificacao enviado via SMS',
+    };
+  }
+
+  @Post('send-otp-verify')
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @ApiOperation({
+    summary: 'Enviar OTP via Twilio Verify Service',
+    description: 'Envia codigo de verificacao usando Twilio Verify API v2. Suporta canais SMS e WhatsApp.',
+  })
+  @ApiResponse({ status: 200, description: 'Codigo de verificacao enviado com sucesso' })
+  @ApiResponse({ status: 400, description: 'Telefone invalido ou falha no envio' })
+  async sendOtpVerify(@Body() body: SendVerifyOtpDto) {
+    const channel = body.channel ?? 'sms';
+    const result = await this.verifyService.sendVerification(body.phone, channel);
+
+    if (!result.success) {
+      throw new BadRequestException(result.message);
+    }
+
+    return {
+      success: true,
+      message: result.message,
+      status: result.status,
+    };
+  }
+
+  @Post('check-otp-verify')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({
+    summary: 'Verificar codigo OTP via Twilio Verify Service',
+    description: 'Valida o codigo OTP enviado pelo usuario usando Twilio Verify API v2.',
+  })
+  @ApiResponse({ status: 200, description: 'Codigo verificado com sucesso' })
+  @ApiResponse({ status: 400, description: 'Codigo invalido, expirado ou telefone invalido' })
+  async checkOtpVerify(@Body() body: CheckVerifyOtpDto) {
+    const result = await this.verifyService.checkVerification(body.phone, body.code);
+
+    if (!result.success) {
+      throw new BadRequestException(result.message);
+    }
+
+    return {
+      success: true,
+      message: result.message,
+      status: result.status,
     };
   }
 

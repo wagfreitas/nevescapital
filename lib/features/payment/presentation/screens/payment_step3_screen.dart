@@ -165,7 +165,9 @@ class _PaymentStep3ScreenState extends State<PaymentStep3Screen> {
         builder: (context) => const _BankSearchScreen(),
       ),
     );
-    if (selected != null && mounted) {
+    if (!mounted) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (selected != null) {
       setState(() {
         _selectedBank = selected;
         _bankController.text = selected.displayName;
