@@ -333,6 +333,102 @@ class AuthApiService {
     }
   }
 
+  /// Envia OTP via Twilio Verify Service (suporta canais 'sms' e 'whatsapp').
+  /// O [phone] deve conter apenas dígitos, com código do país (ex: 5511999999999).
+  static Future<Map<String, dynamic>> sendVerifyOtp(
+      String phone, String channel) async {
+    final url = Uri.parse('$_baseUrl/api/auth/send-otp-verify');
+
+    try {
+      AppLogger.info(
+          '[API] Enviando OTP via Verify ($channel) para: ${phone.substring(0, 4)}***');
+
+      final response = await http
+          .post(
+        url,
+        headers: _headers,
+        body: jsonEncode({'phone': phone, 'channel': channel}),
+      )
+          .timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw Exception('Timeout na requisição');
+        },
+      );
+
+      AppLogger.debug('[API] Response status: ${response.statusCode}');
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Código enviado',
+          'status': data['status'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message':
+              _parseApiErrorMessage(data) ?? 'Erro ao enviar código',
+        };
+      }
+    } catch (e) {
+      AppLogger.error('[API] Erro em sendVerifyOtp: $e');
+      return {
+        'success': false,
+        'message': 'Erro de conexão. Tente novamente.',
+      };
+    }
+  }
+
+  /// Verifica código OTP via Twilio Verify Service.
+  /// O [phone] deve conter apenas dígitos, com código do país.
+  static Future<Map<String, dynamic>> checkVerifyOtp(
+      String phone, String code) async {
+    final url = Uri.parse('$_baseUrl/api/auth/check-otp-verify');
+
+    try {
+      AppLogger.info('[API] Verificando OTP via Verify...');
+
+      final response = await http
+          .post(
+        url,
+        headers: _headers,
+        body: jsonEncode({'phone': phone, 'code': code}),
+      )
+          .timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw Exception('Timeout na requisição');
+        },
+      );
+
+      AppLogger.debug('[API] Response status: ${response.statusCode}');
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Código verificado',
+          'status': data['status'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Código inválido',
+        };
+      }
+    } catch (e) {
+      AppLogger.error('[API] Erro em checkVerifyOtp: $e');
+      return {
+        'success': false,
+        'message': 'Erro de conexão. Tente novamente.',
+      };
+    }
+  }
+
   /// Verifica OTP e faz login em uma única chamada
   /// Retorna: { success, status (LOGGED_IN/REGISTER), customToken?, userId?, phone? }
   static Future<Map<String, dynamic>> verifyOtpLogin(
