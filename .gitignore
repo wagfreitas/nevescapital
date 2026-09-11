@@ -93,3 +93,10 @@ agent-os/
 
 # Docs gerados / temporários
 docs/
+
+# Chaves privadas — nunca versionar
+chave/
+*.p8
+*.p12
+*.jks
+*.keystore
